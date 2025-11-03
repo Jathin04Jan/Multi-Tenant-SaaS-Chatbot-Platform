@@ -8,7 +8,7 @@ import { motion } from 'framer-motion';
 
 const Brand = () => {
   const navigate = useNavigate();
-  const completeStep = useWizardStore((state) => state.completeStep);
+  const { completeStep } = useWizardStore();
 
   const handleComplete = () => {
     completeStep(1);

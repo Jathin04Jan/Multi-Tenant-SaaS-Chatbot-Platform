@@ -16,6 +16,13 @@ const styleOptions = [
   { value: 'casual', label: 'Casual', description: 'Relaxed and conversational' },
 ] as const;
 
+// Helper to get tone label based on value
+const getToneLabel = (tone: number): string => {
+  if (tone <= 0.3) return 'Formal';
+  if (tone >= 0.7) return 'Casual';
+  return 'Balanced';
+};
+
 export const PersonaForm = ({ onComplete }: PersonaFormProps) => {
   const { persona, updatePersona } = useWizardStore();
 
@@ -58,14 +65,14 @@ export const PersonaForm = ({ onComplete }: PersonaFormProps) => {
 
       <div>
         <label className="text-sm font-medium block mb-3">
-          Tone: {tone}% Casual
+          Tone: {getToneLabel(tone)} ({tone.toFixed(1)})
         </label>
         <Slider
           value={[tone]}
           onValueChange={(values) => setValue('tone', values[0], { shouldValidate: true })}
           min={0}
-          max={100}
-          step={5}
+          max={1}
+          step={0.1}
           className="py-4"
         />
         <div className="flex justify-between text-xs text-muted-foreground mt-2">

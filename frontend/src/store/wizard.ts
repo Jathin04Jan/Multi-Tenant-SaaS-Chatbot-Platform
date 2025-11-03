@@ -9,7 +9,7 @@ export interface BrandConfig {
 
 export interface PersonaConfig {
   botName: string;
-  tone: number; // 0-100
+  tone: number; // 0-1
   style: 'professional' | 'friendly' | 'casual';
 }
 
@@ -89,7 +89,7 @@ const initialState = {
   },
   persona: {
     botName: 'Assistant',
-    tone: 50,
+    tone: 0.5,
     style: 'friendly' as const,
   },
   dataSources: [],

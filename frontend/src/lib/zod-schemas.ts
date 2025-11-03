@@ -35,7 +35,7 @@ export const personaSchema = z.object({
     .trim()
     .min(1, { message: 'Bot name required' })
     .max(50, { message: 'Must be less than 50 characters' }),
-  tone: z.number().min(0).max(100),
+  tone: z.number().min(0).max(1),
   style: z.enum(['professional', 'friendly', 'casual']),
 });
 

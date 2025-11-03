@@ -100,7 +100,7 @@ const Data = () => {
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
               <Upload className="w-5 h-5 text-primary" />
             </div>
-            <h2 className="text-xl font-semibold">Upload Documents</h2>
+            <h2 className="text-xl font-semibold">Manage Documents</h2>
           </div>
 
           <label className="glass-card p-8 border-2 border-dashed cursor-pointer hover:border-primary transition-colors flex flex-col items-center justify-center min-h-[200px]">

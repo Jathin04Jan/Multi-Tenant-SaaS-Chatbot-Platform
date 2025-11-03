@@ -20,7 +20,7 @@ const quickActions = [
     icon: ArrowRight,
   },
   {
-    title: 'Upload Documents',
+    title: 'Manage Documents',
     description: 'Add more training data',
     href: '/dashboard/onboarding/data',
     icon: FileText,

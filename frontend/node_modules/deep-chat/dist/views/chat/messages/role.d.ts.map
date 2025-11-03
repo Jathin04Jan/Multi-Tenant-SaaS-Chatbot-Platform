@@ -1,0 +1,1 @@
+{"version":3,"file":"role.d.ts","sourceRoot":"","sources":["../../../../src/views/chat/messages/role.ts"],"names":[],"mappings":"AAEA,qBAAa,IAAI;IACf,SAAS,CAAC,SAAS,EAAE,MAAM,CAAC;gBAEhB,SAAS,EAAE,MAAM;IAItB,kBAAkB,CAAC,cAAc,EAAE,WAAW,GACgB,WAAW;IAGzE,OAAO,CAAC,cAAc,EAAE,WAAW;IAInC,SAAS,CAAC,cAAc,EAAE,WAAW;IAIrC,UAAU,CAAC,cAAc,EAAE,WAAW;CAG9C"}

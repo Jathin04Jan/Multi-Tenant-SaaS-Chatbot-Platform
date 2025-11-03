@@ -1,0 +1,40 @@
+import { DropupMenuStyles } from '../../../../../types/dropupStyles';
+import { DeepChat } from '../../../../../deepChat';
+import { InputButton } from '../inputButton';
+import { Buttons } from '../../input';
+import { DefinedButtonStateStyles } from '../../../../../types/buttonInternal';
+import { CustomButton as CustomButtonT, CustomDropupItemStyles, CustomButtonStyles } from '../../../../../types/customButton';
+type Styles = DefinedButtonStateStyles<CustomButtonStyles>;
+export type CustomButtonDropupStyles = Pick<CustomDropupItemStyles, 'default' | 'active' | 'disabled'>;
+export declare class CustomButton extends InputButton<Styles> {
+    static readonly INDICATOR_PREFIX = "custom";
+    static readonly BUTTON_CLASS = "custom-button";
+    static readonly DISABLED_CONTAINER_CLASS = "custom-button-container-disabled";
+    private static readonly DEFAULT_CONTAINER_CLASS;
+    private static readonly ACTIVE_CONTAINER_CLASS;
+    private readonly _innerElements;
+    private _originalElementRef;
+    private _state;
+    private readonly _onClick;
+    private readonly _dropupStyles?;
+    private readonly _menuStyles?;
+    isCustom: boolean;
+    constructor(customButton: CustomButtonT, index: number, focusInput?: () => void, menuStyles?: DropupMenuStyles);
+    private static createButtonElement;
+    private createInnerElementsForStates;
+    private setSetState;
+    private addClickListener;
+    private changeState;
+    private applyDropupContentStyles;
+    private resetDropupItem;
+    private assignDropupItemStyle;
+    private changeToDefault;
+    private changeToActive;
+    private changeToDisabled;
+    setDropupItem(dropupItem: HTMLElement): void;
+    private genStateInnerElements;
+    private static addToInnerElements;
+    static add(deepChat: DeepChat, buttons: Buttons): void;
+}
+export {};
+//# sourceMappingURL=customButton.d.ts.map

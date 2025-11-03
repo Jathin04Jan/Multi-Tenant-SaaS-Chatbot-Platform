@@ -1,0 +1,12 @@
+import { MessageFiles } from './messageFile';
+export interface Response {
+    text?: string;
+    files?: MessageFiles;
+    html?: string;
+    error?: string;
+    role?: string;
+    overwrite?: boolean;
+    custom?: any;
+    _sessionId?: string;
+}
+//# sourceMappingURL=response.d.ts.map

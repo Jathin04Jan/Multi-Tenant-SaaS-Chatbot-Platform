@@ -1,0 +1,77 @@
+{
+  "name": "deep-chat",
+  "version": "2.3.0",
+  "description": "Customizable chat component for AI APIs",
+  "main": "./dist/deepChat.js",
+  "module": "./dist/deepChat.js",
+  "type": "module",
+  "scripts": {
+    "start": "vite",
+    "build": "vite build",
+    "build:watch": "vite build --watch",
+    "build:bundle": "npm run lint && tsc && vite build && npm run analyze && rollup -c && npm run build:babel",
+    "analyze": "cem analyze --globs \"src/**/*.ts\"",
+    "lint": "eslint --parser-options '{'project':'./tsconfig.json'}' 'src/**/*.ts'",
+    "build:babel": "npm run build:temp && npm run transpile && rimraf dist/deepChatTemp.js",
+    "build:temp": "cp dist/deepChat.js dist/deepChatTemp.js && rimraf dist/deepChat.js",
+    "transpile": "babel dist/deepChatTemp.js --out-file dist/deepChat.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OvidijusParsiunas/deep-chat.git"
+  },
+  "author": "OvidijusParsiunas",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/OvidijusParsiunas/deep-chat/issues"
+  },
+  "homepage": "https://deepchat.dev",
+  "keywords": [
+    "ai",
+    "chat",
+    "bot",
+    "chatbot",
+    "assistant",
+    "openai",
+    "chatgpt",
+    "react",
+    "vue",
+    "angular",
+    "solid",
+    "svelte",
+    "next",
+    "component"
+  ],
+  "devDependencies": {
+    "@babel/cli": "^7.23.9",
+    "@babel/core": "^7.24.0",
+    "@babel/preset-env": "^7.24.0",
+    "@custom-elements-manifest/analyzer": "^0.9.3",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "@rollup/plugin-replace": "^6.0.2",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@types/dom-speech-recognition": "^0.0.4",
+    "@typescript-eslint/eslint-plugin": "^8.25.0",
+    "@typescript-eslint/parser": "^8.25.0",
+    "eslint": "^8.57.1",
+    "highlight.js": "^11.9.0",
+    "prettier": "^3.2.5",
+    "rimraf": "^5.0.5",
+    "rollup": "^4.34.8",
+    "rollup-plugin-summary": "^3.0.0",
+    "typescript": "^5.7.2",
+    "vite": "^6.2.0",
+    "vite-plugin-dts": "^4.5.3"
+  },
+  "customElements": "custom-elements.json",
+  "files": [
+    "dist/**/*",
+    "assets/**/*",
+    "custom-elements.json"
+  ],
+  "dependencies": {
+    "@microsoft/fetch-event-source": "^2.0.1",
+    "remarkable": "^2.0.1",
+    "speech-to-element": "^1.0.4"
+  }
+}

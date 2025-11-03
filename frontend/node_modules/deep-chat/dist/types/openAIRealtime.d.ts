@@ -1,0 +1,80 @@
+import { SpeechToSpeechEvents } from './speechToSpeechEvents';
+import { ButtonStyles } from './button';
+import { CustomStyle } from './styles';
+export type OpenAIRealtimeFunctionHandler = (details: {
+    name: string;
+    arguments: string;
+}) => object | Promise<object>;
+export type OpenAIRealtimeInputAudioTranscription = {
+    model?: string;
+    language?: string;
+    prompt?: string;
+};
+export type OpenAIRealtimeConfig = {
+    model?: string;
+    instructions?: string;
+    voice?: string;
+    temperature?: number;
+    max_response_output_tokens?: number | 'inf';
+    turn_detection?: {
+        type?: string;
+        threshold?: number;
+        prefix_padding_ms?: number;
+        silence_duration_ms?: number;
+    };
+    input_audio_transcription?: true | OpenAIRealtimeInputAudioTranscription;
+    tools?: {
+        type: 'function' | 'code_interpreter' | 'file_search';
+        name?: string;
+        description?: string;
+        parameters?: object;
+    }[];
+    tool_choice?: string;
+    function_handler?: OpenAIRealtimeFunctionHandler;
+};
+export type OpenAIRealtimeMethods = {
+    updateConfig?: (config: OpenAIRealtimeConfig) => void;
+    sendMessage?: (text: string, role?: 'user' | 'assistant' | 'system') => void;
+};
+export type OpenAIRealtimeLoading = {
+    text?: string;
+    html?: string;
+    display?: boolean;
+    style?: CustomStyle;
+};
+export type OpenAIRealtimeError = {
+    text?: string;
+    style?: CustomStyle;
+};
+export type OpenAIRealtimeButton = {
+    default?: ButtonStyles;
+    active?: ButtonStyles;
+    unavailable?: ButtonStyles;
+};
+export type OpenAIRealtimeButtons = {
+    container?: CustomStyle;
+    microphone?: OpenAIRealtimeButton;
+    toggle?: OpenAIRealtimeButton;
+};
+export type OpenAIRealtimeAvatar = {
+    src?: string;
+    maxScale?: number;
+    styles?: {
+        container?: CustomStyle;
+        image?: CustomStyle;
+    };
+};
+export type OpenAIRealtime = {
+    ephemeralKey?: string;
+    fetchEphemeralKey?: () => string | Promise<string>;
+    autoFetchEphemeralKey?: boolean;
+    autoStart?: boolean;
+    avatar?: OpenAIRealtimeAvatar;
+    buttons?: OpenAIRealtimeButtons;
+    config?: OpenAIRealtimeConfig;
+    methods?: OpenAIRealtimeMethods;
+    events?: SpeechToSpeechEvents;
+    loading?: OpenAIRealtimeLoading;
+    error?: OpenAIRealtimeError;
+};
+//# sourceMappingURL=openAIRealtime.d.ts.map

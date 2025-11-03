@@ -1,0 +1,52 @@
+import { FileAttachments } from '../../fileAttachments/fileAttachments';
+import { SubmitButtonStyles } from '../../../../../types/submitButton';
+import { UserContentI } from '../../../../../types/messagesInternal';
+import { ServiceIO } from '../../../../../services/serviceIO';
+import { UserContent } from '../../../../../types/messages';
+import { TextInputEl } from '../../textInput/textInput';
+import { Messages } from '../../../messages/messages';
+import { DeepChat } from '../../../../../deepChat';
+import { InputButton } from '../inputButton';
+import { Buttons } from '../../input';
+import { DefinedButtonStateStyles } from '../../../../../types/buttonInternal';
+type Styles = Omit<DefinedButtonStateStyles<SubmitButtonStyles>, 'alwaysEnabled' | 'tooltip'>;
+export declare class SubmitButton extends InputButton<Styles> {
+    private readonly _serviceIO;
+    private readonly _messages;
+    private readonly _textInput;
+    private readonly _stopClicked;
+    private readonly _innerElements;
+    private readonly _fileAttachments;
+    private readonly _alwaysEnabled;
+    private _microphoneButton?;
+    private _stopSTTAfterSubmit?;
+    private _isSVGLoadingIconOverriden;
+    private _validationHandler?;
+    readonly status: {
+        requestInProgress: boolean;
+        loadingActive: boolean;
+    };
+    constructor(deepChat: DeepChat, textInput: TextInputEl, messages: Messages, serviceIO: ServiceIO, fileAttachments: FileAttachments, buttons: Buttons);
+    private createInnerElementsForStates;
+    private createCustomElements;
+    private static createButtonContainerElement;
+    private static createLoadingIconElement;
+    private static createStopIconElement;
+    private createDisabledIconElement;
+    private attemptOverwriteLoadingStyle;
+    private assignHandlers;
+    private setUpSpeechToText;
+    private resetSubmit;
+    submitFromInput(): Promise<void>;
+    programmaticSubmit(content: UserContent): Promise<void>;
+    attemptSubmit(content: UserContentI, isProgrammatic?: boolean): Promise<void>;
+    private addNewMessage;
+    private stopStream;
+    private changeToStopIcon;
+    private changeToLoadingIcon;
+    changeToSubmitIcon(): void;
+    changeToDisabledIcon(isProgrammatic?: boolean): void;
+    private disableSubmitButton;
+}
+export {};
+//# sourceMappingURL=submitButton.d.ts.map

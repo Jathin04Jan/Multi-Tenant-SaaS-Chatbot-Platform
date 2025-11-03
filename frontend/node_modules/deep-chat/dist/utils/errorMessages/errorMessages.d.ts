@@ -1,0 +1,20 @@
+declare function getInvalidResponseMessage(result: object, messageType: string, isInterceptor: boolean, postInterceptor?: object): string;
+declare function getModelResponseMessage(result: object, isInterceptor: boolean, postInterceptor?: object): string;
+declare function getModelRequestMessage(result: object, isInterceptor: boolean): string;
+export declare const INVALID_RESPONSE: typeof getInvalidResponseMessage;
+export declare const INVALID_MODEL_REQUEST: typeof getModelRequestMessage;
+export declare const INVALID_MODEL_RESPONSE: typeof getModelResponseMessage;
+export declare const INVALID_KEY = "Invalid API Key";
+export declare const CONNECTION_FAILED = "Failed to connect";
+export declare const REQUEST_SETTINGS_ERROR = "Request settings have not been set up";
+export declare const NO_FILE_ADDED_ERROR = "No file was added";
+export declare const IMAGE_NOT_FOUND_ERROR = "Image was not found";
+export declare const INVALID_STREAM_ARRAY_RESPONSE = "Multi-response arrays are not supported for streaming";
+export declare const INVALID_STREAM_EVENT: string;
+export declare const INVALID_STREAM_EVENT_MIX = "Cannot mix {text: string} and {html: string} responses.";
+export declare const NO_VALID_STREAM_EVENTS_SENT = "No valid stream events were sent.\nMake sure the events are using {text: string} or {html: string} format.\nYou can also augment them using the responseInterceptor property: https://deepchat.dev/docs/interceptors#responseInterceptor";
+export declare const READABLE_STREAM_CONNECTION_ERROR = "Readable Stream connection error.";
+export declare const DEFINE_FUNCTION_HANDLER = "Please define a `function_handler` property inside the service config.";
+export declare const FUNCTION_TOOL_RESPONSE_STRUCTURE_ERROR = "Function tool response must be an array or contain a text property";
+export {};
+//# sourceMappingURL=errorMessages.d.ts.map

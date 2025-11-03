@@ -1,0 +1,16 @@
+export declare const SUBMIT_CLASS = "submit-button";
+export declare const LOADING_CLASS = "loading-button";
+export declare const DISABLED_CLASS = "disabled-button";
+export declare const INPUT_OUTSIDE_LEFT_ADJUSTMENT_CLASS = "text-input-container-left-adjustment";
+export declare const INPUT_OUTSIDE_RIGHT_ADJUSTMENT_CLASS = "text-input-container-right-adjustment";
+export declare const INPUT_OUTSIDE_LEFT_SMALL_ADJUSTMENT_CLASS = "text-input-container-left-small-adjustment";
+export declare const INPUT_OUTSIDE_RIGHT_SMALL_ADJUSTMENT_CLASS = "text-input-container-right-small-adjustment";
+export declare const INSIDE_LEFT = "inside-left";
+export declare const INSIDE_RIGHT = "inside-right";
+export declare const OUTSIDE_LEFT = "outside-left";
+export declare const OUTSIDE_RIGHT = "outside-right";
+export declare const DROPUP_MENU = "dropup-menu";
+export declare const DEFAULT = "default";
+export declare const HOVER = "hover";
+export declare const CLICK = "click";
+//# sourceMappingURL=inputConstants.d.ts.map

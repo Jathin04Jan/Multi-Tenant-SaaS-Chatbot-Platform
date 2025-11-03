@@ -1,0 +1,44 @@
+import { HuggingFace } from './huggingFace';
+import { StabilityAI } from './stabilityAI';
+import { AssemblyAI } from './assemblyAI';
+import { OpenRouter } from './openRouter';
+import { Perplexity } from './perplexity';
+import { DeepSeek } from './deepSeek';
+import { Together } from './together';
+import { BigModel } from './bigModel';
+import { Mistral } from './mistral';
+import { MiniMax } from './miniMax';
+import { APIKey } from './APIKey';
+import { Cohere } from './cohere';
+import { Gemini } from './gemini';
+import { OpenAI } from './openAI';
+import { Claude } from './claude';
+import { Ollama } from './ollama';
+import { Azure } from './azure';
+import { Groq } from './groq';
+import { Kimi } from './kimi';
+import { Qwen } from './qwen';
+import { X } from './x';
+export interface DirectConnection {
+    openAI?: OpenAI & APIKey;
+    huggingFace?: HuggingFace & APIKey;
+    mistral?: Mistral & APIKey;
+    stabilityAI?: StabilityAI & APIKey;
+    cohere?: Cohere & APIKey;
+    gemini?: Gemini & APIKey;
+    azure?: Azure & APIKey;
+    assemblyAI?: AssemblyAI & APIKey;
+    claude?: Claude & APIKey;
+    deepSeek?: DeepSeek & APIKey;
+    kimi?: Kimi & APIKey;
+    miniMax?: MiniMax & APIKey;
+    openRouter?: OpenRouter & APIKey;
+    x?: X & APIKey;
+    qwen?: Qwen & APIKey;
+    together?: Together & APIKey;
+    bigModel?: BigModel & APIKey;
+    groq?: Groq & APIKey;
+    perplexity?: Perplexity & APIKey;
+    ollama?: Ollama;
+}
+//# sourceMappingURL=directConnection.d.ts.map

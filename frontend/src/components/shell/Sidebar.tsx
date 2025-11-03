@@ -87,6 +87,12 @@ const navigation = [
     href: '/dashboard/settings/billing',
     icon: CreditCard,
   },
+  // [schema-demo:additive]
+  {
+    name: 'Metrics', // [schema-demo:additive]
+    href: '/dashboard/demo', // [schema-demo:additive]
+    icon: LayoutDashboard,
+  },
 ];
 
 export const Sidebar = () => {

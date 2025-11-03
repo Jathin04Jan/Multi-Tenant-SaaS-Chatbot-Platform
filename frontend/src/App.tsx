@@ -22,6 +22,16 @@ import Team from "./pages/dashboard/settings/Team";
 import Billing from "./pages/dashboard/settings/Billing";
 import ApiKeys from "./pages/dashboard/settings/ApiKeys";
 import NotFound from "./pages/NotFound";
+// [schema-demo:additive]
+import DemoLayout from "./pages/demo/DemoLayout";
+import DemoOverview from "./pages/demo/Overview";
+import DemoAgents from "./pages/demo/Agents";
+import DemoKnowledge from "./pages/demo/Knowledge";
+import DemoJobs from "./pages/demo/Jobs";
+import DemoInstall from "./pages/demo/Install";
+import DemoTeam from "./pages/demo/Team";
+import DemoTenant from "./pages/demo/Tenant";
+import DemoBilling from "./pages/demo/Billing";
 
 const queryClient = new QueryClient();
 
@@ -55,10 +65,33 @@ const App = () => (
             <Route path="settings/team" element={<Team />} />
             <Route path="settings/billing" element={<Billing />} />
             <Route path="settings/api-keys" element={<ApiKeys />} />
+
+            {/* [schema-demo:additive] Demo routes also available under dashboard shell */}
+            <Route path="demo" element={<DemoLayout />}>
+              <Route index element={<DemoOverview />} />
+              <Route path="agents" element={<DemoAgents />} />
+              <Route path="knowledge" element={<DemoKnowledge />} />
+              <Route path="jobs" element={<DemoJobs />} />
+              <Route path="install" element={<DemoInstall />} />
+              <Route path="team" element={<DemoTeam />} />
+              <Route path="tenant" element={<DemoTenant />} />
+              <Route path="billing" element={<DemoBilling />} />
+            </Route>
           </Route>
 
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />
+          {/* [schema-demo:additive] Demo routes (client-side only) - standalone access */}
+          <Route path="/demo" element={<DemoLayout />}>
+            <Route index element={<DemoOverview />} />
+            <Route path="agents" element={<DemoAgents />} />
+            <Route path="knowledge" element={<DemoKnowledge />} />
+            <Route path="jobs" element={<DemoJobs />} />
+            <Route path="install" element={<DemoInstall />} />
+            <Route path="team" element={<DemoTeam />} />
+            <Route path="tenant" element={<DemoTenant />} />
+            <Route path="billing" element={<DemoBilling />} />
+          </Route>
         </Routes>
       </BrowserRouter>
     </TooltipProvider>

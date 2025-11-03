@@ -1,7 +1,15 @@
-import { CalendarIcon, Download } from 'lucide-react';
+import { CalendarIcon, Download, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const Analytics = () => {
   // Safari compatibility: ensure animations work
@@ -13,6 +21,19 @@ const Analytics = () => {
       });
     }
   }, []);
+
+  // Date range options (ascending granularity)
+  const ranges = [
+    { id: '10h', label: 'Last 10 hours' },
+    { id: '24h', label: 'Last 24 hours' },
+    { id: '7d', label: 'Last 7 days' },
+    { id: '30d', label: 'Last 30 days' },
+    { id: '3m', label: 'Last 3 months' },
+    { id: '6m', label: 'Last 6 months' },
+    { id: '12m', label: 'Last 12 months' },
+  ] as const;
+
+  const [selectedRange, setSelectedRange] = useState<typeof ranges[number]>(ranges[3]);
 
   return (
     <div className="container max-w-7xl px-4 py-8 space-y-8">
@@ -29,10 +50,28 @@ const Analytics = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="rounded-xl glass">
-            <CalendarIcon className="w-4 h-4 mr-2" />
-            Last 30 days
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="rounded-xl glass">
+                <CalendarIcon className="w-4 h-4 mr-2" />
+                {selectedRange.label}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 glass">
+              <DropdownMenuLabel>Date range</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {ranges.map((r) => (
+                <DropdownMenuItem
+                  key={r.id}
+                  onClick={() => setSelectedRange(r)}
+                  className="justify-between"
+                >
+                  {r.label}
+                  {selectedRange.id === r.id && <Check className="w-4 h-4" />}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="outline" className="rounded-xl glass" disabled>
             <Download className="w-4 h-4 mr-2" />
             Export

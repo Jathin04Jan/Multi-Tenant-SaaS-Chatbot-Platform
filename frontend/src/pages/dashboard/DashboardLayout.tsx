@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { TopNav } from '@/components/shell/TopNav';
 import { Sidebar } from '@/components/shell/Sidebar';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+// [schema-demo:additive] no behavior change here
 
 const DashboardLayout = () => {
   return (

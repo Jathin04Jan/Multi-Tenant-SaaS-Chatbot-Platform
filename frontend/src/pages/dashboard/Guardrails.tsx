@@ -33,7 +33,11 @@ const styleOptions = [
   { value: 'enthusiastic', label: 'Enthusiastic', description: 'Energetic and positive', icon: '✨' },
 ] as const;
 
-const Guardrails = () => {
+interface GuardrailsProps {
+  hidePersona?: boolean;
+}
+
+const Guardrails = ({ hidePersona = false }: GuardrailsProps = {}) => {
   const { persona, updatePersona } = useWizardStore();
 
   type GuardrailFormData = PersonaInput & GuardrailInput & { blockedPhrasesText: string; allowedDomainsText: string; blockedRegexText: string };
@@ -133,75 +137,77 @@ const Guardrails = () => {
       </motion.div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Persona Section */}
-        <Card className="p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <Bot className="w-5 h-5 text-primary" />
-            <h2 className="text-2xl font-semibold">Persona & Tone</h2>
-          </div>
-
-          <div className="space-y-6">
-            <div>
-              <label htmlFor="botName" className="text-sm font-medium block mb-2">
-                Bot Name
-              </label>
-              <Input
-                id="botName"
-                placeholder="Assistant"
-                className="rounded-xl"
-                {...register('botName')}
-              />
-              {errors.botName && (
-                <p className="text-sm text-destructive mt-1">{errors.botName.message}</p>
-              )}
+        {/* Persona Section - Only show if hidePersona is false */}
+        {!hidePersona && (
+          <Card className="p-6">
+            <div className="flex items-center gap-2 mb-6">
+              <Bot className="w-5 h-5 text-primary" />
+              <h2 className="text-2xl font-semibold">Persona & Tone</h2>
             </div>
 
-            <div>
-              <label className="text-sm font-medium block mb-3">
-                Tone: {getToneLabel(tone)} ({tone.toFixed(1)})
-              </label>
-              <Slider
-                value={[tone]}
-                onValueChange={(values) => setValue('tone', values[0], { shouldValidate: true })}
-                min={0}
-                max={1}
-                step={0.1}
-                className="py-4"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                <span>Formal</span>
-                <span>Casual</span>
+            <div className="space-y-6">
+              <div>
+                <label htmlFor="botName" className="text-sm font-medium block mb-2">
+                  Bot Name
+                </label>
+                <Input
+                  id="botName"
+                  placeholder="Assistant"
+                  className="rounded-xl"
+                  {...register('botName')}
+                />
+                {errors.botName && (
+                  <p className="text-sm text-destructive mt-1">{errors.botName.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="text-sm font-medium block mb-3">
+                  Tone: {getToneLabel(tone)} ({tone.toFixed(1)})
+                </label>
+                <Slider
+                  value={[tone]}
+                  onValueChange={(values) => setValue('tone', values[0], { shouldValidate: true })}
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  className="py-4"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                  <span>Formal</span>
+                  <span>Casual</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium block mb-3">Communication Style</label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {styleOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setValue('style', option.value as any, { shouldValidate: true })}
+                      className={`glass-card p-4 text-center transition-all ${
+                        selectedStyle === option.value
+                          ? 'ring-2 ring-primary bg-primary/5'
+                          : 'hover:scale-105'
+                      }`}
+                    >
+                      <div className="text-2xl mb-2">{option.icon}</div>
+                      <div className="font-medium mb-1">{option.label}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {option.description}
+                      </div>
+                      {selectedStyle === option.value && (
+                        <Badge className="mt-2" variant="default">Selected</Badge>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-
-            <div>
-              <label className="text-sm font-medium block mb-3">Communication Style</label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {styleOptions.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => setValue('style', option.value as any, { shouldValidate: true })}
-                    className={`glass-card p-4 text-center transition-all ${
-                      selectedStyle === option.value
-                        ? 'ring-2 ring-primary bg-primary/5'
-                        : 'hover:scale-105'
-                    }`}
-                  >
-                    <div className="text-2xl mb-2">{option.icon}</div>
-                    <div className="font-medium mb-1">{option.label}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {option.description}
-                    </div>
-                    {selectedStyle === option.value && (
-                      <Badge className="mt-2" variant="default">Selected</Badge>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </Card>
+          </Card>
+        )}
 
         {/* Guardrails Section */}
         <Card className="p-6">

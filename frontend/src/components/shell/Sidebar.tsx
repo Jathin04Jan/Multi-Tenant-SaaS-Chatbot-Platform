@@ -1,70 +1,8 @@
 import { useState } from 'react';
-import { Bot, LayoutDashboard, Wand2, BarChart3, CreditCard } from 'lucide-react';
+import { Bot, LayoutDashboard, BarChart3, CreditCard, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-
-// Custom Sidebar Layout Icon
-const SidebarIcon = ({ isCollapsed }: { isCollapsed: boolean }) => (
-  <svg
-    width="24"
-    height="24"
-    viewBox="0 0 20 20"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className="stroke-current"
-  >
-    <rect
-      x="2"
-      y="2"
-      width="16"
-      height="16"
-      rx="2"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <line
-      x1="7"
-      y1="2"
-      x2="7"
-      y2="18"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-    <line
-      x1="4"
-      y1="6"
-      x2="6"
-      y2="6"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={isCollapsed ? 'opacity-0' : 'opacity-100'}
-    />
-    <line
-      x1="4"
-      y1="9"
-      x2="6"
-      y2="9"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={isCollapsed ? 'opacity-0' : 'opacity-100'}
-    />
-    <line
-      x1="4"
-      y1="12"
-      x2="6"
-      y2="12"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={isCollapsed ? 'opacity-0' : 'opacity-100'}
-    />
-  </svg>
-);
 
 const navigation = [
   {
@@ -73,7 +11,7 @@ const navigation = [
     icon: LayoutDashboard,
   },
   {
-    name: 'Bot Builder',
+    name: 'Bots',
     href: '/dashboard/onboarding',
     icon: Bot,
   },
@@ -88,11 +26,11 @@ const navigation = [
     icon: CreditCard,
   },
   // [schema-demo:additive]
-  {
-    name: 'Metrics', // [schema-demo:additive]
-    href: '/dashboard/demo', // [schema-demo:additive]
-    icon: LayoutDashboard,
-  },
+  // {
+  //   name: 'Metrics', // [schema-demo:additive]
+  //   href: '/dashboard/demo', // [schema-demo:additive]
+  //   icon: LayoutDashboard,
+  // },
 ];
 
 export const Sidebar = () => {
@@ -104,7 +42,7 @@ export const Sidebar = () => {
   };
 
   return (
-    <div className="relative hidden lg:flex">
+    <div className="relative flex">
       {/* Sidebar */}
       <aside
         className={cn(
@@ -112,17 +50,7 @@ export const Sidebar = () => {
           isCollapsed ? 'w-0 border-r-0' : 'w-64'
         )}
       >
-        <div className={cn(
-          'flex items-center gap-3 h-16 px-6 border-b border-border/50 transition-opacity duration-300 whitespace-nowrap',
-          isCollapsed ? 'opacity-0' : 'opacity-100'
-        )}>
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Bot className="w-6 h-6 text-primary" />
-          </div>
-          <span className="font-bold text-xl">YourBot</span>
-        </div>
-
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto pt-6">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href || 
               (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
@@ -145,23 +73,37 @@ export const Sidebar = () => {
             );
           })}
         </nav>
+
+        {/* Toggle Button - inside sidebar at the bottom */}
+        <div className={cn(
+          'border-t border-border/50 p-4 transition-opacity duration-300',
+          isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        )}>
+          <Button
+            onClick={toggleSidebar}
+            variant="outline"
+            size="sm"
+            className="w-full justify-start gap-2 rounded-xl"
+            aria-label="Collapse sidebar"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            <span>Collapse</span>
+          </Button>
+        </div>
       </aside>
 
-      {/* Toggle Button - positioned relative to parent, moves outside when collapsed */}
-      <Button
-        onClick={toggleSidebar}
-        variant="outline"
-        size="default"
-        className={cn(
-          'absolute top-4 z-20 h-12 w-12 rounded-lg border-2 border-white/20 bg-background/90 backdrop-blur-xl hover:bg-muted shadow-lg transition-all duration-300 ease-in-out flex items-center justify-center',
-          isCollapsed 
-            ? 'left-4' 
-            : 'left-[256px] -translate-x-full'
-        )}
-        aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-      >
-        <SidebarIcon isCollapsed={isCollapsed} />
-      </Button>
+      {/* Toggle Button - shows when collapsed */}
+      {isCollapsed && (
+        <Button
+          onClick={toggleSidebar}
+          variant="outline"
+          size="icon"
+          className="absolute left-2 top-4 h-10 w-10 rounded-lg bg-background/90 backdrop-blur-xl hover:bg-muted shadow-lg z-20"
+          aria-label="Expand sidebar"
+        >
+          <ChevronRight className="h-5 w-5" />
+        </Button>
+      )}
     </div>
   );
 };

@@ -19,6 +19,11 @@ export const signInSchema = z.object({
 });
 
 export const brandingSchema = z.object({
+  botName: z
+    .string()
+    .trim()
+    .min(1, { message: 'Assistant name required' })
+    .max(50, { message: 'Must be less than 50 characters' }),
   logo: z.string().optional(),
   primaryColor: z
     .string()
@@ -36,8 +41,6 @@ export const personaSchema = z.object({
     .trim()
     .min(1, { message: 'Bot name required' })
     .max(50, { message: 'Must be less than 50 characters' }),
-  tone: z.number().min(0).max(1),
-  style: z.enum(['professional', 'friendly', 'casual']),
 });
 
 export const crawlSchema = z.object({

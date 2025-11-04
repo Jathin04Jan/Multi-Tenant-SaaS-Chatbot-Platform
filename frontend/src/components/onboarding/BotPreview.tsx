@@ -36,7 +36,7 @@ const getBackgroundGradient = (primaryColor: string) => {
 };
 
 export const BotPreview = () => {
-  const { branding, persona } = useWizardStore();
+  const { branding, persona, tone } = useWizardStore();
 
   // Generate message colors for user bubbles
   const messageColors = useMemo(
@@ -108,8 +108,11 @@ export const BotPreview = () => {
               {persona.botName}
             </div>
             <div className="text-xs" style={{ color: `${branding.primaryColor}CC` }}>
-              {persona.style.charAt(0).toUpperCase() + persona.style.slice(1)} · 
-              Tone {persona.tone.toFixed(1)}
+              {tone?.communicationStyle 
+                ? tone.communicationStyle.charAt(0).toUpperCase() + tone.communicationStyle.slice(1)
+                : 'Friendly'
+              } · 
+              Temperature {tone?.llmTemperature?.toFixed(2) ?? '0.70'}
             </div>
           </div>
         </div>

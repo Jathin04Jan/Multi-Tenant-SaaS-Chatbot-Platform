@@ -16,7 +16,7 @@ interface StepperProps {
 export const Stepper = ({ steps, currentStep }: StepperProps) => {
   return (
     <nav aria-label="Progress" className="w-full overflow-visible">
-      <ol className="flex items-start justify-between w-full gap-2 pb-16">
+      <ol className="flex items-start justify-between w-full gap-4 pb-20">
         {steps.map((step, index) => {
           const isCompleted = step.completed;
           const isCurrent = step.number === currentStep;
@@ -25,7 +25,7 @@ export const Stepper = ({ steps, currentStep }: StepperProps) => {
           return (
             <li
               key={step.number}
-              className={cn('relative flex items-start flex-1', index === steps.length - 1 && 'flex-none')}
+              className="relative flex items-start flex-1 min-w-0"
             >
               <div className="flex items-start w-full">
                 {/* Step Circle */}
@@ -40,7 +40,7 @@ export const Stepper = ({ steps, currentStep }: StepperProps) => {
                       ease: 'easeInOut',
                     }}
                     className={cn(
-                      'relative flex h-12 w-12 items-center justify-center rounded-full border-2 transition-all duration-300 shadow-sm overflow-visible',
+                      'relative flex h-14 w-14 items-center justify-center rounded-full border-2 transition-all duration-300 shadow-sm overflow-visible',
                       isCompleted
                         ? 'bg-primary border-primary text-primary-foreground shadow-lg'
                         : isCurrent
@@ -57,7 +57,7 @@ export const Stepper = ({ steps, currentStep }: StepperProps) => {
                           exit={{ scale: 0, opacity: 0, rotate: 180 }}
                           transition={{ duration: 0.3, ease: 'easeOut' }}
                         >
-                          <Check className="h-6 w-6 text-primary-foreground" strokeWidth={3} />
+                          <Check className="h-7 w-7 text-primary-foreground" strokeWidth={3} />
                         </motion.div>
                       ) : (
                         <motion.span
@@ -67,7 +67,7 @@ export const Stepper = ({ steps, currentStep }: StepperProps) => {
                           exit={{ scale: 0, opacity: 0 }}
                           transition={{ duration: 0.2 }}
                           className={cn(
-                            'text-sm font-bold',
+                            'text-base font-bold',
                             isCurrent ? 'text-primary' : 'text-muted-foreground'
                           )}
                         >
@@ -77,10 +77,10 @@ export const Stepper = ({ steps, currentStep }: StepperProps) => {
                     </AnimatePresence>
                   </motion.div>
                   {/* Step Label */}
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 whitespace-nowrap">
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 whitespace-nowrap">
                     <p
                       className={cn(
-                        'text-xs font-medium hidden sm:block transition-colors duration-300',
+                        'text-sm font-medium hidden sm:block transition-colors duration-300',
                         isCurrent
                           ? 'text-foreground font-semibold'
                           : isCompleted
@@ -95,7 +95,7 @@ export const Stepper = ({ steps, currentStep }: StepperProps) => {
 
                 {/* Connector Line */}
                 {index !== steps.length - 1 && (
-                  <div className="flex-1 mx-2 relative mt-6">
+                  <div className="flex-1 mx-3 relative mt-7">
                     <div className="absolute inset-0 flex items-center">
                       <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
                         <motion.div

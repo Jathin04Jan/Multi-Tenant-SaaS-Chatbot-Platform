@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Upload, Check, Shield } from 'lucide-react';
+import { Upload, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -40,7 +39,6 @@ const colorCombinations = [
 ];
 
 export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
-  const navigate = useNavigate();
   const { branding, updateBranding } = useWizardStore();
   const [selectedColor, setSelectedColor] = useState<string>(
     branding.primaryColor || colorCombinations[0].primary
@@ -74,6 +72,21 @@ export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <div>
+        <label htmlFor="botName" className="text-sm font-medium block mb-2">
+          Assistant Name
+        </label>
+        <Input
+          id="botName"
+          placeholder="Assistant"
+          className="rounded-xl"
+          {...register('botName')}
+        />
+        {errors.botName && (
+          <p className="text-sm text-destructive mt-1">{errors.botName.message}</p>
+        )}
+      </div>
+
       <div>
         <label className="text-sm font-medium block mb-2">Logo (Optional)</label>
         <div className="glass-card p-8 text-center border-2 border-dashed cursor-pointer hover:border-primary transition-colors">
@@ -145,20 +158,9 @@ export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
         )}
       </div>
 
-      <div className="flex flex-col gap-3">
-        <Button 
-          type="button" 
-          variant="outline" 
-          className="w-full rounded-xl gap-2"
-          onClick={() => navigate('/dashboard/guardrails')}
-        >
-          <Shield className="w-4 h-4" />
-          Customize Guardrail
-        </Button>
-        <Button type="submit" disabled={!isValid} className="w-full rounded-xl">
-          Continue
-        </Button>
-      </div>
+      <Button type="submit" disabled={!isValid} className="w-full rounded-xl">
+        Continue
+      </Button>
     </form>
   );
 };

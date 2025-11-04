@@ -1,8 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { BrandingForm } from '@/components/onboarding/BrandingForm';
-import { PersonaForm } from '@/components/onboarding/PersonaForm';
 import { BotPreview } from '@/components/onboarding/BotPreview';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useWizardStore } from '@/store/wizard';
 import { motion } from 'framer-motion';
 
@@ -36,18 +34,7 @@ const Brand = () => {
           transition={{ duration: 0.4, delay: 0.1 }}
           className="glass-card p-8"
         >
-          <Tabs defaultValue="branding" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="branding">Branding</TabsTrigger>
-              <TabsTrigger value="persona">Persona</TabsTrigger>
-            </TabsList>
-            <TabsContent value="branding">
-              <BrandingForm onComplete={handleComplete} />
-            </TabsContent>
-            <TabsContent value="persona">
-              <PersonaForm onComplete={handleComplete} />
-            </TabsContent>
-          </Tabs>
+          <BrandingForm onComplete={handleComplete} />
         </motion.div>
 
         <motion.div

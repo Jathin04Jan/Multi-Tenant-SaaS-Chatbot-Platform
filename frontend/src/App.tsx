@@ -21,6 +21,7 @@ import Profile from "./pages/dashboard/settings/Profile";
 import Team from "./pages/dashboard/settings/Team";
 import Billing from "./pages/dashboard/settings/Billing";
 import ApiKeys from "./pages/dashboard/settings/ApiKeys";
+import Guardrails from "./pages/dashboard/Guardrails";
 import NotFound from "./pages/NotFound";
 // [schema-demo:additive]
 import DemoLayout from "./pages/demo/DemoLayout";
@@ -51,6 +52,7 @@ const App = () => (
           <Route path="/dashboard" element={<DashboardLayout />}>
             <Route index element={<Overview />} />
             <Route path="analytics" element={<Analytics />} />
+            <Route path="guardrails" element={<Guardrails />} />
             
             {/* Onboarding */}
             <Route path="onboarding" element={<Onboarding />} />

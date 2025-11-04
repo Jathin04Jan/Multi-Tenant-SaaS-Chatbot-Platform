@@ -53,6 +53,7 @@ export interface Agent {
   llm_config: AgentConfig;
   retrieval_config: RetrievalConfig;
   guardrails: GuardrailsConfig;
+  created_at: string;
   updated_at: string;
 }
 
@@ -106,6 +107,23 @@ export interface Subscription {
   end_date?: string;
   usage_metrics: UsageMetrics;
   billing_id?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  user_id: string;
+  agent_id: string;
+  role: 'user' | 'bot';
+  content: string;
+  created_at: string;
+}
+
+export interface User {
+  id: string;
+  tenant_id: string;
+  agent_id: string; // The chatbot this user is chatting with (one chatbot per user)
+  first_chat_at: string; // When user started chatting
+  chat_history: ChatMessage[];
 }
 
 

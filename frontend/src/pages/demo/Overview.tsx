@@ -4,15 +4,15 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useDemoSession } from '@/demo/DemoSession';
-import { mockAgents, mockIngestionJobs, mockSubscriptions, mockEngagementByRange, mockProductEnquiries, mockMostAskedQuestions, mockChatHistory } from '@/demo/mocks';
+import { mockAgents, mockIngestionJobs, mockSubscriptions, mockProductEnquiries, mockMostAskedQuestions, mockChatHistory, mockUsers } from '@/demo/mocks';
 
 const DemoOverview = () => {
   const { role, tenantId } = useDemoSession();
   const sub = useMemo(() => mockSubscriptions.find(s => s.tenant_id === tenantId), [tenantId]);
   const jobs = useMemo(() => mockIngestionJobs.filter(j => j.tenant_id === tenantId).slice(0, 5), [tenantId]);
-  const agentsCount = useMemo(() => mockAgents.filter(a => a.tenant_id === tenantId).length, [tenantId]);
 
   // [schema-demo:additive] Show realistic 3-digit counts without altering underlying mocks.
   const seeded = useMemo(() => {
@@ -24,11 +24,15 @@ const DemoOverview = () => {
   const displayedAgents = useMemo(() => 100 + (seeded % 900), [seeded]); // 100-999
 
   const [range, setRange] = useState<'24h' | '7d' | '30d' | '3m' | '6m'>('30d');
+  const [expandedUsers, setExpandedUsers] = useState(false);
+  const [expandedChatbots, setExpandedChatbots] = useState(false);
   // Each chatbot serves one user (customer). For demo visuals, show 3-digit numbers consistently.
   const engaged = displayedAgents;
   const products = mockProductEnquiries[tenantId] ?? [];
   const faqs = mockMostAskedQuestions[tenantId] ?? [];
   const chats = useMemo(() => mockChatHistory.filter(c => c.tenant_id === tenantId).slice(-6), [tenantId]);
+  const tenantUsers = useMemo(() => mockUsers.filter(u => u.tenant_id === tenantId), [tenantId]);
+  const tenantAgents = useMemo(() => mockAgents.filter(a => a.tenant_id === tenantId), [tenantId]);
 
   return (
     <div className="container max-w-7xl px-2 md:px-4 py-4 space-y-4">
@@ -52,18 +56,78 @@ const DemoOverview = () => {
 
       <div className="grid md:grid-cols-3 gap-4">
         <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Deployed Chatbots</div>
-          <div className="text-2xl font-bold">{displayedAgents}</div>
+          <div 
+            className="flex items-center justify-between cursor-pointer hover:bg-muted/50 rounded-lg p-2 -m-2 transition-colors"
+            onClick={() => setExpandedChatbots(!expandedChatbots)}
+          >
+            <div>
+              <div className="text-sm text-muted-foreground">Deployed Chatbots</div>
+              <div className="text-2xl font-bold">{displayedAgents}</div>
+            </div>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+              {expandedChatbots ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </div>
+          {expandedChatbots && (
+            <div className="mt-4 pt-4 border-t space-y-4 max-h-[600px] overflow-auto">
+              {tenantAgents.length > 0 ? tenantAgents.map(agent => (
+                <Card key={agent.id} className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="font-semibold text-lg mb-2">
+                        Chatbot ID: <span className="font-mono text-sm">{agent.id}</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground mb-1">
+                        Name: <span className="font-medium text-foreground">{agent.name}</span>
+                      </div>
+                      {agent.description && (
+                        <div className="text-sm text-muted-foreground mb-1">
+                          {agent.description}
+                        </div>
+                      )}
+                      <div className="text-sm text-muted-foreground mt-2">
+                        Created: <span className="font-medium">{new Date(agent.created_at).toLocaleString()}</span>
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Last Updated: <span className="font-medium">{new Date(agent.updated_at).toLocaleString()}</span>
+                      </div>
+                    </div>
+                    <div className="ml-4">
+                      <Badge 
+                        variant="outline" 
+                        className="text-xs"
+                        style={{ borderColor: agent.branding.themeColor, color: agent.branding.themeColor }}
+                      >
+                        Active
+                      </Badge>
+                    </div>
+                  </div>
+                </Card>
+              )) : (
+                <div className="text-sm text-muted-foreground text-center py-8">No chatbots found for this tenant.</div>
+              )}
+            </div>
+          )}
         </Card>
         <Card className="p-4">
           <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm text-muted-foreground">Users Engaged</div>
-              <div className="text-2xl font-bold">{engaged.toLocaleString()}</div>
+            <div 
+              className="flex-1 cursor-pointer hover:bg-muted/50 rounded-lg p-2 -m-2 transition-colors"
+              onClick={() => setExpandedUsers(!expandedUsers)}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-muted-foreground">Users Engaged</div>
+                  <div className="text-2xl font-bold">{engaged.toLocaleString()}</div>
+                </div>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  {expandedUsers ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </div>
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="rounded-xl glass text-xs">{range}</Button>
+                <Button variant="outline" className="rounded-xl glass text-xs" onClick={(e) => e.stopPropagation()}>{range}</Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40 glass">
                 <DropdownMenuLabel>Range</DropdownMenuLabel>
@@ -74,6 +138,49 @@ const DemoOverview = () => {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          {expandedUsers && (
+            <div className="mt-4 pt-4 border-t space-y-4 max-h-[600px] overflow-auto">
+              {tenantUsers.length > 0 ? tenantUsers.map(user => {
+                const agent = mockAgents.find(a => a.id === user.agent_id);
+                return (
+                  <Card key={user.id} className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <div className="font-semibold text-lg">User ID: <span className="font-mono text-sm">{user.id}</span></div>
+                        <div className="text-sm text-muted-foreground mt-1">
+                          Started chatting: {new Date(user.first_chat_at).toLocaleString()}
+                        </div>
+                        {agent && (
+                          <div className="text-sm text-muted-foreground">
+                            Chatbot: <span className="font-medium">{agent.name}</span>
+                          </div>
+                        )}
+                      </div>
+                      <Badge variant="secondary">{user.chat_history.length} messages</Badge>
+                    </div>
+                    <div className="border-t pt-3 mt-3">
+                      <div className="text-sm font-semibold mb-2">Chat History:</div>
+                      <div className="space-y-2 max-h-64 overflow-auto">
+                        {user.chat_history.map(msg => (
+                          <div key={msg.id} className="text-sm">
+                            <span className="text-muted-foreground">
+                              [{new Date(msg.created_at).toLocaleString()}]
+                            </span>{' '}
+                            <span className={msg.role === 'user' ? 'font-medium text-foreground' : 'text-primary'}>
+                              {msg.role === 'user' ? 'User' : 'Bot'}:
+                            </span>{' '}
+                            <span>{msg.content}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </Card>
+                );
+              }) : (
+                <div className="text-sm text-muted-foreground text-center py-8">No users found for this tenant.</div>
+              )}
+            </div>
+          )}
         </Card>
         <Card className="p-4">
           <div className="text-sm text-muted-foreground">Top Products (enquiries)</div>
@@ -134,6 +241,7 @@ const DemoOverview = () => {
           </div>
         </Card>
       </div>
+
     </div>
   );
 };

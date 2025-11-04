@@ -13,6 +13,7 @@ import DashboardLayout from "./pages/dashboard/DashboardLayout";
 import Overview from "./pages/dashboard/Overview";
 import Analytics from "./pages/dashboard/Analytics";
 import Onboarding from "./pages/dashboard/onboarding/Onboarding";
+import BotDetail from "./pages/dashboard/BotDetail";
 import Brand from "./pages/dashboard/onboarding/Brand";
 import Data from "./pages/dashboard/onboarding/Data";
 import Progress from "./pages/dashboard/onboarding/Progress";
@@ -68,6 +69,7 @@ const App = () => (
             
             {/* Onboarding */}
             <Route path="onboarding" element={<Onboarding />} />
+            <Route path="bots/:botId" element={<BotDetail />} />
             <Route path="onboarding/brand" element={<Brand />} />
             <Route path="onboarding/data" element={<Data />} />
             <Route path="onboarding/progress" element={<Progress />} />

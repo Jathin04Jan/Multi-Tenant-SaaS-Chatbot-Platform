@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Plus, Bot, MessageSquare, CheckCircle2, MoreVertical } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,6 +43,7 @@ const dummyBots = [
 
 const Onboarding = () => {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <>
@@ -91,7 +93,10 @@ const Onboarding = () => {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4, delay: index * 0.1 }}
             >
-              <Card className="glass-card hover:shadow-lg transition-all h-full flex flex-col">
+              <Card 
+                className="glass-card hover:shadow-lg transition-all h-full flex flex-col cursor-pointer"
+                onClick={() => navigate(`/dashboard/bots/${bot.id}`)}
+              >
                 <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -102,15 +107,24 @@ const Onboarding = () => {
                     </div>
                   </div>
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
+                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                       <Button variant="ghost" size="icon" className="h-8 w-8">
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem>Edit</DropdownMenuItem>
-                      <DropdownMenuItem>Duplicate</DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/dashboard/bots/${bot.id}`);
+                      }}>
+                        View Details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                        Duplicate
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive" onClick={(e) => e.stopPropagation()}>
+                        Delete
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </CardHeader>

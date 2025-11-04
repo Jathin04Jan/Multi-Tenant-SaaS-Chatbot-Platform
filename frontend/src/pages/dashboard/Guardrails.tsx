@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
@@ -8,11 +10,12 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { personaSchema, type PersonaInput } from '@/lib/zod-schemas';
+import { personaSchema, type PersonaInput, guardrailSchema, type GuardrailInput } from '@/lib/zod-schemas';
 import { useWizardStore } from '@/store/wizard';
 import { motion } from 'framer-motion';
 import { Shield, Save, Bot } from 'lucide-react';
 import { toast } from 'sonner';
+import { mockGetGuardrails, mockSaveGuardrails } from '@/lib/api';
 
 // Helper to get tone label based on value
 const getToneLabel = (tone: number): string => {
@@ -33,13 +36,7 @@ const styleOptions = [
 const Guardrails = () => {
   const { persona, updatePersona } = useWizardStore();
 
-  type GuardrailFormData = PersonaInput & { 
-    maxResponseLength: number;
-    blockedPhrases: string;
-    enableFactChecking: boolean;
-    enableSensitiveFilter: boolean;
-    customInstructions: string;
-  };
+  type GuardrailFormData = PersonaInput & GuardrailInput & { blockedPhrasesText: string; allowedDomainsText: string; blockedRegexText: string };
 
   const {
     register,
@@ -48,14 +45,24 @@ const Guardrails = () => {
     setValue,
     formState: { errors, isValid },
   } = useForm<GuardrailFormData>({
-    resolver: zodResolver(personaSchema),
+    resolver: zodResolver(personaSchema.merge(guardrailSchema).extend({
+      blockedPhrasesText: z.string().optional(),
+      allowedDomainsText: z.string().optional(),
+      blockedRegexText: z.string().optional(),
+    })),
     defaultValues: {
       ...persona,
       maxResponseLength: 500,
-      blockedPhrases: '',
+      blockedPhrases: [],
+      blockedPhrasesText: '',
       enableFactChecking: true,
       enableSensitiveFilter: true,
       customInstructions: '',
+      allowedDomains: [],
+      allowedDomainsText: '',
+      blockedRegex: [],
+      blockedRegexText: '',
+      escalationRules: {},
     },
     mode: 'onChange',
   });
@@ -63,20 +70,46 @@ const Guardrails = () => {
   const selectedStyle = watch('style');
   const tone = watch('tone');
   const maxResponseLength = watch('maxResponseLength');
-  const blockedPhrases = watch('blockedPhrases');
+  const blockedPhrasesText = watch('blockedPhrasesText');
   const enableFactChecking = watch('enableFactChecking');
   const enableSensitiveFilter = watch('enableSensitiveFilter');
   const customInstructions = watch('customInstructions');
+  const allowedDomainsText = watch('allowedDomainsText');
+  const blockedRegexText = watch('blockedRegexText');
 
-  const onSubmit = (data: GuardrailFormData) => {
+  const onSubmit = async (data: GuardrailFormData) => {
     updatePersona({
       botName: data.botName,
       tone: data.tone,
       style: data.style,
     });
-    // In a real app, you'd save the guardrail settings to a separate store/API
-    toast.success('Chatbot content configuration saved successfully!');
+    // Save guardrails via mock API
+    const payload: GuardrailInput = {
+      maxResponseLength: data.maxResponseLength,
+      blockedPhrases: (data.blockedPhrasesText || '').split(/\n|\r/).map(s=>s.trim()).filter(Boolean),
+      enableFactChecking: data.enableFactChecking,
+      enableSensitiveFilter: data.enableSensitiveFilter,
+      customInstructions: data.customInstructions,
+      allowedDomains: (data.allowedDomainsText || '').split(/\n|\r/).map(s=>s.trim()).filter(Boolean),
+      blockedRegex: (data.blockedRegexText || '').split(/\n|\r/).map(s=>s.trim()).filter(Boolean),
+      escalationRules: {},
+    };
+    await mockSaveGuardrails(payload as any);
+    toast.success('Guardrails saved successfully!');
   };
+
+  // Load existing guardrails on mount
+  useEffect(() => {
+    mockGetGuardrails().then((r) => {
+      setValue('maxResponseLength', r.data.maxResponseLength);
+      setValue('enableFactChecking', r.data.enableFactChecking);
+      setValue('enableSensitiveFilter', r.data.enableSensitiveFilter);
+      setValue('customInstructions', r.data.customInstructions ?? '');
+      setValue('blockedPhrasesText', (r.data.blockedPhrases || []).join('\n'));
+      setValue('allowedDomainsText', (r.data.allowedDomains || []).join('\n'));
+      setValue('blockedRegexText', (r.data.blockedRegex || []).join('\n'));
+    });
+  }, [setValue]);
 
   return (
     <div className="container max-w-6xl px-4 py-8">
@@ -202,13 +235,24 @@ const Guardrails = () => {
               </label>
               <Textarea
                 id="blockedPhrases"
-                placeholder="refund immediately&#10;cancel now&#10;..."
+                placeholder="refund immediately\ncancel now\n..."
                 className="rounded-xl min-h-[100px] font-mono text-sm"
-                {...register('blockedPhrases')}
+                {...register('blockedPhrasesText')}
               />
               <p className="text-xs text-muted-foreground mt-1">
                 The chatbot will avoid using these phrases in responses
               </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium block mb-2">Allowed Domains (one per line)</label>
+                <Textarea className="rounded-xl min-h-[100px] font-mono text-sm" placeholder="https://docs.example.com\nhttps://help.example.com" {...register('allowedDomainsText')} />
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-2">Blocked Regex (one per line)</label>
+                <Textarea className="rounded-xl min-h-[100px] font-mono text-sm" placeholder="\\bcredit\\s*card\\b\nssn:\\s*\\d+" {...register('blockedRegexText')} />
+              </div>
             </div>
 
             <div className="space-y-4">

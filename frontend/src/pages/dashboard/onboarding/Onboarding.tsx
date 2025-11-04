@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Stepper } from '@/components/shell/Stepper';
 import { Button } from '@/components/ui/button';
 import { useWizardStore } from '@/store/wizard';
@@ -16,7 +16,16 @@ const steps = [
 
 const Onboarding = () => {
   const navigate = useNavigate();
-  const { completedSteps, currentStep } = useWizardStore();
+  const location = useLocation();
+  const { completedSteps, currentStep, setCurrentStep } = useWizardStore();
+
+  // Update current step based on route
+  useEffect(() => {
+    const step = steps.find((s) => location.pathname === s.path);
+    if (step) {
+      setCurrentStep(step.number);
+    }
+  }, [location.pathname, setCurrentStep]);
 
   // Safari compatibility: ensure animations work
   useEffect(() => {
@@ -44,38 +53,45 @@ const Onboarding = () => {
   });
 
   return (
-    <div className="container max-w-5xl px-4 py-8 space-y-8">
+    <div className="container max-w-6xl px-4 py-8 space-y-8">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <h1 className="text-4xl font-bold mb-2">Onboarding</h1>
-        <p className="text-muted-foreground mb-8">
-          Set up your chatbot in 5 simple steps
-        </p>
+        <div className="mb-8">
+          <h1 className="text-4xl font-bold mb-2">Bot Builder</h1>
+          <p className="text-muted-foreground">
+            Set up your chatbot in 5 simple steps
+          </p>
+        </div>
 
-        <Stepper steps={stepsWithCompletion} currentStep={currentStep} />
+        {/* Stepper with better spacing */}
+        <div className="glass-card p-8 mb-8">
+          <Stepper steps={stepsWithCompletion} currentStep={currentStep} />
+        </div>
       </motion.div>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.2 }}
-        className="glass-card p-12 text-center"
+        className="glass-card p-12 text-center rounded-2xl"
       >
-        <h2 className="text-2xl font-bold mb-4">Ready to get started?</h2>
-        <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-          Follow the guided setup to configure your chatbot's personality, 
-          upload training data, and deploy to your website.
-        </p>
-        <Button
-          size="lg"
-          onClick={() => navigate(steps[0].path)}
-          className="rounded-xl"
-        >
-          Start Setup <ArrowRight className="ml-2 h-5 w-5" />
-        </Button>
+        <div className="max-w-lg mx-auto">
+          <h2 className="text-3xl font-bold mb-4">Ready to get started?</h2>
+          <p className="text-muted-foreground mb-8 text-base leading-relaxed">
+            Follow the guided setup to configure your chatbot's personality, 
+            upload training data, and deploy to your website.
+          </p>
+          <Button
+            size="lg"
+            onClick={() => navigate(steps[0].path)}
+            className="rounded-xl px-8 py-6 text-base font-semibold"
+          >
+            Start Setup <ArrowRight className="ml-2 h-5 w-5" />
+          </Button>
+        </div>
       </motion.div>
 
       <motion.div
@@ -89,7 +105,7 @@ const Onboarding = () => {
           onClick={() => navigate('/dashboard')}
           className="rounded-xl glass"
         >
-          Exit Onboarding
+          Exit Builder
         </Button>
       </motion.div>
     </div>

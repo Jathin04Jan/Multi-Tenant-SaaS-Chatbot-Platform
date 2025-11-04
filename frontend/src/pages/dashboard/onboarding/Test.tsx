@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bot, Send, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { Stepper } from '@/components/shell/Stepper';
 import { useWizardStore } from '@/store/wizard';
 import { mockChatMessage } from '@/lib/api';
 import { motion } from 'framer-motion';
@@ -17,9 +18,31 @@ interface Message {
   content: string;
 }
 
+const steps = [
+  { number: 1, name: 'Brand & Persona', path: '/dashboard/onboarding/brand' },
+  { number: 2, name: 'Data Sources', path: '/dashboard/onboarding/data' },
+  { number: 3, name: 'Indexing', path: '/dashboard/onboarding/progress' },
+  { number: 4, name: 'Test Chat', path: '/dashboard/onboarding/test' },
+  { number: 5, name: 'Install', path: '/dashboard/onboarding/install' },
+];
+
 const Test = () => {
   const navigate = useNavigate();
-  const { branding, persona, completeStep } = useWizardStore();
+  const { branding, persona, completeStep, setCurrentStep, completedSteps } = useWizardStore();
+
+  useEffect(() => {
+    setCurrentStep(4);
+  }, [setCurrentStep]);
+
+  const stepsWithCompletion = steps.map((step) => {
+    let isCompleted = false;
+    if (completedSteps instanceof Set) {
+      isCompleted = completedSteps.has(step.number);
+    } else if (Array.isArray(completedSteps)) {
+      isCompleted = (completedSteps as number[]).includes(step.number);
+    }
+    return { ...step, completed: isCompleted };
+  });
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -73,11 +96,17 @@ const Test = () => {
 
   const handleContinue = () => {
     completeStep(4);
+    setCurrentStep(5);
     navigate('/dashboard/onboarding/install');
   };
 
   return (
     <div className="container max-w-7xl px-4 py-8 space-y-8">
+      {/* Persistent Stepper */}
+      <div className="glass-card p-6 mb-8">
+        <Stepper steps={stepsWithCompletion} currentStep={4} />
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

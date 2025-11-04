@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Landing from "./pages/Landing";
 import SignUp from "./pages/SignUp";
 import SignIn from "./pages/SignIn";
+import AdminSignIn from "./pages/AdminSignIn";
 import Verify from "./pages/Verify";
 import DashboardLayout from "./pages/dashboard/DashboardLayout";
 import Overview from "./pages/dashboard/Overview";
@@ -21,7 +22,13 @@ import Profile from "./pages/dashboard/settings/Profile";
 import Team from "./pages/dashboard/settings/Team";
 import Billing from "./pages/dashboard/settings/Billing";
 import ApiKeys from "./pages/dashboard/settings/ApiKeys";
+import Tenant from "./pages/dashboard/settings/Tenant";
+import Settings from "./pages/dashboard/settings/Settings";
 import Guardrails from "./pages/dashboard/Guardrails";
+import Agents from "./pages/dashboard/Agents";
+import Sources from "./pages/dashboard/Sources";
+import Knowledge from "./pages/dashboard/Knowledge";
+import Jobs from "./pages/dashboard/Jobs";
 import NotFound from "./pages/NotFound";
 // [schema-demo:additive]
 import DemoLayout from "./pages/demo/DemoLayout";
@@ -46,6 +53,7 @@ const App = () => (
           <Route path="/" element={<Landing />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/signin" element={<SignIn />} />
+          <Route path="/admin/signin" element={<AdminSignIn />} />
           <Route path="/verify" element={<Verify />} />
 
           {/* Dashboard Routes */}
@@ -53,6 +61,10 @@ const App = () => (
             <Route index element={<Overview />} />
             <Route path="analytics" element={<Analytics />} />
             <Route path="guardrails" element={<Guardrails />} />
+            <Route path="agents" element={<Agents />} />
+            <Route path="sources" element={<Sources />} />
+            <Route path="knowledge" element={<Knowledge />} />
+            <Route path="jobs" element={<Jobs />} />
             
             {/* Onboarding */}
             <Route path="onboarding" element={<Onboarding />} />
@@ -63,10 +75,12 @@ const App = () => (
             <Route path="onboarding/install" element={<Install />} />
 
             {/* Settings */}
+            <Route path="settings" element={<Settings />} />
             <Route path="settings/profile" element={<Profile />} />
             <Route path="settings/team" element={<Team />} />
             <Route path="settings/billing" element={<Billing />} />
             <Route path="settings/api-keys" element={<ApiKeys />} />
+            <Route path="settings/tenant" element={<Tenant />} />
 
             {/* [schema-demo:additive] Demo routes also available under dashboard shell */}
             <Route path="demo" element={<DemoLayout />}>

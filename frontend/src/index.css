@@ -8,25 +8,28 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    /* Light, warm palette inspired by reference (no purple) */
+    --background: 40 33% 88%; /* slightly darker warm beige canvas for contrast */
     --foreground: 222 47% 11%;
 
-    --card: 0 0% 100%;
+    /* Cards with subtle pastel tints - not all white */
+    --card: 40 25% 96%; /* very light warm beige */
     --card-foreground: 222 47% 11%;
 
-    --popover: 0 0% 100%;
+    --popover: 40 25% 96%; /* match card */
     --popover-foreground: 222 47% 11%;
 
-    --primary: 239 84% 67%;
+    /* In light mode, primary acts like a neutral dark (buttons/active) */
+    --primary: 222 9% 15%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96%;
+    --secondary: 84 30% 92%; /* very light pastel green */
     --secondary-foreground: 222 47% 11%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 84 25% 93%; /* very light pastel green-tinted */
+    --muted-foreground: 215 12% 35%;
 
-    --accent: 199 89% 48%;
+    --accent: 84 74% 55%; /* lime accent for highlights */
     --accent-foreground: 0 0% 100%;
 
     --success: 142 71% 45%;
@@ -35,30 +38,31 @@ All colors MUST be HSL.
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 239 84% 67%;
+    /* Pastel borders for better visibility and separation */
+    --border: 84 25% 75%; /* soft pastel green border */
+    --input: 84 25% 75%;
+    --ring: 84 74% 55%;
 
     --radius: 1rem;
 
-    /* Glass effect tokens */
-    --glass-bg: 0 0% 100% / 0.1;
-    --glass-border: 0 0% 100% / 0.2;
-    --glass-shadow: 0 0% 0% / 0.15;
+    /* Glass effect tokens with pastel tints */
+    --glass-bg: 84 30% 95% / 0.6; /* very light pastel green tint */
+    --glass-border: 84 25% 75% / 0.8; /* pastel border */
+    --glass-shadow: 0 0% 0% / 0.08;
 
     /* Gradient stops */
-    --gradient-from: 239 84% 67% / 0.2;
-    --gradient-via: 199 89% 48% / 0.1;
-    --gradient-to: 142 71% 45% / 0.1;
+    --gradient-from: 84 74% 55% / 0.12;
+    --gradient-via: 199 89% 48% / 0.06;
+    --gradient-to: 40 33% 92% / 0.0;
 
-    --sidebar-background: 0 0% 98%;
+    --sidebar-background: 40 20% 94%; /* light warm beige */
     --sidebar-foreground: 240 5% 26%;
-    --sidebar-primary: 239 84% 67%;
+    --sidebar-primary: 222 9% 15%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 5% 96%;
+    --sidebar-accent: 84 25% 90%; /* pastel green accent */
     --sidebar-accent-foreground: 240 6% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 239 84% 67%;
+    --sidebar-border: 84 20% 80%; /* pastel border */
+    --sidebar-ring: 84 74% 55%;
   }
 
   .dark {
@@ -128,7 +132,7 @@ All colors MUST be HSL.
     background: radial-gradient(ellipse at top, hsl(var(--gradient-from)), transparent 50%),
                 radial-gradient(ellipse at bottom right, hsl(var(--gradient-via)), transparent 50%),
                 radial-gradient(ellipse at bottom left, hsl(var(--gradient-to)), transparent 50%);
-    opacity: 0.5;
+    opacity: 0.35;
   }
 }
 
@@ -149,6 +153,19 @@ All colors MUST be HSL.
     @apply glass rounded-2xl;
     /* Safari fix: ensure proper rendering */
     isolation: isolate;
+  }
+
+  /* Light mode: better card separation with pastel backgrounds */
+  :root:not(.dark) .glass-card {
+    background: hsl(84 25% 97% / 0.9);
+    border-color: hsl(84 20% 78% / 0.7);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  /* Better border visibility in light mode - override Tailwind border utilities */
+  :root:not(.dark) [class*="border-border"] {
+    border-color: hsl(84 20% 75% / 0.7);
   }
 
   /* Animation utilities */

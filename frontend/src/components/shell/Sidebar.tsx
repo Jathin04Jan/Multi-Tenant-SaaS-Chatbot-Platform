@@ -73,12 +73,12 @@ const navigation = [
     icon: LayoutDashboard,
   },
   {
-    name: 'Onboarding',
+    name: 'Bot Builder',
     href: '/dashboard/onboarding',
-    icon: Wand2,
+    icon: Bot,
   },
   {
-    name: 'Analytics',
+    name: 'Dashboard',
     href: '/dashboard/analytics',
     icon: BarChart3,
   },

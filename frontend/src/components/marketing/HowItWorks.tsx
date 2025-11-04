@@ -54,11 +54,11 @@ export const HowItWorks = () => {
               className="relative"
             >
               {/* Step Number */}
-              <div className="absolute -top-4 -left-4 w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg shadow-lg">
+              <div className="absolute -top-4 -left-4 w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-lg shadow-lg z-10">
                 {index + 1}
               </div>
 
-              <div className="glass-card p-8 pt-10 h-full">
+              <div className="glass-card p-8 pt-10 h-full relative z-0">
                 <div className="w-14 h-14 rounded-xl bg-accent/20 flex items-center justify-center mb-4">
                   <step.icon className="w-7 h-7 text-accent" />
                 </div>

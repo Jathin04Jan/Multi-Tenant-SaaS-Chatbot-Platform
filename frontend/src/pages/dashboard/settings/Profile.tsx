@@ -1,12 +1,23 @@
-import { User, Mail, Lock } from 'lucide-react';
+import { User, Mail, Lock, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 const Profile = () => {
+  const navigate = useNavigate();
+
   const handleSave = () => {
     toast.success('Profile updated!');
+  };
+
+  const handleSignOut = () => {
+    // Clear any stored auth data
+    localStorage.removeItem('auth-token');
+    localStorage.removeItem('wizard-storage');
+    toast.success('Signed out successfully');
+    navigate('/');
   };
 
   return (
@@ -75,6 +86,26 @@ const Profile = () => {
         <Button variant="outline" className="rounded-xl glass">
           <Lock className="w-4 h-4 mr-2" />
           Update Password
+        </Button>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.3 }}
+        className="glass-card p-8 border-destructive/20 border-2"
+      >
+        <h2 className="text-xl font-semibold mb-2 text-destructive">Account Actions</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Sign out of your account. You'll need to sign in again to access your dashboard.
+        </p>
+        <Button 
+          variant="destructive" 
+          onClick={handleSignOut}
+          className="rounded-xl"
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Sign Out
         </Button>
       </motion.div>
     </div>

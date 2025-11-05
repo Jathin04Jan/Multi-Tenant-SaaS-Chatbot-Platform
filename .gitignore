@@ -113,6 +113,13 @@ frontend/.next/
 frontend/.nuxt/
 frontend/.svelte-kit/
 
+# Vite Dependency Cache (should be ignored but adding explicitly)
+node_modules/.vite/
+frontend/node_modules/.vite/
+**/node_modules/.vite/
+.vite/
+**/.vite/
+
 # Frontend Build Files
 *.tsbuildinfo
 *.pidb

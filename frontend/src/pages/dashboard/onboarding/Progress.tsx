@@ -3,10 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Circle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { Stepper } from '@/components/shell/Stepper';
 import { useWizardStore } from '@/store/wizard';
 import { mockGetIndexingStatus } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
+
+const steps = [
+  { number: 1, name: 'Brand & Persona', path: '/dashboard/onboarding/brand' },
+  { number: 2, name: 'Data Sources', path: '/dashboard/onboarding/data' },
+  { number: 3, name: 'Indexing', path: '/dashboard/onboarding/progress' },
+  { number: 4, name: 'Test Chat', path: '/dashboard/onboarding/test' },
+  { number: 5, name: 'Install', path: '/dashboard/onboarding/install' },
+];
 
 const IndexingProgress = () => {
   const navigate = useNavigate();
@@ -16,7 +25,23 @@ const IndexingProgress = () => {
     setIndexingProgress,
     setIndexingStatus,
     completeStep,
+    setCurrentStep,
+    completedSteps,
   } = useWizardStore();
+
+  useEffect(() => {
+    setCurrentStep(3);
+  }, [setCurrentStep]);
+
+  const stepsWithCompletion = steps.map((step) => {
+    let isCompleted = false;
+    if (completedSteps instanceof Set) {
+      isCompleted = completedSteps.has(step.number);
+    } else if (Array.isArray(completedSteps)) {
+      isCompleted = (completedSteps as number[]).includes(step.number);
+    }
+    return { ...step, completed: isCompleted };
+  });
 
   const { data } = useQuery({
     queryKey: ['indexing-status'],
@@ -33,6 +58,7 @@ const IndexingProgress = () => {
 
   const handleContinue = () => {
     completeStep(3);
+    setCurrentStep(4);
     navigate('/dashboard/onboarding/test');
   };
 
@@ -45,6 +71,11 @@ const IndexingProgress = () => {
 
   return (
     <div className="container max-w-4xl px-4 py-8 space-y-8">
+      {/* Persistent Stepper */}
+      <div className="glass-card p-6 mb-8">
+        <Stepper steps={stepsWithCompletion} currentStep={3} />
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

@@ -2,15 +2,30 @@ import { Key, Plus, Eye, Copy, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
-
-const apiKeys = [
-  { id: '1', name: 'Production API Key', key: 'sk_live_••••••••••••••••', createdAt: '2024-01-15' },
-  { id: '2', name: 'Development API Key', key: 'sk_test_••••••••••••••••', createdAt: '2024-01-10' },
-];
+import { useEffect, useState } from 'react';
+import { mockCreateApiKey, mockDeleteApiKey, mockListApiKeys, type ApiKeyDTO } from '@/lib/api';
 
 const ApiKeys = () => {
-  const handleCopy = (key: string) => {
+  const [keys, setKeys] = useState<ApiKeyDTO[]>([]);
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => { mockListApiKeys().then((r) => setKeys(r.data)); }, []);
+
+  const handleCopy = (label: string) => {
     toast.success('API key copied!');
+  };
+
+  const createKey = async () => {
+    setCreating(true);
+    const res = await mockCreateApiKey('New Key');
+    setKeys((k) => [ { id: res.data.id, label: res.data.label, last4: res.data.last4, createdAt: res.data.createdAt }, ...k ]);
+    toast.message('API key created', { description: res.data.secretPreview });
+    setCreating(false);
+  };
+
+  const revoke = async (id: string) => {
+    await mockDeleteApiKey(id);
+    setKeys((k) => k.filter((x) => x.id !== id));
   };
 
   return (
@@ -27,7 +42,7 @@ const ApiKeys = () => {
             Manage your API keys for programmatic access
           </p>
         </div>
-        <Button className="rounded-xl">
+        <Button className="rounded-xl" onClick={createKey} disabled={creating}>
           <Plus className="w-4 h-4 mr-2" />
           Create Key
         </Button>
@@ -39,7 +54,7 @@ const ApiKeys = () => {
         transition={{ duration: 0.4, delay: 0.1 }}
         className="glass-card p-6 space-y-4"
       >
-        {apiKeys.map((apiKey) => (
+        {keys.map((apiKey) => (
           <div
             key={apiKey.id}
             className="flex items-center justify-between p-4 rounded-xl bg-muted/30"
@@ -49,12 +64,12 @@ const ApiKeys = () => {
                 <Key className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <div className="font-medium">{apiKey.name}</div>
+                <div className="font-medium">{apiKey.label}</div>
                 <div className="text-sm text-muted-foreground font-mono">
-                  {apiKey.key}
+                  sk_••••••••••••{apiKey.last4}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  Created {apiKey.createdAt}
+                  Created {new Date(apiKey.createdAt).toLocaleDateString()}
                 </div>
               </div>
             </div>
@@ -66,11 +81,11 @@ const ApiKeys = () => {
                 size="icon"
                 variant="ghost"
                 className="h-9 w-9"
-                onClick={() => handleCopy(apiKey.key)}
+                onClick={() => handleCopy(apiKey.label)}
               >
                 <Copy className="h-4 w-4" />
               </Button>
-              <Button size="icon" variant="ghost" className="h-9 w-9 text-destructive">
+              <Button size="icon" variant="ghost" className="h-9 w-9 text-destructive" onClick={() => revoke(apiKey.id)}>
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>

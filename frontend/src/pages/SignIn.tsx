@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Bot, ArrowLeft } from 'lucide-react';
+import { Bot, ArrowLeft, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { signInSchema, type SignInInput } from '@/lib/zod-schemas';
@@ -121,6 +121,16 @@ const SignIn = () => {
               Sign up
             </Link>
           </p>
+
+          <div className="mt-6 pt-6 border-t border-border/50">
+            <Link
+              to="/admin/signin"
+              className="flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors group"
+            >
+              <Shield className="w-4 h-4 group-hover:text-primary transition-colors" />
+              <span>Admin Sign In</span>
+            </Link>
+          </div>
         </div>
       </motion.div>
     </div>

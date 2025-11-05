@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload, Globe, Trash2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Stepper } from '@/components/shell/Stepper';
 import { useWizardStore } from '@/store/wizard';
 import { mockUploadFile, mockStartCrawl } from '@/lib/api';
 import { motion } from 'framer-motion';
@@ -13,12 +14,34 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 
 dayjs.extend(relativeTime);
 
+const steps = [
+  { number: 1, name: 'Brand & Persona', path: '/dashboard/onboarding/brand' },
+  { number: 2, name: 'Data Sources', path: '/dashboard/onboarding/data' },
+  { number: 3, name: 'Indexing', path: '/dashboard/onboarding/progress' },
+  { number: 4, name: 'Test Chat', path: '/dashboard/onboarding/test' },
+  { number: 5, name: 'Install', path: '/dashboard/onboarding/install' },
+];
+
 const Data = () => {
   const navigate = useNavigate();
-  const { dataSources, addDataSource, removeDataSource, completeStep } = useWizardStore();
+  const { dataSources, addDataSource, removeDataSource, completeStep, setCurrentStep, completedSteps } = useWizardStore();
   const [crawlUrl, setCrawlUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isCrawling, setIsCrawling] = useState(false);
+
+  useEffect(() => {
+    setCurrentStep(2);
+  }, [setCurrentStep]);
+
+  const stepsWithCompletion = steps.map((step) => {
+    let isCompleted = false;
+    if (completedSteps instanceof Set) {
+      isCompleted = completedSteps.has(step.number);
+    } else if (Array.isArray(completedSteps)) {
+      isCompleted = (completedSteps as number[]).includes(step.number);
+    }
+    return { ...step, completed: isCompleted };
+  });
 
   const handleFileUpload = async (files: FileList | null) => {
     if (!files) return;
@@ -72,11 +95,17 @@ const Data = () => {
       return;
     }
     completeStep(2);
+    setCurrentStep(3);
     navigate('/dashboard/onboarding/progress');
   };
 
   return (
     <div className="container max-w-7xl px-4 py-8 space-y-8">
+      {/* Persistent Stepper */}
+      <div className="glass-card p-6 mb-8">
+        <Stepper steps={stepsWithCompletion} currentStep={2} />
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -100,7 +129,7 @@ const Data = () => {
             <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
               <Upload className="w-5 h-5 text-primary" />
             </div>
-            <h2 className="text-xl font-semibold">Upload Documents</h2>
+            <h2 className="text-xl font-semibold">Manage Documents</h2>
           </div>
 
           <label className="glass-card p-8 border-2 border-dashed cursor-pointer hover:border-primary transition-colors flex flex-col items-center justify-center min-h-[200px]">

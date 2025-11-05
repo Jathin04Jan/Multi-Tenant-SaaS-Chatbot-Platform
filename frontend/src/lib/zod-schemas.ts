@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { type Agent, type Source, type Tenant } from './schema-types';
 
 export const signUpSchema = z.object({
   email: z.string().trim().email({ message: 'Invalid email address' }),
@@ -18,6 +19,11 @@ export const signInSchema = z.object({
 });
 
 export const brandingSchema = z.object({
+  botName: z
+    .string()
+    .trim()
+    .min(1, { message: 'Assistant name required' })
+    .max(50, { message: 'Must be less than 50 characters' }),
   logo: z.string().optional(),
   primaryColor: z
     .string()
@@ -35,8 +41,6 @@ export const personaSchema = z.object({
     .trim()
     .min(1, { message: 'Bot name required' })
     .max(50, { message: 'Must be less than 50 characters' }),
-  tone: z.number().min(0).max(100),
-  style: z.enum(['professional', 'friendly', 'casual']),
 });
 
 export const crawlSchema = z.object({
@@ -56,9 +60,50 @@ export const domainSchema = z.object({
     ),
 });
 
+// Tenant schema (frontend form)
+export const tenantSchema = z.object({
+  name: z.string().trim().min(1, 'Tenant name required'),
+  domain: z.string().trim().optional().or(z.literal('').transform(() => undefined)),
+  plan: z.enum(['free', 'pro', 'business', 'enterprise']),
+  status: z.enum(['active', 'suspended', 'pending']).default('active'),
+});
+
+// Agent schema (frontend form)
+export const agentSchema = z.object({
+  name: z.string().trim().min(1, 'Agent name required'),
+  provider: z.enum(['openai', 'anthropic', 'azure_openai', 'other']).default('openai'),
+  model: z.string().trim().min(1, 'Model is required'),
+  temperature: z.number().min(0).max(1).default(0.5),
+  systemPrompt: z.string().max(4000).optional(),
+  routing: z.enum(['direct', 'retrieval', 'tools']).default('direct'),
+});
+
+// Source schema (frontend form)
+export const sourceSchema = z.object({
+  name: z.string().trim().min(1, 'Source name required'),
+  type: z.enum(['upload', 'crawl', 'api', 's3', 'gdrive', 'notion', 'github']).default('upload'),
+  config: z.record(z.any()).default({}),
+});
+
+// Guardrails schema (separate from persona)
+export const guardrailSchema = z.object({
+  maxResponseLength: z.number().min(100).max(2000).default(500),
+  blockedPhrases: z.array(z.string()).default([]),
+  enableFactChecking: z.boolean().default(true),
+  enableSensitiveFilter: z.boolean().default(true),
+  customInstructions: z.string().max(4000).optional().default(''),
+  allowedDomains: z.array(z.string().url()).default([]),
+  blockedRegex: z.array(z.string()).default([]),
+  escalationRules: z.record(z.any()).default({}),
+});
+
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type SignInInput = z.infer<typeof signInSchema>;
 export type BrandingInput = z.infer<typeof brandingSchema>;
 export type PersonaInput = z.infer<typeof personaSchema>;
 export type CrawlInput = z.infer<typeof crawlSchema>;
 export type DomainInput = z.infer<typeof domainSchema>;
+export type TenantInput = z.infer<typeof tenantSchema>;
+export type AgentInput = z.infer<typeof agentSchema>;
+export type SourceInput = z.infer<typeof sourceSchema>;
+export type GuardrailInput = z.infer<typeof guardrailSchema>;

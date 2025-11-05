@@ -1,20 +1,13 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Slider } from '@/components/ui/slider';
 import { personaSchema, type PersonaInput } from '@/lib/zod-schemas';
 import { useWizardStore } from '@/store/wizard';
+import { Bot } from 'lucide-react';
 
 interface PersonaFormProps {
-  onComplete: () => void;
+  onComplete?: () => void;
 }
-
-const styleOptions = [
-  { value: 'professional', label: 'Professional', description: 'Formal and business-like' },
-  { value: 'friendly', label: 'Friendly', description: 'Warm and approachable' },
-  { value: 'casual', label: 'Casual', description: 'Relaxed and conversational' },
-] as const;
 
 export const PersonaForm = ({ onComplete }: PersonaFormProps) => {
   const { persona, updatePersona } = useWizardStore();
@@ -24,82 +17,53 @@ export const PersonaForm = ({ onComplete }: PersonaFormProps) => {
     handleSubmit,
     watch,
     setValue,
-    formState: { errors, isValid },
+    formState: { errors },
   } = useForm<PersonaInput>({
     resolver: zodResolver(personaSchema),
-    defaultValues: persona,
+    defaultValues: {
+      ...persona,
+    },
     mode: 'onChange',
   });
 
-  const selectedStyle = watch('style');
-  const tone = watch('tone');
-
   const onSubmit = (data: PersonaInput) => {
-    updatePersona(data);
-    onComplete();
+    updatePersona({
+      botName: data.botName,
+    });
+    onComplete?.();
+  };
+
+  const handleBotNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setValue('botName', value);
+    updatePersona({ botName: value });
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div>
-        <label htmlFor="botName" className="text-sm font-medium block mb-2">
-          Bot Name
-        </label>
-        <Input
-          id="botName"
-          placeholder="Assistant"
-          className="rounded-xl"
-          {...register('botName')}
-        />
-        {errors.botName && (
-          <p className="text-sm text-destructive mt-1">{errors.botName.message}</p>
-        )}
+      <div className="flex items-center gap-2 mb-4">
+        <Bot className="w-5 h-5 text-primary" />
+        <h3 className="text-lg font-semibold">Persona</h3>
       </div>
 
-      <div>
-        <label className="text-sm font-medium block mb-3">
-          Tone: {tone}% Casual
-        </label>
-        <Slider
-          value={[tone]}
-          onValueChange={(values) => setValue('tone', values[0], { shouldValidate: true })}
-          min={0}
-          max={100}
-          step={5}
-          className="py-4"
-        />
-        <div className="flex justify-between text-xs text-muted-foreground mt-2">
-          <span>Formal</span>
-          <span>Casual</span>
+      <div className="space-y-6">
+        <div>
+          <label htmlFor="botName" className="text-sm font-medium block mb-2">
+            Bot Name
+          </label>
+          <Input
+            id="botName"
+            placeholder="Assistant"
+            className="rounded-xl"
+            {...register('botName')}
+            onChange={handleBotNameChange}
+          />
+          {errors.botName && (
+            <p className="text-sm text-destructive mt-1">{errors.botName.message}</p>
+          )}
         </div>
       </div>
-
-      <div>
-        <label className="text-sm font-medium block mb-3">Style Preset</label>
-        <div className="grid grid-cols-3 gap-3">
-          {styleOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => setValue('style', option.value, { shouldValidate: true })}
-              className={`glass-card p-4 text-center transition-all ${
-                selectedStyle === option.value
-                  ? 'ring-2 ring-primary'
-                  : 'hover:scale-105'
-              }`}
-            >
-              <div className="font-medium mb-1">{option.label}</div>
-              <div className="text-xs text-muted-foreground">
-                {option.description}
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <Button type="submit" disabled={!isValid} className="w-full rounded-xl">
-        Continue
-      </Button>
     </form>
   );
 };
+

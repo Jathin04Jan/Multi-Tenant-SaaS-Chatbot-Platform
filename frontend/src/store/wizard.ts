@@ -9,8 +9,12 @@ export interface BrandConfig {
 
 export interface PersonaConfig {
   botName: string;
-  tone: number; // 0-100
-  style: 'professional' | 'friendly' | 'casual';
+}
+
+export interface ToneConfig {
+  llmTemperature: number; // 0-1
+  communicationStyle: 'professional' | 'friendly' | 'casual' | 'technical' | 'supportive' | 'enthusiastic';
+  stylePrompt: string;
 }
 
 export interface DataSource {
@@ -30,6 +34,9 @@ interface WizardState {
   branding: BrandConfig;
   persona: PersonaConfig;
   
+  // Step 2: Tone
+  tone: ToneConfig;
+  
   // Step 2: Data sources
   dataSources: DataSource[];
   
@@ -46,6 +53,7 @@ interface WizardState {
   setAgentId: (id: string) => void;
   updateBranding: (branding: Partial<BrandConfig>) => void;
   updatePersona: (persona: Partial<PersonaConfig>) => void;
+  updateTone: (tone: Partial<ToneConfig>) => void;
   addDataSource: (source: DataSource) => void;
   removeDataSource: (id: string) => void;
   updateDataSource: (id: string, updates: Partial<DataSource>) => void;
@@ -89,8 +97,11 @@ const initialState = {
   },
   persona: {
     botName: 'Assistant',
-    tone: 50,
-    style: 'friendly' as const,
+  },
+  tone: {
+    llmTemperature: 0.7,
+    communicationStyle: 'friendly' as const,
+    stylePrompt: 'You are a friendly and warm assistant. Be approachable, empathetic, and conversational. Use a welcoming tone that makes users feel comfortable. Show genuine interest in helping them.',
   },
   dataSources: [],
   indexingProgress: 0,
@@ -115,6 +126,11 @@ export const useWizardStore = create<WizardState>()(
       updatePersona: (persona) =>
         set((state) => ({
           persona: { ...state.persona, ...persona },
+        })),
+      
+      updateTone: (tone) =>
+        set((state) => ({
+          tone: { ...state.tone, ...tone },
         })),
       
       addDataSource: (source) =>

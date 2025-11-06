@@ -6,57 +6,40 @@ import { Label } from '@/components/ui/label';
 import { type GuardrailInput } from '@/lib/zod-schemas';
 import { Shield } from 'lucide-react';
 import { mockGetGuardrails, mockSaveGuardrails } from '@/lib/api';
+import { useWizardStore } from '@/store/wizard';
 
 interface GuardrailsFormProps {
   onComplete?: () => void;
 }
 
 export const GuardrailsForm = ({ onComplete }: GuardrailsFormProps) => {
-  const [maxResponseLength, setMaxResponseLength] = useState(500);
-  const [blockedPhrasesText, setBlockedPhrasesText] = useState('');
-  const [enableFactChecking, setEnableFactChecking] = useState(true);
-  const [blockExplicitContent, setBlockExplicitContent] = useState(true);
-  const [blockPoliticalViews, setBlockPoliticalViews] = useState(true);
-  const [strictlyStickToTopic, setStrictlyStickToTopic] = useState(true);
-  const [blockPersonalInfo, setBlockPersonalInfo] = useState(true);
-  const [customInstructions, setCustomInstructions] = useState('');
-  const [isInitialized, setIsInitialized] = useState(false);
+  const { guardrails: storeGuardrails, updateGuardrails } = useWizardStore();
+  const [maxResponseLength, setMaxResponseLength] = useState(storeGuardrails.maxResponseLength);
+  const [blockedPhrasesText, setBlockedPhrasesText] = useState(storeGuardrails.blockedPhrases.join('\n'));
+  const [enableFactChecking, setEnableFactChecking] = useState(storeGuardrails.enableFactChecking);
+  const [blockExplicitContent, setBlockExplicitContent] = useState(storeGuardrails.blockExplicitContent);
+  const [blockPoliticalViews, setBlockPoliticalViews] = useState(storeGuardrails.blockPoliticalViews);
+  const [strictlyStickToTopic, setStrictlyStickToTopic] = useState(storeGuardrails.strictlyStickToTopic);
+  const [blockPersonalInfo, setBlockPersonalInfo] = useState(storeGuardrails.blockPersonalInfo);
+  const [customInstructions, setCustomInstructions] = useState(storeGuardrails.customInstructions);
 
-  // Load existing guardrails on mount
+  // Update store when values change (debounced)
   useEffect(() => {
-    mockGetGuardrails().then((r) => {
-      setMaxResponseLength(r.data.maxResponseLength);
-      setEnableFactChecking(r.data.enableFactChecking);
-      setCustomInstructions(r.data.customInstructions ?? '');
-      setBlockedPhrasesText((r.data.blockedPhrases || []).join('\n'));
-      setIsInitialized(true);
-    });
-  }, []);
-
-  // Auto-save when values change (but not on initial load)
-  useEffect(() => {
-    if (!isInitialized) return;
-
-    const saveTimeout = setTimeout(async () => {
-      const payload: GuardrailInput = {
+    const saveTimeout = setTimeout(() => {
+      updateGuardrails({
         maxResponseLength,
         blockedPhrases: (blockedPhrasesText || '').split(/\n|\r/).map(s=>s.trim()).filter(Boolean),
         enableFactChecking,
-        enableSensitiveFilter: blockExplicitContent || blockPoliticalViews || strictlyStickToTopic || blockPersonalInfo,
+        blockExplicitContent,
+        blockPoliticalViews,
+        strictlyStickToTopic,
+        blockPersonalInfo,
         customInstructions,
-        allowedDomains: [],
-        blockedRegex: [],
-        escalationRules: {},
-      };
-      try {
-        await mockSaveGuardrails(payload as any);
-      } catch (error) {
-        // Silent save
-      }
-    }, 1000); // Debounce saves
+      });
+    }, 500); // Debounce updates
 
     return () => clearTimeout(saveTimeout);
-  }, [maxResponseLength, blockedPhrasesText, enableFactChecking, blockExplicitContent, blockPoliticalViews, strictlyStickToTopic, blockPersonalInfo, customInstructions, isInitialized]);
+  }, [maxResponseLength, blockedPhrasesText, enableFactChecking, blockExplicitContent, blockPoliticalViews, strictlyStickToTopic, blockPersonalInfo, customInstructions, updateGuardrails]);
 
   return (
     <div className="space-y-6">

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { getBot, type BotDTO, updateBot } from '@/lib/api';
 import {
   Bot,
   MessageSquare,
@@ -49,68 +50,24 @@ import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-// Dummy bot data - in production, this would come from API
-const getBotData = (id: string) => {
-  const bots: Record<string, any> = {
-    '1': {
-      id: '1',
-      name: 'Customer Support Bot',
-      description: 'Handles customer inquiries and support tickets',
-      status: 'active',
-      conversations: 1247,
-      activeUsers: 342,
-      avgResponseTime: 1.2,
-      satisfactionScore: 4.8,
-      messagesSent: 8923,
-      messagesReceived: 12456,
-      uptime: '99.8%',
-      lastUpdated: '2 hours ago',
-      createdAt: '2024-01-15',
-      primaryColor: '#3b82f6',
-      welcomeMessage: 'Hello! How can I help you today?',
-      communicationStyle: 'friendly',
-      llmTemperature: 0.7,
-    },
-    '2': {
-      id: '2',
-      name: 'Sales Assistant',
-      description: 'Helps with product information and sales inquiries',
-      status: 'active',
-      conversations: 892,
-      activeUsers: 189,
-      avgResponseTime: 0.8,
-      satisfactionScore: 4.6,
-      messagesSent: 6543,
-      messagesReceived: 8921,
-      uptime: '99.9%',
-      lastUpdated: '5 hours ago',
-      createdAt: '2024-01-10',
-      primaryColor: '#f97316',
-      welcomeMessage: 'Hi! I can help you with product information.',
-      communicationStyle: 'professional',
-      llmTemperature: 0.6,
-    },
-    '3': {
-      id: '3',
-      name: 'HR Bot',
-      description: 'Answers HR-related questions and employee onboarding',
-      status: 'active',
-      conversations: 456,
-      activeUsers: 98,
-      avgResponseTime: 1.5,
-      satisfactionScore: 4.7,
-      messagesSent: 3124,
-      messagesReceived: 4567,
-      uptime: '99.5%',
-      lastUpdated: '1 day ago',
-      createdAt: '2024-01-05',
-      primaryColor: '#10b981',
-      welcomeMessage: 'Hello! How can I assist with HR questions?',
-      communicationStyle: 'supportive',
-      llmTemperature: 0.75,
-    },
-  };
-  return bots[id] || bots['1'];
+// Helper function to format time ago
+const formatTimeAgo = (dateString: string): string => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (diffInSeconds < 60) return 'just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+  if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 604800)} weeks ago`;
+  return `${Math.floor(diffInSeconds / 2592000)} months ago`;
+};
+
+// Helper function to format date
+const formatDate = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
 // Color theme options
@@ -187,17 +144,18 @@ const styleOptions = [
 const BotDetail = () => {
   const { botId } = useParams<{ botId: string }>();
   const navigate = useNavigate();
-  const [bot, setBot] = useState(getBotData(botId || '1'));
+  const [bot, setBot] = useState<BotDTO | null>(null);
+  const [loading, setLoading] = useState(true);
   
   // Bot Configuration State
-  const [botName, setBotName] = useState(bot.name);
-  const [welcomeMessage, setWelcomeMessage] = useState(bot.welcomeMessage);
-  const [selectedColor, setSelectedColor] = useState(bot.primaryColor);
+  const [botName, setBotName] = useState('');
+  const [welcomeMessage, setWelcomeMessage] = useState('');
+  const [selectedColor, setSelectedColor] = useState('#6366f1');
   
   // Tone Configuration State
-  const [llmTemperature, setLlmTemperature] = useState(bot.llmTemperature);
-  const [communicationStyle, setCommunicationStyle] = useState(bot.communicationStyle);
-  const [stylePrompt, setStylePrompt] = useState(bot.stylePrompt || styleOptions.find(s => s.value === bot.communicationStyle)?.defaultPrompt || '');
+  const [llmTemperature, setLlmTemperature] = useState(0.7);
+  const [communicationStyle, setCommunicationStyle] = useState<'professional' | 'friendly' | 'casual' | 'technical' | 'supportive' | 'enthusiastic'>('friendly');
+  const [stylePrompt, setStylePrompt] = useState('');
   
   // Guardrails State
   const [maxResponseLength, setMaxResponseLength] = useState(500);
@@ -209,22 +167,91 @@ const BotDetail = () => {
   const [blockPersonalInfo, setBlockPersonalInfo] = useState(true);
   const [customInstructions, setCustomInstructions] = useState('');
 
-  // Initialize state when bot data changes
+  // Fetch bot data from API
   useEffect(() => {
-    const botData = getBotData(botId || '1');
-    setBot(botData);
-    setBotName(botData.name);
-    setWelcomeMessage(botData.welcomeMessage);
-    setSelectedColor(botData.primaryColor);
-    setLlmTemperature(botData.llmTemperature);
-    setCommunicationStyle(botData.communicationStyle);
-    const defaultPrompt = styleOptions.find(s => s.value === botData.communicationStyle)?.defaultPrompt || '';
-    setStylePrompt(botData.stylePrompt || defaultPrompt);
-  }, [botId]);
+    const fetchBot = async () => {
+      if (!botId) {
+        navigate('/dashboard/onboarding');
+        return;
+      }
 
-  const handleStatusChange = (newStatus: 'active' | 'paused' | 'stopped') => {
-    setBot({ ...bot, status: newStatus });
-    toast.success(`Bot ${newStatus === 'active' ? 'started' : newStatus === 'paused' ? 'paused' : 'stopped'} successfully`);
+      try {
+        setLoading(true);
+        const response = await getBot(botId);
+        
+        if (response.error) {
+          toast.error(response.error || 'Failed to load bot');
+          navigate('/dashboard/onboarding');
+          return;
+        }
+
+        const botData = response.data;
+        setBot(botData);
+        
+        // Initialize state from bot data
+        setBotName(botData.name);
+        
+        // Extract branding data
+        const branding = botData.branding as any || {};
+        setWelcomeMessage(branding.welcome_message || 'Hello! How can I help you today?');
+        setSelectedColor(branding.primary_color || '#6366f1');
+        
+        // Extract LLM config
+        const llmConfig = botData.llm_config as any || {};
+        setLlmTemperature(llmConfig.temperature || 0.7);
+        setCommunicationStyle(llmConfig.communication_style || 'friendly');
+        setStylePrompt(llmConfig.style_prompt || styleOptions.find(s => s.value === (llmConfig.communication_style || 'friendly'))?.defaultPrompt || '');
+        
+        // Extract guardrails
+        const guardrails = botData.guardrails as any || {};
+        setMaxResponseLength(guardrails.max_response_length || 500);
+        setBlockedPhrasesText((guardrails.blocked_phrases || []).join('\n'));
+        setEnableFactChecking(guardrails.enable_fact_checking !== false);
+        setBlockExplicitContent(guardrails.block_explicit_content !== false);
+        setBlockPoliticalViews(guardrails.block_political_views !== false);
+        setStrictlyStickToTopic(guardrails.strictly_stick_to_topic !== false);
+        setBlockPersonalInfo(guardrails.block_personal_info !== false);
+        setCustomInstructions(guardrails.custom_instructions || '');
+      } catch (error) {
+        console.error('Error fetching bot:', error);
+        toast.error('Failed to load bot');
+        navigate('/dashboard/onboarding');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBot();
+  }, [botId, navigate]);
+
+  // Update style prompt when communication style changes
+  useEffect(() => {
+    const selectedOption = styleOptions.find(opt => opt.value === communicationStyle);
+    if (selectedOption && (!stylePrompt || stylePrompt === selectedOption.defaultPrompt)) {
+      setStylePrompt(selectedOption.defaultPrompt);
+    }
+  }, [communicationStyle]);
+
+  const handleStatusChange = async (newStatus: 'active' | 'paused' | 'stopped') => {
+    if (!bot) return;
+    
+    // Map UI status to database status
+    const dbStatus = newStatus === 'stopped' ? 'archived' : newStatus === 'paused' ? 'paused' : 'active';
+    
+    try {
+      const response = await updateBot(bot.id, { status: dbStatus });
+      
+      if (response.error) {
+        toast.error(response.error || 'Failed to update bot status');
+        return;
+      }
+      
+      setBot(response.data);
+      toast.success(`Bot ${newStatus === 'active' ? 'started' : newStatus === 'paused' ? 'paused' : 'stopped'} successfully`);
+    } catch (error) {
+      console.error('Error updating bot status:', error);
+      toast.error('Failed to update bot status');
+    }
   };
 
   const handleDelete = () => {
@@ -246,80 +273,176 @@ const BotDetail = () => {
     }
   }, [communicationStyle]);
 
-  const handleSaveBotConfiguration = () => {
-    setBot({
-      ...bot,
-      name: botName,
-      welcomeMessage,
-      primaryColor: selectedColor,
-    });
-    toast.success('Bot configuration saved successfully!');
+  const handleSaveBotConfiguration = async () => {
+    if (!bot) return;
+
+    try {
+      const updatedBranding = {
+        ...(bot.branding as any || {}),
+        welcome_message: welcomeMessage,
+        primary_color: selectedColor,
+        assistant_name: botName,
+      };
+
+      const response = await updateBot(bot.id, {
+        name: botName,
+        branding: updatedBranding,
+      });
+
+      if (response.error) {
+        toast.error(response.error || 'Failed to save bot configuration');
+        return;
+      }
+
+      setBot(response.data);
+      toast.success('Bot configuration saved successfully!');
+    } catch (error) {
+      console.error('Error saving bot configuration:', error);
+      toast.error('Failed to save bot configuration');
+    }
   };
 
-  const handleSaveToneConfiguration = () => {
-    setBot({
-      ...bot,
-      llmTemperature,
-      communicationStyle,
-      stylePrompt,
-    });
-    toast.success('Tone configuration saved successfully!');
+  const handleSaveToneConfiguration = async () => {
+    if (!bot) return;
+
+    try {
+      const updatedLlmConfig = {
+        ...(bot.llm_config as any || {}),
+        temperature: llmTemperature,
+        communication_style: communicationStyle,
+        style_prompt: stylePrompt,
+      };
+
+      const response = await updateBot(bot.id, {
+        llm_config: updatedLlmConfig,
+      });
+
+      if (response.error) {
+        toast.error(response.error || 'Failed to save tone configuration');
+        return;
+      }
+
+      setBot(response.data);
+      toast.success('Tone configuration saved successfully!');
+    } catch (error) {
+      console.error('Error saving tone configuration:', error);
+      toast.error('Failed to save tone configuration');
+    }
   };
 
-  const handleSaveGuardrails = () => {
-    toast.success('Guardrails saved successfully!');
+  const handleSaveGuardrails = async () => {
+    if (!bot) return;
+
+    try {
+      const updatedGuardrails = {
+        ...(bot.guardrails as any || {}),
+        max_response_length: maxResponseLength,
+        blocked_phrases: (blockedPhrasesText || '').split(/\n|\r/).map(s => s.trim()).filter(Boolean),
+        enable_fact_checking: enableFactChecking,
+        block_explicit_content: blockExplicitContent,
+        block_political_views: blockPoliticalViews,
+        strictly_stick_to_topic: strictlyStickToTopic,
+        block_personal_info: blockPersonalInfo,
+        custom_instructions: customInstructions,
+      };
+
+      const response = await updateBot(bot.id, {
+        guardrails: updatedGuardrails,
+      });
+
+      if (response.error) {
+        toast.error(response.error || 'Failed to save guardrails');
+        return;
+      }
+
+      setBot(response.data);
+      toast.success('Guardrails saved successfully!');
+    } catch (error) {
+      console.error('Error saving guardrails:', error);
+      toast.error('Failed to save guardrails');
+    }
   };
 
-  const analyticsCards = [
+  // Analytics cards - using placeholder data until conversations table is implemented
+  const analyticsCards = bot ? [
     {
       title: 'Total Conversations',
-      value: bot.conversations.toLocaleString(),
+      value: '0', // TODO: Calculate from conversations table
       icon: MessageSquare,
-      change: '+12%',
-      trend: 'up',
+      change: 'No data yet',
+      trend: 'neutral' as const,
       color: 'text-blue-500',
     },
     {
       title: 'Active Users',
-      value: bot.activeUsers.toLocaleString(),
+      value: '0', // TODO: Calculate from conversations table
       icon: Users,
-      change: '+8%',
-      trend: 'up',
+      change: 'No data yet',
+      trend: 'neutral' as const,
       color: 'text-green-500',
     },
     {
       title: 'Avg Response Time',
-      value: `${bot.avgResponseTime}s`,
+      value: 'N/A', // TODO: Calculate from conversations table
       icon: Clock,
-      change: '-5%',
-      trend: 'down',
+      change: 'No data yet',
+      trend: 'neutral' as const,
       color: 'text-purple-500',
     },
     {
       title: 'Satisfaction Score',
-      value: bot.satisfactionScore.toFixed(1),
+      value: 'N/A', // TODO: Calculate from conversations table
       icon: Star,
-      change: '+0.2',
-      trend: 'up',
+      change: 'No data yet',
+      trend: 'neutral' as const,
       color: 'text-yellow-500',
     },
     {
       title: 'Messages Sent',
-      value: bot.messagesSent.toLocaleString(),
+      value: '0', // TODO: Calculate from conversations table
       icon: TrendingUp,
-      change: '+15%',
-      trend: 'up',
+      change: 'No data yet',
+      trend: 'neutral' as const,
       color: 'text-cyan-500',
     },
     {
       title: 'Uptime',
-      value: bot.uptime,
+      value: bot.status === 'active' ? '100%' : '0%',
       icon: RefreshCw,
-      change: 'Last 30 days',
-      trend: 'neutral',
+      change: 'Since creation',
+      trend: 'neutral' as const,
       color: 'text-emerald-500',
     },
-  ];
+  ] : [];
+
+  if (loading) {
+    return (
+      <div className="container max-w-7xl px-4 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground">Loading bot details...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!bot) {
+    return (
+      <div className="container max-w-7xl px-4 py-8">
+        <div className="text-center py-12">
+          <p className="text-muted-foreground mb-4">Bot not found</p>
+          <Button onClick={() => navigate('/dashboard/onboarding')}>
+            Back to Bots
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const branding = bot.branding as any || {};
+  const llmConfig = bot.llm_config as any || {};
 
   return (
     <div className="container max-w-7xl px-4 py-8 space-y-8">
@@ -367,9 +490,9 @@ const BotDetail = () => {
                 {bot.status}
               </Badge>
             </div>
-            <p className="text-muted-foreground">{bot.description}</p>
+            <p className="text-muted-foreground">{bot.description || 'No description'}</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Last updated {bot.lastUpdated} · Created {bot.createdAt}
+              Last updated {formatTimeAgo(bot.updated_at)} · Created {formatDate(bot.created_at)}
             </p>
           </div>
         </div>
@@ -397,7 +520,7 @@ const BotDetail = () => {
                 Stop
               </Button>
             </>
-          ) : (
+          ) : bot.status === 'paused' ? (
             <Button
               variant="default"
               size="sm"
@@ -406,6 +529,16 @@ const BotDetail = () => {
             >
               <Play className="w-4 h-4" />
               Start
+            </Button>
+          ) : (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => handleStatusChange('active')}
+              className="gap-2"
+            >
+              <Play className="w-4 h-4" />
+              Activate
             </Button>
           )}
 
@@ -417,7 +550,7 @@ const BotDetail = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setIsEditing(true)}>
+              <DropdownMenuItem onClick={() => {/* TODO: Implement edit */}}>
                 <Edit className="w-4 h-4 mr-2" />
                 Edit Bot
               </DropdownMenuItem>
@@ -515,11 +648,11 @@ const BotDetail = () => {
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground">Communication Style</Label>
-                    <p className="font-medium capitalize">{bot.communicationStyle}</p>
+                    <p className="font-medium capitalize">{llmConfig.communication_style || 'friendly'}</p>
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground">LLM Temperature</Label>
-                    <p className="font-medium">{bot.llmTemperature}</p>
+                    <p className="font-medium">{llmConfig.temperature || 0.7}</p>
                   </div>
                 </div>
               </CardContent>
@@ -836,30 +969,45 @@ const BotDetail = () => {
                 <CardDescription>Manage documents and data sources for your bot's knowledge base</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <FileText className="w-5 h-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">Product Documentation.pdf</p>
-                      <p className="text-sm text-muted-foreground">2.4 MB · Indexed</p>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <Globe className="w-5 h-5 text-muted-foreground" />
-                    <div>
-                      <p className="font-medium">https://docs.example.com</p>
-                      <p className="text-sm text-muted-foreground">Crawled · 245 pages</p>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
+                {(() => {
+                  const retrievalConfig = bot.retrieval_config as any || {};
+                  const dataSources = retrievalConfig.data_sources || [];
+                  
+                  if (dataSources.length === 0) {
+                    return (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        <p>No data sources yet</p>
+                        <p className="text-sm mt-2">Add documents or websites to build your knowledge base</p>
+                      </div>
+                    );
+                  }
+                  
+                  return (
+                    <>
+                      {dataSources.map((source: any) => (
+                        <div key={source.id} className="flex items-center justify-between p-4 border rounded-lg">
+                          <div className="flex items-center gap-3">
+                            {source.type === 'upload' ? (
+                              <FileText className="w-5 h-5 text-muted-foreground" />
+                            ) : (
+                              <Globe className="w-5 h-5 text-muted-foreground" />
+                            )}
+                            <div>
+                              <p className="font-medium">{source.name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {source.type === 'upload' ? 'Uploaded' : 'Crawled'} · {source.status}
+                              </p>
+                            </div>
+                          </div>
+                          <Button variant="ghost" size="sm">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </>
+                  );
+                })()}
                 <Button variant="outline" className="w-full gap-2">
                   <Upload className="w-4 h-4" />
                   Add Document or Website

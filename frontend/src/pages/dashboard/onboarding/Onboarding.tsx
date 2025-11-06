@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Plus, Bot, MessageSquare, CheckCircle2, MoreVertical } from 'lucide-react';
@@ -12,38 +12,49 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { OnboardingPanel } from '@/components/onboarding/OnboardingPanel';
+import { getBots, type BotDTO } from '@/lib/api';
 
-// Dummy bot data
-const dummyBots = [
-  {
-    id: '1',
-    name: 'Customer Support Bot',
-    description: 'Handles customer inquiries and support tickets',
-    status: 'active',
-    conversations: 1247,
-    lastUpdated: '2 hours ago',
-  },
-  {
-    id: '2',
-    name: 'Sales Assistant',
-    description: 'Helps with product information and sales inquiries',
-    status: 'active',
-    conversations: 892,
-    lastUpdated: '5 hours ago',
-  },
-  {
-    id: '3',
-    name: 'HR Bot',
-    description: 'Answers HR-related questions and employee onboarding',
-    status: 'active',
-    conversations: 456,
-    lastUpdated: '1 day ago',
-  },
-];
+// Helper function to format time ago
+const formatTimeAgo = (dateString: string): string => {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (diffInSeconds < 60) return 'just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+  if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 604800)} weeks ago`;
+  return `${Math.floor(diffInSeconds / 2592000)} months ago`;
+};
 
 const Onboarding = () => {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [bots, setBots] = useState<BotDTO[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchBots = async () => {
+      try {
+        setLoading(true);
+        const response = await getBots();
+        if (response.error) {
+          console.error('Error fetching bots:', response.error);
+          setBots([]);
+        } else {
+          setBots(response.data || []);
+        }
+      } catch (error) {
+        console.error('Error fetching bots:', error);
+        setBots([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBots();
+  }, []);
 
   return (
     <>
@@ -86,74 +97,97 @@ const Onboarding = () => {
           </motion.div>
 
           {/* Existing Bot Cards */}
-          {dummyBots.map((bot, index) => (
-            <motion.div
-              key={bot.id}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4, delay: index * 0.1 }}
-            >
-              <Card 
-                className="glass-card hover:shadow-lg transition-all h-full flex flex-col cursor-pointer"
-                onClick={() => navigate(`/dashboard/bots/${bot.id}`)}
+          {loading ? (
+            <div className="col-span-full text-center py-8 text-muted-foreground">
+              Loading bots...
+            </div>
+          ) : bots.length === 0 ? (
+            <div className="col-span-full text-center py-8 text-muted-foreground">
+              No bots yet. Create your first bot to get started!
+            </div>
+          ) : (
+            bots.map((bot, index) => (
+              <motion.div
+                key={bot.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.4, delay: index * 0.1 }}
               >
-                <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                      <Bot className="w-6 h-6 text-primary" />
+                <Card 
+                  className="glass-card hover:shadow-lg transition-all h-full flex flex-col cursor-pointer"
+                  onClick={() => navigate(`/dashboard/bots/${bot.id}`)}
+                >
+                  <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                        <Bot className="w-6 h-6 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <CardTitle className="text-lg">{bot.name}</CardTitle>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <CardTitle className="text-lg">{bot.name}</CardTitle>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/dashboard/bots/${bot.id}`);
+                        }}>
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
+                          Duplicate
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={(e) => e.stopPropagation()}>
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </CardHeader>
+                  <CardContent className="flex-1 flex flex-col">
+                    <CardDescription className="mb-4">
+                      {bot.description || 'No description'}
+                    </CardDescription>
+                    
+                    <div className="flex items-center gap-2 mb-4">
+                      <Badge 
+                        variant="outline" 
+                        className={
+                          bot.status === 'active' 
+                            ? "bg-success/10 text-success border-success/20"
+                            : bot.status === 'paused'
+                            ? "bg-warning/10 text-warning border-warning/20"
+                            : bot.status === 'archived'
+                            ? "bg-muted/10 text-muted-foreground border-muted/20"
+                            : "bg-primary/10 text-primary border-primary/20"
+                        }
+                      >
+                        <CheckCircle2 className="w-3 h-3 mr-1" />
+                        {bot.status}
+                      </Badge>
                     </div>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/dashboard/bots/${bot.id}`);
-                      }}>
-                        View Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
-                        Duplicate
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive" onClick={(e) => e.stopPropagation()}>
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col">
-                  <CardDescription className="mb-4">{bot.description}</CardDescription>
-                  
-                  <div className="flex items-center gap-2 mb-4">
-                    <Badge variant="outline" className="bg-success/10 text-success border-success/20">
-                      <CheckCircle2 className="w-3 h-3 mr-1" />
-                      {bot.status}
-                    </Badge>
-                  </div>
 
-                  <div className="mt-auto space-y-2 pt-4 border-t border-border/50">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        <MessageSquare className="w-4 h-4" />
-                        Conversations
-                      </span>
-                      <span className="font-medium">{bot.conversations.toLocaleString()}</span>
+                    <div className="mt-auto space-y-2 pt-4 border-t border-border/50">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground flex items-center gap-1">
+                          <MessageSquare className="w-4 h-4" />
+                          Conversations
+                        </span>
+                        <span className="font-medium">{bot.conversations_count.toLocaleString()}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Updated {formatTimeAgo(bot.updated_at)}
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      Updated {bot.lastUpdated}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))
+          )}
         </div>
       </div>
 

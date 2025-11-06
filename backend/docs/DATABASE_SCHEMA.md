@@ -1,4 +1,12 @@
-# Database Schema
+# Complete Database Schema
+
+## Tables Overview
+
+1. **`users`** - User/Tenant accounts (users = tenants)
+2. **`bots`** - Bot/Agent configurations
+3. **`installation_snippets`** - Embed codes and installation scripts
+
+---
 
 ## Current Tables
 
@@ -35,6 +43,64 @@ In this multi-tenant system, **users are tenants**. Each user account represents
 
 ---
 
+---
+
+### `bots` Table
+
+Stores all chatbot/bot configurations and settings for each user/tenant.
+
+#### Columns
+
+| Column Name | Type | Constraints | Description |
+|------------|------|-------------|-------------|
+| `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique bot identifier |
+| `user_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Owner/creator of the bot |
+| `name` | VARCHAR(255) | NOT NULL | Bot name |
+| `description` | TEXT | NULLABLE | Bot persona summary/description |
+| `slug` | VARCHAR(255) | NULLABLE, UNIQUE, INDEXED | URL-friendly identifier |
+| `status` | ENUM | NOT NULL, DEFAULT 'draft', INDEXED | Bot status: draft, active, paused, archived |
+| `is_active` | BOOLEAN | NOT NULL, DEFAULT true | Quick enable/disable toggle |
+| `last_deployed_at` | TIMESTAMP WITH TIME ZONE | NULLABLE | When bot was last deployed/activated |
+| `llm_config` | JSONB | NULLABLE | LLM configuration (model, temperature, style, etc.) |
+| `retrieval_config` | JSONB | NULLABLE | RAG/Retrieval configuration (Vector DB, filters, chunking, etc.) |
+| `guardrails` | JSONB | NULLABLE | Content guardrails (moderation, blocked phrases, filters) |
+| `branding` | JSONB | NULLABLE | Branding (logo, colors, welcome message, assistant name) |
+| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
+| `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
+
+#### Status Enum Values
+- `draft` - Bot is being created/configured (default)
+- `active` - Bot is live and operational
+- `paused` - Bot is temporarily disabled
+- `archived` - Bot is deactivated/removed
+
+---
+
+### `installation_snippets` Table
+
+Stores embed codes and script URLs for installing bots on customer websites.
+
+#### Columns
+
+| Column Name | Type | Constraints | Description |
+|------------|------|-------------|-------------|
+| `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique snippet identifier |
+| `user_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Owner/tenant reference |
+| `bot_id` | UUID | FOREIGN KEY → bots.id, NOT NULL, INDEXED, CASCADE DELETE | Bot reference - snippet is specific to this bot |
+| `script_url` | TEXT | NULLABLE | CDN-hosted script URL |
+| `embed_code` | TEXT | NOT NULL | Full JavaScript snippet for installation |
+| `name` | VARCHAR(255) | NULLABLE | Optional name/identifier (e.g., 'Production', 'Staging') |
+| `environment` | VARCHAR(50) | NULLABLE | Environment type: 'production', 'staging', 'development' |
+| `is_active` | BOOLEAN | NOT NULL, DEFAULT true | Whether this snippet is currently active/enabled |
+| `domain_whitelist` | JSONB | NULLABLE | List of allowed domains (null = no restrictions) |
+| `usage_count` | INTEGER | NOT NULL, DEFAULT 0 | Number of times this snippet has been used/accessed |
+| `last_used_at` | TIMESTAMP WITH TIME ZONE | NULLABLE | Timestamp when snippet was last accessed/used |
+| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
+| `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
+| `expires_at` | TIMESTAMP WITH TIME ZONE | NULLABLE | Optional expiry timestamp (null = never expires) |
+
+---
+
 ## SQL Equivalent
 
 ### Users Table
@@ -60,6 +126,61 @@ CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_id ON users(id);
 ```
 
+### Bots Table
+```sql
+CREATE TYPE bot_status AS ENUM ('draft', 'active', 'paused', 'archived');
+
+CREATE TABLE bots (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    slug VARCHAR(255) UNIQUE,
+    status bot_status NOT NULL DEFAULT 'draft',
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    last_deployed_at TIMESTAMP WITH TIME ZONE,
+    llm_config JSONB,
+    retrieval_config JSONB,
+    guardrails JSONB,
+    branding JSONB,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_bots_user_id ON bots(user_id);
+CREATE INDEX idx_bots_id ON bots(id);
+CREATE INDEX idx_bots_slug ON bots(slug);
+CREATE INDEX idx_bots_status ON bots(status);
+CREATE INDEX idx_bots_created_at ON bots(created_at);
+```
+
+### Installation Snippets Table
+```sql
+CREATE TABLE installation_snippets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    bot_id UUID NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+    script_url TEXT,
+    embed_code TEXT NOT NULL,
+    name VARCHAR(255),
+    environment VARCHAR(50),
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    domain_whitelist JSONB,
+    usage_count INTEGER NOT NULL DEFAULT 0,
+    last_used_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX idx_installation_snippets_user_id ON installation_snippets(user_id);
+CREATE INDEX idx_installation_snippets_bot_id ON installation_snippets(bot_id);
+CREATE INDEX idx_installation_snippets_id ON installation_snippets(id);
+CREATE INDEX idx_installation_snippets_is_active ON installation_snippets(is_active);
+CREATE INDEX idx_installation_snippets_created_at ON installation_snippets(created_at);
+CREATE INDEX idx_installation_snippets_user_bot ON installation_snippets(user_id, bot_id);
+```
+
 ## Key Features
 
 ### Users Table:
@@ -69,6 +190,23 @@ CREATE INDEX idx_users_id ON users(id);
 4. ✅ **`status`** - Enum with three states (active, pending_verification, suspended)
 5. ✅ **`plan`** - Subscription plan field
 6. ✅ **`settings`** - JSONB for miscellaneous configuration
+
+### Bots Table:
+1. ✅ **`user_id`** - Foreign key to users (CASCADE DELETE)
+2. ✅ **`status`** - Enum with four states (draft, active, paused, archived)
+3. ✅ **`llm_config`** - JSONB for LLM configuration (model, temperature, style, etc.)
+4. ✅ **`retrieval_config`** - JSONB for RAG/Vector DB configuration
+5. ✅ **`guardrails`** - JSONB for content moderation and safety rules
+6. ✅ **`branding`** - JSONB for logo, colors, welcome message, assistant name
+7. ✅ **`slug`** - URL-friendly identifier for public bot URLs
+
+### Installation Snippets Table:
+1. ✅ **`user_id` + `bot_id`** - Dual foreign keys for flexibility
+2. ✅ **`embed_code`** - Full JavaScript snippet for installation
+3. ✅ **`script_url`** - CDN-hosted script URL
+4. ✅ **`domain_whitelist`** - JSONB for security (restrict domains)
+5. ✅ **`usage_count` & `last_used_at`** - Analytics tracking
+6. ✅ **`expires_at`** - Optional expiry for time-limited access
 
 ## Example Data
 

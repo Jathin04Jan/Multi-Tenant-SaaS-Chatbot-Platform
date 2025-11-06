@@ -18,5 +18,8 @@ pydantic==2.5.0
 pydantic-settings==2.1.0
 email-validator==2.1.0
 
+# Storage
+minio==7.2.0
+
 # Note: CORS middleware is included in FastAPI, no separate package needed
 

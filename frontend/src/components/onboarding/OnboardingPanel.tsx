@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Upload, Globe, Trash2, RefreshCw, ArrowRight, CheckCircle2, Bot, Circle } from 'lucide-react';
-import { mockUploadFile, mockStartCrawl, mockGetGuardrails, mockSaveGuardrails } from '@/lib/api';
+import { mockUploadFile, mockStartCrawl, mockGetGuardrails, mockSaveGuardrails, createBot } from '@/lib/api';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -35,7 +35,20 @@ interface OnboardingPanelProps {
 }
 
 export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) => {
-  const { completedSteps, currentStep, setCurrentStep, completeStep, dataSources, addDataSource, removeDataSource, resetWizard } = useWizardStore();
+  const { 
+    completedSteps, 
+    currentStep, 
+    setCurrentStep, 
+    completeStep, 
+    dataSources, 
+    addDataSource, 
+    removeDataSource, 
+    resetWizard,
+    branding,
+    persona,
+    tone,
+    guardrails
+  } = useWizardStore();
   const [crawlUrl, setCrawlUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isCrawling, setIsCrawling] = useState(false);
@@ -182,15 +195,73 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     setCurrentStep(7);
   };
 
-  // Step 6: Install
-  const handleFinish = () => {
-    completeStep(7);
-    toast.success('Bot created successfully! 🎉');
-    setTimeout(() => {
-      onOpenChange(false);
-      // Reset for next time
-      resetWizard();
-    }, 1000);
+  // Step 7: Install
+  const handleFinish = async () => {
+    try {
+      // Get bot name from persona (BrandingForm updates persona.botName)
+      const botName = persona.botName || 'My Bot';
+      
+      // Prepare bot data from wizard store
+      const botData = {
+        name: botName,
+        description: `A ${tone.communicationStyle} chatbot`,
+        branding: {
+          logo_url: branding.logo || null,
+          primary_color: branding.primaryColor,
+          welcome_message: branding.welcomeMessage,
+          assistant_name: botName,
+        },
+        llm_config: {
+          model: 'gpt-4',
+          temperature: tone.llmTemperature,
+          communication_style: tone.communicationStyle,
+          style_prompt: tone.stylePrompt,
+        },
+        guardrails: {
+          max_response_length: guardrails.maxResponseLength,
+          blocked_phrases: guardrails.blockedPhrases,
+          block_explicit_content: guardrails.blockExplicitContent,
+          block_political_views: guardrails.blockPoliticalViews,
+          strictly_stick_to_topic: guardrails.strictlyStickToTopic,
+          block_personal_info: guardrails.blockPersonalInfo,
+          enable_fact_checking: guardrails.enableFactChecking,
+          custom_instructions: guardrails.customInstructions,
+        },
+        retrieval_config: {
+          data_sources: dataSources.map(ds => ({
+            id: ds.id,
+            name: ds.name,
+            type: ds.type,
+            status: ds.status,
+          })),
+          chunk_size: 1000,
+          chunk_overlap: 200,
+          embedding_model: 'text-embedding-ada-002',
+        },
+      };
+      
+      // Create bot via API
+      const response = await createBot(botData);
+      
+      if (response.error) {
+        toast.error(response.error || 'Failed to create bot');
+        return;
+      }
+      
+      completeStep(7);
+      toast.success('Bot created successfully! 🎉');
+      
+      setTimeout(() => {
+        onOpenChange(false);
+        // Reset for next time
+        resetWizard();
+        // Refresh the page to show the new bot
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      console.error('Error creating bot:', error);
+      toast.error('Failed to create bot. Please try again.');
+    }
   };
 
   const renderStepContent = () => {

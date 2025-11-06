@@ -2,31 +2,29 @@
 
 This directory contains detailed documentation for the backend API.
 
-## 📚 Documentation Files
+## 📚 Documentation Index
 
-- **EXPLANATIONS.md** - Technical concepts explained:
-  - PostgreSQL and SQLAlchemy
-  - Alembic migrations
-  - How they work together
+### Setup & Configuration
+- **[SETUP_ENV.md](./SETUP_ENV.md)** - Environment variable setup guide
+- **[DEV_WORKFLOW.md](./DEV_WORKFLOW.md)** - Development workflow and best practices
+- **[README_DEV.md](./README_DEV.md)** - Additional development documentation
 
-- **DEV_WORKFLOW.md** - Development workflow guide:
-  - Quick start without migrations
-  - When to use migrations
-  - Database reset procedures
+### Database
+- **[DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md)** - Complete database schema documentation
+- **[FINAL_SCHEMA.md](./FINAL_SCHEMA.md)** - Final database schema reference
+- **[MIGRATIONS_VS_CREATE_ALL.md](./MIGRATIONS_VS_CREATE_ALL.md)** - Explanation of Alembic migrations vs `create_all()`
 
-- **SETUP_ENV.md** - Environment variables setup:
-  - How to configure `.env` file
-  - Security best practices
-  - Production deployment checklist
+### Security
+- **[SECURITY.md](./SECURITY.md)** - Security features and best practices
 
-- **MIGRATIONS_VS_CREATE_ALL.md** - Migration best practices:
-  - When to use migrations vs `create_all()`
-  - Production considerations
-  - Team collaboration
+### Technical Explanations
+- **[EXPLANATIONS.md](./EXPLANATIONS.md)** - Technical concepts (SQLAlchemy, Alembic, etc.)
+- **[SQLALCHEMY_VS_RAW_SQL.md](./SQLALCHEMY_VS_RAW_SQL.md)** - SQLAlchemy vs raw SQL comparison
 
-## 🚀 Quick Links
+### Troubleshooting
+- **[DIAGNOSTIC.md](./DIAGNOSTIC.md)** - Route registration diagnostic guide
+- **[FIX_CORS.md](./FIX_CORS.md)** - CORS configuration and troubleshooting
 
-- [Main README](../README.md) - Backend overview and quick start
-- [Backend Setup Guide](../../BACKEND_SETUP.md) - Complete setup instructions
-- [Database Setup Guide](../../DATABASE_SETUP.md) - PostgreSQL setup
+## 🚀 Quick Start
 
+For quick setup instructions, see the main [README.md](../README.md) in the backend root directory.

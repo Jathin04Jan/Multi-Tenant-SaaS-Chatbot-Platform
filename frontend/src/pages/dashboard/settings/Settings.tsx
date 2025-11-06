@@ -1,22 +1,16 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, Key, CreditCard, Shield, Bot, Settings as SettingsIcon } from 'lucide-react';
+import { User, Key, Settings as SettingsIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Profile from './Profile';
 import ApiKeys from './ApiKeys';
-import Billing from './Billing';
-import Guardrails from '../Guardrails';
-import Agents from '../Agents';
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState('profile');
 
   const settingsTabs = [
     { id: 'profile', label: 'Profile', icon: User, component: Profile },
-    { id: 'agents', label: 'Agent Config', icon: Bot, component: Agents },
-    { id: 'guardrails', label: 'Guardrails', icon: Shield, component: Guardrails },
     { id: 'api-keys', label: 'API Keys', icon: Key, component: ApiKeys },
-    { id: 'billing', label: 'Billing', icon: CreditCard, component: Billing },
   ];
 
   const ActiveComponent = settingsTabs.find(tab => tab.id === activeTab)?.component || Profile;
@@ -41,7 +35,7 @@ const Settings = () => {
 
       {/* Settings Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 md:grid-cols-5 gap-2 h-auto p-1 glass rounded-xl">
+        <TabsList className="grid w-full grid-cols-2 gap-2 h-auto p-1 glass rounded-xl">
           {settingsTabs.map((tab) => {
             const Icon = tab.icon;
             return (

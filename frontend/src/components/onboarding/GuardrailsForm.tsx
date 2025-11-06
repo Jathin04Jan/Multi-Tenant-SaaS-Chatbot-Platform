@@ -11,7 +11,7 @@ interface GuardrailsFormProps {
   onComplete?: () => void;
 }
 
-export const GuardrailsForm = ({ onComplete }: GuardrailsFormProps) => {
+export const GuardrailsForm = ({}: GuardrailsFormProps) => {
   const [maxResponseLength, setMaxResponseLength] = useState(500);
   const [blockedPhrasesText, setBlockedPhrasesText] = useState('');
   const [enableFactChecking, setEnableFactChecking] = useState(true);

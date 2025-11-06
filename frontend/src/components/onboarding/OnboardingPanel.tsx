@@ -12,12 +12,8 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Upload, Globe, Trash2, RefreshCw, ArrowRight, ArrowLeft, CheckCircle2, Bot, Circle } from 'lucide-react';
-import { mockUploadFile, mockStartCrawl, mockGetGuardrails, mockSaveGuardrails } from '@/lib/api';
+import { mockUploadFile, mockStartCrawl } from '@/lib/api';
 import { toast } from 'sonner';
-import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
-
-dayjs.extend(relativeTime);
 
 const steps = [
   { number: 1, name: 'Brand & Persona' },
@@ -214,10 +210,6 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                 <BotPreview />
               </div>
             </div>
-
-            <Button onClick={handleBrandComplete} size="default" className="w-full">
-              Continue <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
           </div>
         );
 

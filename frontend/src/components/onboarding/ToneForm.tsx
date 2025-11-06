@@ -56,7 +56,7 @@ interface ToneFormProps {
   onComplete?: () => void;
 }
 
-export const ToneForm = ({ onComplete }: ToneFormProps) => {
+export const ToneForm = ({}: ToneFormProps) => {
   const { tone, updateTone } = useWizardStore();
   const [llmTemperature, setLlmTemperature] = useState(tone?.llmTemperature ?? 0.7);
   const [selectedStyle, setSelectedStyle] = useState<'professional' | 'friendly' | 'casual' | 'technical' | 'supportive' | 'enthusiastic'>(

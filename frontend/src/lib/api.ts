@@ -64,15 +64,105 @@ export interface GuardrailsDTO {
   escalationRules: Record<string, unknown>;
 }
 
+// API Base URL - use environment variable or default to localhost
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+// Helper function for API calls
+async function apiRequest<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<ApiResponse<T>> {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const token = localStorage.getItem('access_token');
+  
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+  
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers,
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      return {
+        data: data as T,
+        error: data.detail || data.message || 'An error occurred',
+      };
+    }
+    
+    return { data: data as T };
+  } catch (error) {
+    return {
+      data: {} as T,
+      error: error instanceof Error ? error.message : 'Network error',
+    };
+  }
+}
+
 // Auth
-export const mockSignUp = async (email: string, password: string): Promise<ApiResponse<{ userId: string }>> => {
-  await new Promise((resolve) => setTimeout(resolve, 800));
-  return { data: { userId: 'user_' + Math.random().toString(36).substring(7) } };
+export const mockSignUp = async (
+  email: string, 
+  password: string, 
+  fullName: string,
+  companyName: string,
+  domain?: string
+): Promise<ApiResponse<{ userId: string }>> => {
+  return apiRequest<{ access_token: string; token_type: string; user: any }>(
+    '/api/v1/auth/signup',
+    {
+      method: 'POST',
+      body: JSON.stringify({ 
+        email, 
+        password, 
+        full_name: fullName,
+        company_name: companyName,
+        domain: domain 
+      }),
+    }
+  ).then((response) => {
+    if (response.error) {
+      throw new Error(response.error);
+    }
+    if (response.data && response.data.access_token) {
+      localStorage.setItem('access_token', response.data.access_token);
+      return {
+        data: {
+          userId: response.data.user.id,
+        },
+      };
+    }
+    throw new Error(response.error || 'Sign up failed');
+  });
 };
 
-export const mockSignIn = async (email: string, password: string): Promise<ApiResponse<{ token: string }>> => {
-  await new Promise((resolve) => setTimeout(resolve, 600));
-  return { data: { token: 'mock_token_' + Math.random().toString(36) } };
+export const mockSignIn = async (email: string, password: string): Promise<ApiResponse<{ token: string; user: any }>> => {
+  return apiRequest<{ access_token: string; token_type: string; user: any }>(
+    '/api/v1/auth/signin',
+    {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    }
+  ).then((response) => {
+    if (response.data && response.data.access_token) {
+      localStorage.setItem('access_token', response.data.access_token);
+      return {
+        data: {
+          token: response.data.access_token,
+          user: response.data.user,
+        },
+      };
+    }
+    throw new Error(response.error || 'Sign in failed');
+  });
 };
 
 // Tenant

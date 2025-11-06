@@ -46,7 +46,7 @@ export const Sidebar = () => {
       {/* Sidebar */}
       <aside
         className={cn(
-          'relative flex flex-col border-r border-border/50 backdrop-blur-xl bg-background/80 transition-all duration-300 ease-in-out overflow-hidden',
+          'relative flex flex-col border-r border-border/50 glass transition-all duration-300 ease-in-out overflow-hidden',
           isCollapsed ? 'w-0 border-r-0' : 'w-64'
         )}
       >
@@ -92,13 +92,13 @@ export const Sidebar = () => {
         </div>
       </aside>
 
-      {/* Toggle Button - shows when collapsed */}
+      {/* Toggle Button - shows when collapsed, positioned to the left of where sidebar was */}
       {isCollapsed && (
         <Button
           onClick={toggleSidebar}
           variant="outline"
           size="icon"
-          className="absolute left-2 top-4 h-10 w-10 rounded-lg bg-background/90 backdrop-blur-xl hover:bg-muted shadow-lg z-20"
+          className="absolute left-2 top-4 h-10 w-10 rounded-lg glass hover:bg-muted shadow-lg z-20"
           aria-label="Expand sidebar"
         >
           <ChevronRight className="h-5 w-5" />

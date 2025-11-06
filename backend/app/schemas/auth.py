@@ -4,6 +4,8 @@ from datetime import datetime
 from uuid import UUID
 from app.models.user import UserStatus
 
+__all__ = ["UserSignUp", "UserSignIn", "UserResponse", "UserUpdate", "Token", "TokenData"]
+
 
 class UserSignUp(BaseModel):
     """Schema for user/tenant registration."""
@@ -63,4 +65,11 @@ class TokenData(BaseModel):
     """Schema for token data."""
     user_id: Optional[UUID] = None
     email: Optional[str] = None
+
+
+class UserUpdate(BaseModel):
+    """Schema for updating user profile."""
+    full_name: Optional[str] = Field(None, min_length=1, description="Full name")
+    company_name: Optional[str] = Field(None, min_length=1, description="Company/Organization name")
+    domain: Optional[str] = Field(None, description="Tenant domain (optional)")
 

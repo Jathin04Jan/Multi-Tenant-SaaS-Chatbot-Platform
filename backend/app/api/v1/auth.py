@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.api.dependencies import get_current_user
 from app.core.database import get_db
-from app.schemas.auth import UserSignIn, UserSignUp, Token, UserResponse
+from app.schemas.auth import UserSignIn, UserSignUp, Token, UserResponse, UserUpdate
 from app.services.auth_service import AuthService
 from app.models.user import User
 
@@ -77,4 +77,44 @@ async def get_current_user_info(
     Requires valid access token.
     """
     return UserResponse.from_orm(current_user)
+
+
+@router.patch("/me", response_model=UserResponse)
+async def update_current_user(
+    user_update: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Update current user profile information.
+    Requires valid access token.
+    
+    - **full_name**: Update full name (optional)
+    - **company_name**: Update company/organization name (optional)
+    - **domain**: Update tenant domain (optional)
+    """
+    try:
+        # Get only the fields that were actually provided (not None defaults)
+        update_data = user_update.model_dump(exclude_unset=True)
+        
+        # Update only provided fields
+        if 'full_name' in update_data:
+            current_user.full_name = update_data['full_name']
+        if 'company_name' in update_data:
+            current_user.company_name = update_data['company_name']
+        if 'domain' in update_data:
+            # Convert empty string to None, otherwise use the provided value
+            domain_value = update_data['domain']
+            current_user.domain = domain_value.strip() if domain_value and domain_value.strip() else None
+        
+        db.commit()
+        db.refresh(current_user)
+        
+        return UserResponse.from_orm(current_user)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while updating profile: {str(e)}"
+        )
 

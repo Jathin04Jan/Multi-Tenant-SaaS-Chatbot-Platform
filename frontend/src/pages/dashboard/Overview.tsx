@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { FileText, Database, ArrowRight, Bot, Activity, MessageCircle, CheckCircle2, AlertCircle, Clock, Zap, Bell, Settings, Link as LinkIcon, TrendingUp, Users, Shield, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { FileText, Database, ArrowRight, Bot, Activity, MessageCircle, CheckCircle2, AlertCircle, Clock, Zap, Bell, Settings, Link as LinkIcon, TrendingUp, Users, Shield, RefreshCw, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useUserStore } from '@/store/user';
@@ -8,11 +8,40 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { EmbedCodeDialog } from '@/components/EmbedCodeDialog';
+import { apiRequest } from '@/lib/api';
+
+interface UserData {
+  full_name: string;
+  email: string;
+}
 
 const Overview = () => {
   const userName = useUserStore((state) => state.userName);
   const { completedSteps } = useWizardStore();
   const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch user data on mount
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await apiRequest<UserData>('/api/v1/auth/me', {
+          method: 'GET',
+        });
+        
+        if (response.data) {
+          setUserData(response.data);
+        }
+      } catch (error) {
+        // Silently fail - use fallback
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, []);
   
   // Check if onboarding is complete (all 5 steps completed)
   const isOnboardingComplete = completedSteps instanceof Set 
@@ -93,11 +122,23 @@ const Overview = () => {
         transition={{ duration: 0.4 }}
         className="flex items-center justify-between"
       >
-        <div>
-          <h1 className="text-4xl font-bold mb-2">Overview</h1>
-          <p className="text-muted-foreground text-lg">
-            Welcome back{userName ? `, ${userName}` : ''}! Here's your workspace at a glance.
-          </p>
+        <div className="space-y-3">
+          <h1 className="text-4xl font-bold">Overview</h1>
+          <motion.div
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, delay: 0.2 }}
+            className="flex items-center gap-2"
+          >
+            <Sparkles className="w-5 h-5 text-primary" />
+            <p className="text-lg text-muted-foreground">
+              Welcome back,{' '}
+              <span className="font-semibold text-foreground">
+                {userData?.full_name || userName || 'there'}
+              </span>
+              ! Here's your workspace at a glance.
+            </p>
+          </motion.div>
         </div>
       </motion.div>
 

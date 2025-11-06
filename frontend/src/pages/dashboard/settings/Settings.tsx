@@ -1,19 +1,19 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, Key, Settings as SettingsIcon } from 'lucide-react';
+import { Key, Palette, Settings as SettingsIcon } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import Profile from './Profile';
 import ApiKeys from './ApiKeys';
+import Appearance from './Appearance';
 
 const Settings = () => {
-  const [activeTab, setActiveTab] = useState('profile');
+  const [activeTab, setActiveTab] = useState('appearance');
 
   const settingsTabs = [
-    { id: 'profile', label: 'Profile', icon: User, component: Profile },
+    { id: 'appearance', label: 'Appearance', icon: Palette, component: Appearance },
     { id: 'api-keys', label: 'API Keys', icon: Key, component: ApiKeys },
   ];
 
-  const ActiveComponent = settingsTabs.find(tab => tab.id === activeTab)?.component || Profile;
+  const ActiveComponent = settingsTabs.find(tab => tab.id === activeTab)?.component || Appearance;
 
   return (
     <div className="container max-w-7xl px-4 py-8 space-y-8">
@@ -42,7 +42,7 @@ const Settings = () => {
               <TabsTrigger
                 key={tab.id}
                 value={tab.id}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg glass transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:ring-2 data-[state=active]:ring-primary/50 data-[state=inactive]:bg-background/40 data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-background/60"
               >
                 <Icon className="w-4 h-4" />
                 <span className="hidden sm:inline">{tab.label}</span>

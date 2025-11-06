@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Upload, Globe, Trash2, RefreshCw, ArrowRight, CheckCircle2, Bot, Circle } from 'lucide-react';
+import { Upload, Globe, Trash2, RefreshCw, ArrowRight, ArrowLeft, CheckCircle2, Bot, Circle } from 'lucide-react';
 import { mockUploadFile, mockStartCrawl, mockGetGuardrails, mockSaveGuardrails } from '@/lib/api';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
@@ -22,9 +22,9 @@ dayjs.extend(relativeTime);
 const steps = [
   { number: 1, name: 'Brand & Persona' },
   { number: 2, name: 'Tone' },
-  { number: 3, name: 'Data Sources' },
-  { number: 4, name: 'Indexing' },
-  { number: 5, name: 'Guardrails' },
+  { number: 3, name: 'Guardrails' },
+  { number: 4, name: 'Data Sources' },
+  { number: 5, name: 'Indexing' },
   { number: 6, name: 'Test Chat' },
   { number: 7, name: 'Install' },
 ];
@@ -77,7 +77,13 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     setCurrentStep(3);
   };
 
-  // Step 3: Data Sources
+  // Step 3: Guardrails
+  const handleGuardrailsContinue = () => {
+    completeStep(3);
+    setCurrentStep(4);
+  };
+
+  // Step 4: Data Sources
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -130,8 +136,8 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
       toast.error('Please add at least one data source');
       return;
     }
-    completeStep(3);
-    setCurrentStep(4);
+    completeStep(4);
+    setCurrentStep(5);
     // Start indexing simulation
     setIndexingStatus('indexing');
     setIndexingProgress(0);
@@ -147,19 +153,13 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     }, 500);
   };
 
-  // Step 4: Indexing
+  // Step 5: Indexing
   useEffect(() => {
-    if (indexingStatus === 'completed' && indexingProgress === 100 && currentStep === 4) {
-      completeStep(4);
-      setCurrentStep(5);
+    if (indexingStatus === 'completed' && indexingProgress === 100 && currentStep === 5) {
+      completeStep(5);
+      setCurrentStep(6);
     }
   }, [indexingStatus, indexingProgress, currentStep, completeStep, setCurrentStep]);
-
-  // Step 5: Guardrails
-  const handleGuardrailsContinue = () => {
-    completeStep(5);
-    setCurrentStep(6);
-  };
 
   // Step 6: Test Chat
   const handleTestMessage = () => {
@@ -214,6 +214,10 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                 <BotPreview />
               </div>
             </div>
+
+            <Button onClick={handleBrandComplete} size="default" className="w-full">
+              Continue <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
           </div>
         );
 
@@ -231,13 +235,58 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
               <ToneForm onComplete={handleToneComplete} />
             </div>
 
-            <Button onClick={handleToneComplete} size="default" className="w-full">
-              Continue <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+            <div className="flex gap-3">
+              <Button 
+                onClick={() => setCurrentStep(1)} 
+                variant="outline" 
+                size="default" 
+                className="flex-1"
+              >
+                Previous
+              </Button>
+              <Button onClick={handleToneComplete} size="default" className="flex-1">
+                Continue <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </div>
         );
 
       case 3:
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-semibold mb-2">Guardrails</h2>
+              <p className="text-muted-foreground text-sm">
+                Configure safety measures and content guardrails for your chatbot
+              </p>
+            </div>
+
+            {/* Guardrails Form */}
+            <div className="glass-card p-6">
+              <GuardrailsForm onComplete={handleGuardrailsContinue} />
+            </div>
+
+            <div className="flex gap-3">
+              <Button 
+                onClick={() => setCurrentStep(2)} 
+                variant="outline" 
+                size="default" 
+                className="flex-1"
+              >
+                Previous
+              </Button>
+              <Button 
+                onClick={handleGuardrailsContinue} 
+                size="default" 
+                className="flex-1"
+              >
+                Continue <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        );
+
+      case 4:
         return (
           <div className="space-y-6">
             <div>
@@ -306,13 +355,23 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
               </div>
             )}
 
-            <Button onClick={handleDataContinue} size="default" className="w-full">
-              Continue <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+            <div className="flex gap-3">
+              <Button 
+                onClick={() => setCurrentStep(3)} 
+                variant="outline" 
+                size="default" 
+                className="flex-1"
+              >
+                Previous
+              </Button>
+              <Button onClick={handleDataContinue} size="default" className="flex-1">
+                Continue <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </div>
         );
 
-      case 4:
+      case 5:
         // Calculate sub-stage progress based on overall progress
         const getStageStatus = (stageProgress: number) => {
           if (indexingProgress >= stageProgress) return 'complete';
@@ -409,32 +468,27 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        );
 
-      case 5:
-        return (
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-semibold mb-2">Guardrails</h2>
-              <p className="text-muted-foreground text-sm">
-                Configure safety measures and content guardrails for your chatbot
-              </p>
+              {indexingStatus === 'completed' && (
+                <div className="flex gap-3">
+                  <Button 
+                    onClick={() => setCurrentStep(4)} 
+                    variant="outline" 
+                    size="default" 
+                    className="flex-1"
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Previous
+                  </Button>
+                  <Button 
+                    onClick={() => setCurrentStep(6)} 
+                    size="default" 
+                    className="flex-1"
+                  >
+                    Continue <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </div>
-
-            {/* Guardrails Form */}
-            <div className="glass-card p-6">
-              <GuardrailsForm onComplete={handleGuardrailsContinue} />
-            </div>
-
-            <Button 
-              onClick={handleGuardrailsContinue} 
-              size="default" 
-              className="w-full"
-            >
-              Continue <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
           </div>
         );
 
@@ -507,9 +561,19 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
               </div>
             </div>
 
-            <Button onClick={handleTestContinue} size="default" className="w-full">
-              Continue <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+            <div className="flex gap-3">
+              <Button 
+                onClick={() => setCurrentStep(5)} 
+                variant="outline" 
+                size="default" 
+                className="flex-1"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" /> Previous
+              </Button>
+              <Button onClick={handleTestContinue} size="default" className="flex-1">
+                Continue <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </div>
         );
 
@@ -560,9 +624,19 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
               </div>
             </div>
 
-            <Button onClick={handleFinish} size="default" className="w-full">
-              Complete Setup <CheckCircle2 className="ml-2 h-4 w-4" />
-            </Button>
+            <div className="flex gap-3">
+              <Button 
+                onClick={() => setCurrentStep(6)} 
+                variant="outline" 
+                size="default" 
+                className="flex-1"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" /> Previous
+              </Button>
+              <Button onClick={handleFinish} size="default" className="flex-1">
+                Complete Setup <CheckCircle2 className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </div>
         );
 

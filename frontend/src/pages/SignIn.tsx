@@ -26,11 +26,15 @@ const SignIn = () => {
   const onSubmit = async (data: SignInInput) => {
     setIsLoading(true);
     try {
-      await mockSignIn(data.email, data.password);
-      toast.success('Welcome back!');
-      navigate('/dashboard');
+      const response = await mockSignIn(data.email, data.password);
+      if (response.error) {
+        toast.error(response.error || 'Invalid credentials. Please try again.');
+      } else {
+        toast.success('Welcome back!');
+        navigate('/dashboard');
+      }
     } catch (error) {
-      toast.error('Invalid credentials. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Invalid credentials. Please try again.');
     } finally {
       setIsLoading(false);
     }

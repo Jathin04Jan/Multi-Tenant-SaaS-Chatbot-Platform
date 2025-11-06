@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Bot, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,10 +20,14 @@ const SignUp = () => {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
     watch,
   } = useForm<SignUpInput>({
     resolver: zodResolver(signUpSchema),
+    defaultValues: {
+      terms: false,
+    },
   });
 
   const password = watch('password');
@@ -40,14 +44,24 @@ const SignUp = () => {
   const onSubmit = async (data: SignUpInput) => {
     setIsLoading(true);
     try {
-      const userResponse = await mockSignUp(data.email, data.password);
-      const tenantResponse = await mockCreateTenant();
+      const userResponse = await mockSignUp(
+        data.email, 
+        data.password, 
+        data.full_name,
+        data.company_name,
+        data.domain
+      );
+      if (userResponse.error) {
+        toast.error(userResponse.error || 'Failed to create account. Please try again.');
+        return;
+      }
       
+      const tenantResponse = await mockCreateTenant();
       setTenantId(tenantResponse.data.tenantId);
       toast.success('Account created! Check your email to verify.');
       navigate('/verify');
     } catch (error) {
-      toast.error('Failed to create account. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to create account. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -91,6 +105,54 @@ const SignUp = () => {
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
+              <label htmlFor="full_name" className="text-sm font-medium block mb-2">
+                Full Name <span className="text-destructive">*</span>
+              </label>
+              <Input
+                id="full_name"
+                type="text"
+                placeholder="John Doe"
+                className="rounded-xl"
+                {...register('full_name')}
+              />
+              {errors.full_name && (
+                <p className="text-sm text-destructive mt-1">{errors.full_name.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="company_name" className="text-sm font-medium block mb-2">
+                Company/Organization Name <span className="text-destructive">*</span>
+              </label>
+              <Input
+                id="company_name"
+                type="text"
+                placeholder="Acme Corporation"
+                className="rounded-xl"
+                {...register('company_name')}
+              />
+              {errors.company_name && (
+                <p className="text-sm text-destructive mt-1">{errors.company_name.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="domain" className="text-sm font-medium block mb-2">
+                Domain (Optional)
+              </label>
+              <Input
+                id="domain"
+                type="text"
+                placeholder="acme.com"
+                className="rounded-xl"
+                {...register('domain')}
+              />
+              {errors.domain && (
+                <p className="text-sm text-destructive mt-1">{errors.domain.message}</p>
+              )}
+            </div>
+
+            <div>
               <label htmlFor="email" className="text-sm font-medium block mb-2">
                 Email
               </label>
@@ -133,8 +195,18 @@ const SignUp = () => {
             </div>
 
             <div className="flex items-start gap-2">
-              <Checkbox id="terms" {...register('terms')} />
-              <label htmlFor="terms" className="text-sm leading-relaxed">
+              <Controller
+                name="terms"
+                control={control}
+                render={({ field }) => (
+                  <Checkbox
+                    id="terms"
+                    checked={field.value}
+                    onCheckedChange={(checked) => field.onChange(checked === true)}
+                  />
+                )}
+              />
+              <label htmlFor="terms" className="text-sm leading-relaxed cursor-pointer">
                 I agree to the{' '}
                 <Link to="#" className="text-primary hover:underline">
                   Terms of Service
@@ -143,10 +215,11 @@ const SignUp = () => {
                 <Link to="#" className="text-primary hover:underline">
                   Privacy Policy
                 </Link>
+                <span className="text-destructive ml-1">*</span>
               </label>
             </div>
             {errors.terms && (
-              <p className="text-sm text-destructive">{errors.terms.message}</p>
+              <p className="text-sm text-destructive mt-1">{errors.terms.message}</p>
             )}
 
             <Button

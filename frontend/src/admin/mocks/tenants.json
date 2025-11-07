@@ -1,0 +1,11 @@
+[
+  {"id":"t-001","name":"Acme Corp","slug":"acme","plan":"business","region":"us","bots":4,"usageMessages":12470,"spendUsd":412.33,"status":"active","lastActivity":"2025-11-07T07:21:00Z"},
+  {"id":"t-002","name":"Nova Retail","slug":"nova","plan":"pro","region":"eu","bots":2,"usageMessages":5270,"spendUsd":129.55,"status":"active","lastActivity":"2025-11-07T06:10:00Z"},
+  {"id":"t-003","name":"Mint Health","slug":"mint","plan":"enterprise","region":"in","bots":6,"usageMessages":32210,"spendUsd":1187.92,"status":"active","lastActivity":"2025-11-07T07:05:00Z"},
+  {"id":"t-004","name":"Orbit EDU","slug":"orbit","plan":"free","region":"apac","bots":1,"usageMessages":96,"spendUsd":0,"status":"trial","lastActivity":"2025-11-05T12:00:00Z"},
+  {"id":"t-005","name":"Zen Logistics","slug":"zen","plan":"business","region":"eu","bots":3,"usageMessages":7880,"spendUsd":210.04,"status":"past_due","lastActivity":"2025-11-06T19:40:00Z"},
+  {"id":"t-006","name":"Pixel Media","slug":"pixel","plan":"pro","region":"us","bots":2,"usageMessages":1900,"spendUsd":44.12,"status":"active","lastActivity":"2025-11-07T01:30:00Z"},
+  {"id":"t-007","name":"Kite Travel","slug":"kite","plan":"business","region":"apac","bots":3,"usageMessages":10450,"spendUsd":315.77,"status":"active","lastActivity":"2025-11-07T04:15:00Z"},
+  {"id":"t-008","name":"Atlas Finance","slug":"atlas","plan":"enterprise","region":"us","bots":8,"usageMessages":40550,"spendUsd":1580.40,"status":"suspended","lastActivity":"2025-11-02T09:00:00Z"}
+]
+

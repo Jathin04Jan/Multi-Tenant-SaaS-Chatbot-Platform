@@ -1,0 +1,6 @@
+[
+  { "id": "d-1", "tenantId": "t-001", "endpointId": "wh-1", "event": "message.created", "ts": "2025-11-07T07:10:00Z", "status": "ok" },
+  { "id": "d-2", "tenantId": "t-001", "endpointId": "wh-1", "event": "job.completed", "ts": "2025-11-07T06:40:00Z", "status": "ok" },
+  { "id": "d-3", "tenantId": "t-005", "endpointId": "wh-2", "event": "source.synced", "ts": "2025-11-06T18:50:00Z", "status": "retry" }
+]
+

@@ -1,0 +1,15 @@
+[
+  {"id":"b-001","tenantId":"t-001","name":"Acme Support","model":"gpt-4o","temperature":0.7,"status":"active","lastDeploy":"2025-11-06T10:00:00Z","errors24h":1,"successRate":94},
+  {"id":"b-002","tenantId":"t-001","name":"Acme Sales","model":"gpt-4o-mini","temperature":0.6,"status":"active","lastDeploy":"2025-11-05T15:10:00Z","errors24h":0,"successRate":91},
+  {"id":"b-003","tenantId":"t-002","name":"Nova FAQ","model":"claude-3.5-sonnet","temperature":0.5,"status":"active","lastDeploy":"2025-11-03T13:00:00Z","errors24h":2,"successRate":89},
+  {"id":"b-004","tenantId":"t-003","name":"Mint Triage","model":"gpt-4o","temperature":0.2,"status":"active","lastDeploy":"2025-11-07T06:10:00Z","errors24h":0,"successRate":97},
+  {"id":"b-005","tenantId":"t-003","name":"Mint Intake","model":"gpt-4o-mini","temperature":0.3,"status":"active","lastDeploy":"2025-11-04T07:00:00Z","errors24h":1,"successRate":95},
+  {"id":"b-006","tenantId":"t-004","name":"Orbit Help","model":"gpt-4o","temperature":0.7,"status":"disabled","lastDeploy":"2025-10-31T09:00:00Z","errors24h":0,"successRate":0},
+  {"id":"b-007","tenantId":"t-005","name":"Zen Ops","model":"claude-3.5-sonnet","temperature":0.4,"status":"active","lastDeploy":"2025-11-01T08:00:00Z","errors24h":4,"successRate":83},
+  {"id":"b-008","tenantId":"t-006","name":"Pixel Assist","model":"gpt-4o-mini","temperature":0.8,"status":"active","lastDeploy":"2025-11-06T18:10:00Z","errors24h":0,"successRate":90},
+  {"id":"b-009","tenantId":"t-007","name":"Kite Concierge","model":"gpt-4o","temperature":0.7,"status":"active","lastDeploy":"2025-11-05T17:00:00Z","errors24h":1,"successRate":92},
+  {"id":"b-010","tenantId":"t-008","name":"Atlas Advisor","model":"gpt-4o","temperature":0.4,"status":"disabled","lastDeploy":"2025-10-20T10:00:00Z","errors24h":0,"successRate":0},
+  {"id":"b-011","tenantId":"t-001","name":"Acme Onboarding","model":"gpt-4o-mini","temperature":0.6,"status":"active","lastDeploy":"2025-11-02T12:00:00Z","errors24h":0,"successRate":93},
+  {"id":"b-012","tenantId":"t-007","name":"Kite Booking","model":"gpt-4o-mini","temperature":0.6,"status":"active","lastDeploy":"2025-11-06T07:45:00Z","errors24h":0,"successRate":90}
+]
+

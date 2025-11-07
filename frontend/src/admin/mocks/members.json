@@ -1,0 +1,6 @@
+[
+  { "id": "u-1", "tenantId": "t-001", "name": "Alice Johnson", "email": "alice@acme.com", "role": "owner" },
+  { "id": "u-2", "tenantId": "t-001", "name": "Bob Smith", "email": "bob@acme.com", "role": "admin" },
+  { "id": "u-3", "tenantId": "t-003", "name": "Dr. Minty", "email": "mint@minthealth.io", "role": "owner" }
+]
+

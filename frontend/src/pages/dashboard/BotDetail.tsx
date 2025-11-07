@@ -621,12 +621,37 @@ const BotDetail = () => {
         transition={{ duration: 0.4, delay: 0.2 }}
       >
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="configuration">Configuration</TabsTrigger>
-            <TabsTrigger value="documents">Manage Knowledge Base</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-5 gap-2 h-auto p-1 glass rounded-xl">
+            <TabsTrigger 
+              value="overview"
+              className="glass transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:ring-2 data-[state=active]:ring-primary/50 data-[state=inactive]:bg-background/40 data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-background/60"
+            >
+              Overview
+            </TabsTrigger>
+            <TabsTrigger 
+              value="configuration"
+              className="glass transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:ring-2 data-[state=active]:ring-primary/50 data-[state=inactive]:bg-background/40 data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-background/60"
+            >
+              Configuration
+            </TabsTrigger>
+            <TabsTrigger 
+              value="documents"
+              className="glass transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:ring-2 data-[state=active]:ring-primary/50 data-[state=inactive]:bg-background/40 data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-background/60"
+            >
+              Manage Knowledge Base
+            </TabsTrigger>
+            <TabsTrigger 
+              value="analytics"
+              className="glass transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:ring-2 data-[state=active]:ring-primary/50 data-[state=inactive]:bg-background/40 data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-background/60"
+            >
+              Analytics
+            </TabsTrigger>
+            <TabsTrigger 
+              value="settings"
+              className="glass transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:ring-2 data-[state=active]:ring-primary/50 data-[state=inactive]:bg-background/40 data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-background/60"
+            >
+              Settings
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}

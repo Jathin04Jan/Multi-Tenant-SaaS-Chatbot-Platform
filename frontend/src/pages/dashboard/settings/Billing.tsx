@@ -157,7 +157,7 @@ const Billing = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.1 * index }}
-                className={`glass-card p-6 relative ${isCurrent ? 'ring-2 ring-primary' : ''}`}
+                className={`glass-card p-6 relative flex flex-col ${isCurrent ? 'ring-2 ring-primary' : ''}`}
               >
                 {isCurrent && (
                   <Badge className="absolute top-4 right-4" variant="default">
@@ -172,7 +172,7 @@ const Billing = () => {
                   </div>
                 </div>
 
-                <ul className="space-y-2 mb-6">
+                <ul className="space-y-2 mb-6 flex-1">
                   {plan.features.map((feature, idx) => (
                     <li key={idx} className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5 shrink-0" />
@@ -182,7 +182,7 @@ const Billing = () => {
                 </ul>
 
                 <Button
-                  className="w-full rounded-xl"
+                  className="w-full rounded-xl mt-auto"
                   variant={isCurrent ? 'outline' : isUpgrade ? 'default' : 'secondary'}
                   disabled={isCurrent || updating}
                   onClick={() => changePlan(plan.id)}

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { FileText, Database, ArrowRight, Bot, Activity, MessageCircle, CheckCircle2, AlertCircle, Clock, Zap, Bell, Settings, Link as LinkIcon, TrendingUp, Users, Shield, RefreshCw, Sparkles } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import type { ReactNode } from 'react';
+import { FileText, Database, ArrowRight, Bot, Activity, MessageCircle, CheckCircle2, Clock, Zap, Bell, Settings, Link as LinkIcon, TrendingUp, Users, Shield, RefreshCw, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useUserStore } from '@/store/user';
@@ -20,7 +21,6 @@ const Overview = () => {
   const { completedSteps } = useWizardStore();
   const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
-  const [loading, setLoading] = useState(true);
 
   // Fetch user data on mount
   useEffect(() => {
@@ -35,8 +35,6 @@ const Overview = () => {
         }
       } catch (error) {
         // Silently fail - use fallback
-      } finally {
-        setLoading(false);
       }
     };
 
@@ -146,7 +144,7 @@ const Overview = () => {
       <div className="border-t border-[hsl(40_20%_75%)] dark:hidden" />
 
       {/* Main Content */}
-      <div className="rounded-2xl bg-card p-6 mt-4 space-y-8">
+      <div className="glass-card rounded-2xl p-6 mt-4 space-y-8">
         {/* Bot Status & Health */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -197,12 +195,12 @@ const Overview = () => {
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
             {quickActions.map((action, index) => {
               const ActionWrapper = action.onClick 
-                ? ({ children }: { children: React.ReactNode }) => (
+                ? ({ children }: { children: ReactNode }) => (
                     <div onClick={action.onClick} className="cursor-pointer">
                       {children}
                     </div>
                   )
-                : ({ children }: { children: React.ReactNode }) => (
+                : ({ children }: { children: ReactNode }) => (
                     <Link to={action.href!}>
                       {children}
                     </Link>

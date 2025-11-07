@@ -3,7 +3,8 @@ import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { useWizardStore } from '@/store/wizard';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, AlertTriangle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // Communication style options with predefined prompts
 const styleOptions = [
@@ -55,10 +56,12 @@ interface ToneFormProps {
   onComplete?: () => void;
 }
 
-export const ToneForm = ({ onComplete }: ToneFormProps) => {
+export const ToneForm = ({}: ToneFormProps) => {
   const { tone, updateTone } = useWizardStore();
   const [llmTemperature, setLlmTemperature] = useState(tone?.llmTemperature ?? 0.7);
-  const [selectedStyle, setSelectedStyle] = useState<string>(tone?.communicationStyle ?? 'friendly');
+  const [selectedStyle, setSelectedStyle] = useState<'professional' | 'friendly' | 'casual' | 'technical' | 'supportive' | 'enthusiastic'>(
+    (tone?.communicationStyle as 'professional' | 'friendly' | 'casual' | 'technical' | 'supportive' | 'enthusiastic') ?? 'friendly'
+  );
   const [stylePrompt, setStylePrompt] = useState<string>(tone?.stylePrompt ?? '');
 
   // Initialize prompt when component mounts
@@ -92,7 +95,7 @@ export const ToneForm = ({ onComplete }: ToneFormProps) => {
     }
   }, [selectedStyle]);
 
-  const handleStyleSelect = (style: string) => {
+  const handleStyleSelect = (style: 'professional' | 'friendly' | 'casual' | 'technical' | 'supportive' | 'enthusiastic') => {
     setSelectedStyle(style);
     const selectedOption = styleOptions.find(opt => opt.value === style);
     if (selectedOption) {
@@ -126,9 +129,37 @@ export const ToneForm = ({ onComplete }: ToneFormProps) => {
       <div className="space-y-6">
         {/* LLM Temperature Slider */}
         <div>
-          <label className="text-sm font-medium block mb-3">
-            LLM Temperature: {llmTemperature.toFixed(2)}
-          </label>
+          <div className="flex items-center gap-2 mb-3">
+            <label className="text-sm font-medium">
+              LLM Temperature: {llmTemperature.toFixed(2)}
+            </label>
+            <AnimatePresence>
+              {llmTemperature > 0.50 && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                  className="flex items-center gap-1 text-amber-500"
+                >
+                  <motion.div
+                    animate={{ 
+                      rotate: [0, -10, 10, -10, 0],
+                      scale: [1, 1.1, 1, 1.1, 1]
+                    }}
+                    transition={{ 
+                      duration: 0.5,
+                      repeat: Infinity,
+                      repeatDelay: 2
+                    }}
+                  >
+                    <AlertTriangle className="w-4 h-4" />
+                  </motion.div>
+                  <span className="text-xs font-medium">Warning: Elevated creativity can hinder your performance</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
           <Slider
             value={[llmTemperature]}
             onValueChange={handleTemperatureChange}

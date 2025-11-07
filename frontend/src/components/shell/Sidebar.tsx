@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bot, LayoutDashboard, BarChart3, CreditCard, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, BarChart3, CreditCard, Sidebar as SidebarIcon, Bot } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -25,12 +25,6 @@ const navigation = [
     href: '/dashboard/settings/billing',
     icon: CreditCard,
   },
-  // [schema-demo:additive]
-  // {
-  //   name: 'Metrics', // [schema-demo:additive]
-  //   href: '/dashboard/demo', // [schema-demo:additive]
-  //   icon: LayoutDashboard,
-  // },
 ];
 
 export const Sidebar = () => {
@@ -42,66 +36,82 @@ export const Sidebar = () => {
   };
 
   return (
-    <div className="relative flex">
+    <div className="fixed left-0 top-16 bottom-0 flex z-30">
       {/* Sidebar */}
       <aside
         className={cn(
-          'relative flex flex-col border-r border-border/50 backdrop-blur-xl bg-background/80 transition-all duration-300 ease-in-out overflow-hidden',
+          'relative flex flex-col h-full border-r border-border/50 glass transition-all duration-300 ease-in-out overflow-visible',
           isCollapsed ? 'w-0 border-r-0' : 'w-64'
         )}
       >
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto pt-6">
-          {navigation.map((item) => {
-            const isActive = location.pathname === item.href || 
-              (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
-
-            return (
-              <Link
-                key={item.name}
-                to={item.href}
-                className={cn(
-                  'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
-                  isActive
-                    ? 'bg-primary text-primary-foreground shadow-lg'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                  isCollapsed && 'opacity-0 pointer-events-none'
-                )}
-              >
-                <item.icon className="w-5 h-5 shrink-0" />
-                {!isCollapsed && <span>{item.name}</span>}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Toggle Button - inside sidebar at the bottom */}
-        <div className={cn(
-          'border-t border-border/50 p-4 transition-opacity duration-300',
-          isCollapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
-        )}>
+        {/* Toggle Button - positioned on the border at the top right */}
+        {!isCollapsed && (
           <Button
             onClick={toggleSidebar}
-            variant="outline"
-            size="sm"
-            className="w-full justify-start gap-2 rounded-xl"
+            variant="ghost"
+            size="icon"
+            className="absolute -right-3.5 top-3 h-7 w-7 rounded-lg glass hover:bg-muted shadow-lg z-10 border border-border/50"
             aria-label="Collapse sidebar"
           >
-            <ChevronLeft className="h-4 w-4" />
-            <span>Collapse</span>
+            <SidebarIcon className="h-4 w-4" />
+            <span className="sr-only">Toggle Sidebar</span>
           </Button>
-        </div>
+        )}
+
+        {!isCollapsed && (
+          <>
+            {/* Header Section with Logo and Title */}
+            <div className="flex items-center justify-between px-4 py-4 border-b border-border/50">
+              <div className="flex items-center gap-3">
+                {/* Logo */}
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                  <Bot className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-foreground">YourBot</h2>
+                  <p className="text-xs text-muted-foreground">Dashboard</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Navigation Items */}
+            <nav className="flex-1 px-4 py-4 space-y-2 overflow-y-auto">
+              {navigation.map((item) => {
+                const isActive = location.pathname === item.href || 
+                  (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
+
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap',
+                      isActive
+                        ? 'bg-primary text-primary-foreground shadow-md'
+                        : 'text-foreground hover:bg-muted/50'
+                    )}
+                  >
+                    <item.icon className="w-5 h-5 shrink-0" />
+                    <span>{item.name}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </>
+        )}
       </aside>
 
-      {/* Toggle Button - shows when collapsed */}
+      {/* Toggle Button - shows when collapsed, positioned to the left of where sidebar was */}
       {isCollapsed && (
         <Button
           onClick={toggleSidebar}
-          variant="outline"
+          variant="ghost"
           size="icon"
-          className="absolute left-2 top-4 h-10 w-10 rounded-lg bg-background/90 backdrop-blur-xl hover:bg-muted shadow-lg z-20"
+          className="absolute left-2 top-4 h-7 w-7 rounded-lg glass hover:bg-muted shadow-lg z-20"
           aria-label="Expand sidebar"
         >
-          <ChevronRight className="h-5 w-5" />
+          <SidebarIcon className="h-4 w-4" />
+          <span className="sr-only">Toggle Sidebar</span>
         </Button>
       )}
     </div>

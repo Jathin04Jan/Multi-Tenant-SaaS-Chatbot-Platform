@@ -17,6 +17,17 @@ export interface ToneConfig {
   stylePrompt: string;
 }
 
+export interface GuardrailsConfig {
+  maxResponseLength: number;
+  blockedPhrases: string[];
+  enableFactChecking: boolean;
+  blockExplicitContent: boolean;
+  blockPoliticalViews: boolean;
+  strictlyStickToTopic: boolean;
+  blockPersonalInfo: boolean;
+  customInstructions: string;
+}
+
 export interface DataSource {
   id: string;
   name: string;
@@ -37,7 +48,10 @@ interface WizardState {
   // Step 2: Tone
   tone: ToneConfig;
   
-  // Step 2: Data sources
+  // Step 5: Guardrails
+  guardrails: GuardrailsConfig;
+  
+  // Step 3: Data sources
   dataSources: DataSource[];
   
   // Step 3: Indexing progress
@@ -54,6 +68,7 @@ interface WizardState {
   updateBranding: (branding: Partial<BrandConfig>) => void;
   updatePersona: (persona: Partial<PersonaConfig>) => void;
   updateTone: (tone: Partial<ToneConfig>) => void;
+  updateGuardrails: (guardrails: Partial<GuardrailsConfig>) => void;
   addDataSource: (source: DataSource) => void;
   removeDataSource: (id: string) => void;
   updateDataSource: (id: string, updates: Partial<DataSource>) => void;
@@ -103,6 +118,16 @@ const initialState = {
     communicationStyle: 'friendly' as const,
     stylePrompt: 'You are a friendly and warm assistant. Be approachable, empathetic, and conversational. Use a welcoming tone that makes users feel comfortable. Show genuine interest in helping them.',
   },
+  guardrails: {
+    maxResponseLength: 500,
+    blockedPhrases: [],
+    enableFactChecking: true,
+    blockExplicitContent: true,
+    blockPoliticalViews: true,
+    strictlyStickToTopic: true,
+    blockPersonalInfo: true,
+    customInstructions: '',
+  },
   dataSources: [],
   indexingProgress: 0,
   indexingStatus: 'idle' as const,
@@ -131,6 +156,11 @@ export const useWizardStore = create<WizardState>()(
       updateTone: (tone) =>
         set((state) => ({
           tone: { ...state.tone, ...tone },
+        })),
+      
+      updateGuardrails: (guardrails) =>
+        set((state) => ({
+          guardrails: { ...state.guardrails, ...guardrails },
         })),
       
       addDataSource: (source) =>

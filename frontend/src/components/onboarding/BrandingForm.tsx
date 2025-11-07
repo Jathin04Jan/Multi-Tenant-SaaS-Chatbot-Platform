@@ -39,7 +39,7 @@ const colorCombinations = [
 ];
 
 export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
-  const { branding, updateBranding } = useWizardStore();
+  const { branding, updateBranding, updatePersona } = useWizardStore();
   const [selectedColor, setSelectedColor] = useState<string>(
     branding.primaryColor || colorCombinations[0].primary
   );
@@ -66,7 +66,15 @@ export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
   };
 
   const onSubmit = (data: BrandingInput) => {
-    updateBranding(data);
+    // Update branding (excluding botName)
+    const { botName, ...brandingData } = data;
+    updateBranding(brandingData);
+    
+    // Update persona with botName
+    if (botName) {
+      updatePersona({ botName });
+    }
+    
     onComplete();
   };
 

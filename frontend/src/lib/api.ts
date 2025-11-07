@@ -366,3 +366,66 @@ let _guardrails: GuardrailsDTO = {
 };
 export const mockGetGuardrails = async (): Promise<ApiResponse<GuardrailsDTO>> => { await new Promise((r)=>setTimeout(r,200)); return { data: _guardrails }; };
 export const mockSaveGuardrails = async (g: GuardrailsDTO): Promise<ApiResponse<GuardrailsDTO>> => { await new Promise((r)=>setTimeout(r,250)); _guardrails = g; return { data: _guardrails }; };
+
+// Bots
+export interface BotDTO {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  slug: string | null;
+  status: 'draft' | 'active' | 'paused' | 'archived';
+  is_active: boolean;
+  last_deployed_at: string | null;
+  llm_config: Record<string, unknown> | null;
+  retrieval_config: Record<string, unknown> | null;
+  guardrails: Record<string, unknown> | null;
+  branding: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+  conversations_count: number;
+}
+
+export const getBots = async (): Promise<ApiResponse<BotDTO[]>> => {
+  return apiRequest<BotDTO[]>('/api/v1/bots', {
+    method: 'GET',
+  });
+};
+
+export const getBot = async (botId: string): Promise<ApiResponse<BotDTO>> => {
+  return apiRequest<BotDTO>(`/api/v1/bots/${botId}`, {
+    method: 'GET',
+  });
+};
+
+export const createBot = async (botData: {
+  name: string;
+  description?: string;
+  branding?: Record<string, unknown>;
+  llm_config?: Record<string, unknown>;
+  guardrails?: Record<string, unknown>;
+  retrieval_config?: Record<string, unknown>;
+}): Promise<ApiResponse<BotDTO>> => {
+  return apiRequest<BotDTO>('/api/v1/bots', {
+    method: 'POST',
+    body: JSON.stringify(botData),
+  });
+};
+
+export const updateBot = async (
+  botId: string,
+  botData: {
+    name?: string;
+    description?: string;
+    status?: string;
+    branding?: Record<string, unknown>;
+    llm_config?: Record<string, unknown>;
+    guardrails?: Record<string, unknown>;
+    retrieval_config?: Record<string, unknown>;
+  }
+): Promise<ApiResponse<BotDTO>> => {
+  return apiRequest<BotDTO>(`/api/v1/bots/${botId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(botData),
+  });
+};

@@ -1,4 +1,5 @@
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import { lazy, Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -45,6 +46,8 @@ import DemoBilling from "./pages/demo/Billing";
 
 const queryClient = new QueryClient();
 
+const AdminApp = lazy(() => import("./admin/AppAdmin"));
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeInitializer />
@@ -58,6 +61,9 @@ const App = () => (
           <Route path="/signin" element={<SignIn />} />
           <Route path="/admin/signin" element={<AdminSignIn />} />
           <Route path="/verify" element={<Verify />} />
+
+          {/* Admin (lazy-mounted, isolated) */}
+          <Route path="/admin/*" element={<Suspense fallback={null}><AdminApp /></Suspense>} />
 
           {/* Dashboard Routes */}
           <Route path="/dashboard" element={<DashboardLayout />}>

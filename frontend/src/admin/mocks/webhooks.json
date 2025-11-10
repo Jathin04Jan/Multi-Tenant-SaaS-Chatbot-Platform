@@ -1,0 +1,5 @@
+[
+  { "id": "wh-1", "tenantId": "t-001", "url": "https://acme.com/api/webhooks/saas", "status": "active" },
+  { "id": "wh-2", "tenantId": "t-005", "url": "https://zen.io/hooks", "status": "disabled" }
+]
+

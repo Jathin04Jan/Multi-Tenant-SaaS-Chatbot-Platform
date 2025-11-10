@@ -1,0 +1,5 @@
+[
+  {"id":"a-1","actor":"vaibhav@admin","role":"admin","scope":"tenant","tenantId":"t-005","action":"PLAN_CHANGE_ATTEMPT","ip":"103.22.1.9","ts":"2025-11-06T14:10:00Z","before":{"plan":"pro"},"after":{"plan":"business"}},
+  {"id":"a-2","actor":"root@system","role":"superadmin","scope":"global","action":"FLAG_TOGGLE","ip":"127.0.0.1","ts":"2025-11-06T09:00:00Z","before":{"rag_guard":"on"},"after":{"rag_guard":"off"}}
+]
+

@@ -1,0 +1,6 @@
+[
+  {"date":"2025-11-01","tenantId":"t-001","tokensIn":120000,"tokensOut":340000,"costUsd":42.13,"latencyP50":850,"latencyP90":1500,"latencyP99":2400},
+  {"date":"2025-11-02","tenantId":"t-001","tokensIn":134000,"tokensOut":360000,"costUsd":46.27,"latencyP50":820,"latencyP90":1480,"latencyP99":2300},
+  {"date":"2025-11-01","tenantId":"t-003","tokensIn":440000,"tokensOut":910000,"costUsd":118.9,"latencyP50":780,"latencyP90":1400,"latencyP99":2200}
+]
+

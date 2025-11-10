@@ -1,0 +1,6 @@
+[
+  {"id":"j-1001","tenantId":"t-001","source":"gdrive","status":"completed","startedAt":"2025-11-06T09:00:00Z","finishedAt":"2025-11-06T09:07:00Z","retries":0},
+  {"id":"j-1002","tenantId":"t-005","source":"web","status":"failed","startedAt":"2025-11-06T11:22:00Z","retries":2,"error":"HTTP 429 throttled"},
+  {"id":"j-1003","tenantId":"t-003","source":"s3","status":"running","startedAt":"2025-11-07T06:30:00Z","retries":0}
+]
+

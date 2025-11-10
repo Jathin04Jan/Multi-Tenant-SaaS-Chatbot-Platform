@@ -1,0 +1,23 @@
+.admin-glass {
+  background-color: hsl(var(--card));
+  backdrop-filter: saturate(120%) blur(6px);
+  box-shadow: 0 8px 24px hsla(0, 0%, 0%, 0.06);
+  border: 1px solid hsl(var(--border));
+  border-radius: 16px;
+}
+
+.admin-card {
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  border-radius: 16px;
+}
+
+.admin-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background-color: hsl(var(--background) / 0.85);
+  backdrop-filter: saturate(120%) blur(6px);
+  border-bottom: 1px solid hsl(var(--border));
+}
+

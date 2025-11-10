@@ -214,9 +214,9 @@ const Agents = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1 }}
-          className="glass-card p-6"
+          className="space-y-4"
         >
-          <h2 className="text-xl font-semibold mb-4">Existing Agents</h2>
+          <h2 className="text-xl font-semibold">Existing Agents</h2>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>

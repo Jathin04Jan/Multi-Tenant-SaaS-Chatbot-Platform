@@ -1,0 +1,6 @@
+[
+  { "id": "inv-1001", "tenantId": "t-001", "date": "2025-11-01T00:00:00Z", "amountUsd": 129.55, "status": "paid" },
+  { "id": "inv-1002", "tenantId": "t-001", "date": "2025-10-01T00:00:00Z", "amountUsd": 122.10, "status": "paid" },
+  { "id": "inv-2001", "tenantId": "t-005", "date": "2025-11-01T00:00:00Z", "amountUsd": 210.04, "status": "open" }
+]
+

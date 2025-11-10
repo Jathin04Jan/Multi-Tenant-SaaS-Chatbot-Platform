@@ -1,0 +1,6 @@
+[
+  { "id": "ds-1", "tenantId": "t-001", "type": "gdrive", "name": "Acme Drive", "lastIndexedAt": "2025-11-07T06:30:00Z", "status": "healthy" },
+  { "id": "ds-2", "tenantId": "t-001", "type": "web", "name": "Acme Docs", "lastIndexedAt": "2025-11-06T14:00:00Z", "status": "healthy" },
+  { "id": "ds-3", "tenantId": "t-005", "type": "s3", "name": "Zen Bucket", "lastIndexedAt": "2025-11-06T18:45:00Z", "status": "warning" }
+]
+

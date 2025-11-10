@@ -1,0 +1,5 @@
+[
+  {"id":"m-1","tenantId":"t-001","botId":"b-001","category":"pii","action":"blocked","messagePreview":"User posted SSN ...","createdAt":"2025-11-07T06:50:00Z"},
+  {"id":"m-2","tenantId":"t-007","botId":"b-009","category":"toxicity","action":"flagged","messagePreview":"This is offensive ...","createdAt":"2025-11-07T05:00:00Z"}
+]
+

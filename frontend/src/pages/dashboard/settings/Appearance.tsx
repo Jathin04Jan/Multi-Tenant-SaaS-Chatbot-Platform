@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Check } from 'lucide-react';
+import { Check, Palette } from 'lucide-react';
 import { useThemeStore, themes } from '@/store/theme';
 import { cn } from '@/lib/utils';
 import { useEffect, useRef, useState } from 'react';
@@ -37,13 +37,29 @@ const Appearance = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold mb-2">Available Themes</h2>
-        <p className="text-muted-foreground">
-          Click on any theme to apply it instantly. Changes are saved automatically.
-        </p>
-      </div>
+    <div className="container max-w-7xl px-4 py-8 space-y-8">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="flex items-center gap-3"
+      >
+        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+          <Palette className="w-6 h-6 text-primary" />
+        </div>
+        <div>
+          <h1 className="text-4xl font-bold">Appearance</h1>
+          <p className="text-muted-foreground">Customize your theme and visual preferences</p>
+        </div>
+      </motion.div>
+
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold mb-2">Available Themes</h2>
+          <p className="text-muted-foreground">
+            Click on any theme to apply it instantly. Changes are saved automatically.
+          </p>
+        </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {themes.map((theme, index) => {
@@ -167,6 +183,7 @@ const Appearance = () => {
           );
         })}
       </div>
+    </div>
     </div>
   );
 };

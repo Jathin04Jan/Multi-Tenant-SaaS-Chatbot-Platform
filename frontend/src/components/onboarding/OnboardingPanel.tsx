@@ -19,10 +19,10 @@ const steps = [
   { number: 1, name: 'Brand & Persona' },
   { number: 2, name: 'Tone' },
   { number: 3, name: 'Guardrails' },
-  { number: 4, name: 'Data Sources' },
+  { number: 4, name: 'Documents' },
   { number: 5, name: 'Indexing' },
   { number: 6, name: 'Test Chat' },
-  { number: 7, name: 'Install' },
+  { number: 7, name: 'Deploy' },
 ];
 
 interface OnboardingPanelProps {
@@ -66,12 +66,13 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
   }, [open, resetWizard, setCurrentStep]);
 
   // Map steps with completion status
+  // Only show steps as completed if they are completed AND current step is at or beyond that step
   const stepsWithCompletion = steps.map((step) => {
     let isCompleted = false;
     if (completedSteps instanceof Set) {
-      isCompleted = completedSteps.has(step.number);
+      isCompleted = completedSteps.has(step.number) && step.number <= currentStep;
     } else if (Array.isArray(completedSteps)) {
-      isCompleted = (completedSteps as number[]).includes(step.number);
+      isCompleted = (completedSteps as number[]).includes(step.number) && step.number <= currentStep;
     }
     return { ...step, completed: isCompleted };
   });
@@ -94,7 +95,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     setCurrentStep(4);
   };
 
-  // Step 4: Data Sources
+  // Step 4: Documents
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -193,7 +194,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     setCurrentStep(7);
   };
 
-  // Step 7: Install
+  // Step 7: Deploy
   const handleFinish = async () => {
     try {
       // Get bot name from persona (BrandingForm updates persona.botName)
@@ -257,6 +258,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
             name: ds.name,
             type: ds.type,
             status: ds.status,
+            updatedAt: ds.updatedAt,
           })),
           chunk_size: 1000,
           chunk_overlap: 200,
@@ -345,7 +347,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                 size="default" 
                 className="flex-1"
               >
-                Previous
+                Back
               </Button>
               <Button onClick={handleToneComplete} size="default" className="flex-1">
                 Continue <ArrowRight className="ml-2 h-4 w-4" />
@@ -376,7 +378,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                 size="default" 
                 className="flex-1"
               >
-                Previous
+                Back
               </Button>
               <Button 
                 onClick={handleGuardrailsContinue} 
@@ -393,7 +395,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
         return (
           <div className="space-y-6">
             <div>
-              <h2 className="text-2xl font-semibold mb-2">Data Sources</h2>
+              <h2 className="text-2xl font-semibold mb-2">Documents</h2>
               <p className="text-muted-foreground text-sm">
                 Upload documents or crawl a website to train your chatbot
               </p>
@@ -426,10 +428,10 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
               </div>
             </div>
 
-            {/* Data Sources List */}
+            {/* Documents List */}
             {dataSources.length > 0 && (
               <div className="glass-card p-6 space-y-4">
-                <h3 className="font-semibold text-base">Data Sources ({dataSources.length})</h3>
+                <h3 className="font-semibold text-base">Documents ({dataSources.length})</h3>
                 <div className="space-y-2">
                   {dataSources.map((source) => (
                     <div key={source.id} className="flex items-center justify-between p-3 border rounded-lg">
@@ -465,7 +467,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                 size="default" 
                 className="flex-1"
               >
-                Previous
+                Back
               </Button>
               <Button onClick={handleDataContinue} size="default" className="flex-1">
                 Continue <ArrowRight className="ml-2 h-4 w-4" />
@@ -580,7 +582,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                     size="default" 
                     className="flex-1"
                   >
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Previous
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
                   </Button>
                   <Button 
                     onClick={() => setCurrentStep(6)} 
@@ -666,12 +668,12 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
 
             <div className="flex gap-3">
               <Button 
-                onClick={() => setCurrentStep(5)} 
+                onClick={() => setCurrentStep(4)} 
                 variant="outline" 
                 size="default" 
                 className="flex-1"
               >
-                <ArrowLeft className="mr-2 h-4 w-4" /> Previous
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back
               </Button>
               <Button onClick={handleTestContinue} size="default" className="flex-1">
                 Continue <ArrowRight className="ml-2 h-4 w-4" />
@@ -684,7 +686,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
         return (
           <div className="space-y-6">
             <div>
-              <h2 className="text-2xl font-semibold mb-2">Install</h2>
+              <h2 className="text-2xl font-semibold mb-2">Deploy</h2>
               <p className="text-muted-foreground text-sm">
                 Your chatbot is ready! Copy the embed code to add it to your website
               </p>
@@ -761,7 +763,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                 size="default" 
                 className="flex-1"
               >
-                <ArrowLeft className="mr-2 h-4 w-4" /> Previous
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back
               </Button>
               {createdBotId ? (
                 <Button 

@@ -49,6 +49,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 // Helper function to format time ago
 const formatTimeAgo = (dateString: string): string => {
@@ -146,6 +153,7 @@ const BotDetail = () => {
   const navigate = useNavigate();
   const [bot, setBot] = useState<BotDTO | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isEmbedDialogOpen, setIsEmbedDialogOpen] = useState(false);
   
   // Bot Configuration State
   const [botName, setBotName] = useState('');
@@ -297,6 +305,31 @@ const BotDetail = () => {
 
   const handleDuplicate = () => {
     toast.success('Bot duplicated successfully');
+  };
+
+  const handleShowEmbedCode = (event?: React.MouseEvent) => {
+    if (event) {
+      event.stopPropagation();
+    }
+    if (!bot) {
+      toast.error('Bot not loaded');
+      return;
+    }
+    setIsEmbedDialogOpen(true);
+  };
+
+  const handleCopyEmbedCode = async () => {
+    if (!bot) return;
+    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    const embedCode = `<!-- Add this before closing </body> tag -->\n<script \n  src="${apiBase}/static/widget.js"\n  data-bot-id="${bot.slug || bot.id}"\n  async>\n</script>`;
+
+    try {
+      await navigator.clipboard.writeText(embedCode);
+      toast.success('Embed code copied to clipboard');
+    } catch (error) {
+      console.error('Failed to copy embed code:', error);
+      toast.error('Failed to copy embed code');
+    }
   };
 
   // Update style prompt when communication style changes
@@ -635,13 +668,13 @@ const BotDetail = () => {
                 <Copy className="w-4 h-4 mr-2" />
                 Duplicate Bot
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleShowEmbedCode}>
+                <Code className="w-4 h-4 mr-2" />
+                Embed Code
+              </DropdownMenuItem>
               <DropdownMenuItem>
                 <Share2 className="w-4 h-4 mr-2" />
                 Share
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Code className="w-4 h-4 mr-2" />
-                Embed Code
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <Download className="w-4 h-4 mr-2" />
@@ -1176,6 +1209,33 @@ const BotDetail = () => {
           </TabsContent>
         </Tabs>
       </motion.div>
+      <Dialog open={isEmbedDialogOpen} onOpenChange={setIsEmbedDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Embed Code</DialogTitle>
+            <DialogDescription>
+              Add this snippet to your website before the closing <code>&lt;/body&gt;</code> tag.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto border border-border/50">
+{`<!-- Add this before closing </body> tag -->
+<script 
+  src="${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/static/widget.js"
+  data-bot-id="${bot?.slug || bot?.id || ''}"
+  async>
+</script>`}
+            </pre>
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>Your bot must stay <strong>active</strong> for this snippet to render.</span>
+              <Button onClick={handleCopyEmbedCode} size="sm" variant="outline">
+                <Copy className="w-4 h-4 mr-2" />
+                Copy
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

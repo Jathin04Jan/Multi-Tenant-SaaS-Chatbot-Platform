@@ -130,10 +130,11 @@ async def update_bot(
     - retrieval_config: Retrieval/RAG configuration (JSONB)
     """
     try:
+        user_uuid = UUID(str(current_user.id))
         bot = BotService.update_bot(
             db=db,
             bot_id=bot_id,
-            user_id=current_user.id,
+            user_id=user_uuid,
             bot_update=BotUpdate(**bot_update)
         )
         
@@ -155,5 +156,36 @@ async def update_bot(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while updating bot: {str(e)}"
+        )
+
+
+@router.delete("/{bot_id}")
+async def delete_bot(
+    bot_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a bot owned by the current user."""
+    try:
+        user_uuid = UUID(str(current_user.id))
+        deleted = BotService.delete_bot(
+            db=db,
+            bot_id=bot_id,
+            user_id=user_uuid
+        )
+
+        if not deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Bot not found"
+            )
+
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An error occurred while deleting bot: {str(e)}"
         )
 

@@ -488,3 +488,9 @@ export const updateBot = async (
     body: JSON.stringify(botData),
   });
 };
+
+export const deleteBot = async (botId: string): Promise<ApiResponse<{ success: boolean }>> => {
+  return apiRequest<{ success: boolean }>(`/api/v1/bots/${botId}`, {
+    method: 'DELETE',
+  });
+};

@@ -12,7 +12,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { OnboardingPanel } from '@/components/onboarding/OnboardingPanel';
-import { getBots, type BotDTO } from '@/lib/api';
+import { getBots, deleteBot, type BotDTO } from '@/lib/api';
+import { toast } from 'sonner';
 
 // Helper function to format time ago
 const formatTimeAgo = (dateString: string): string => {
@@ -55,6 +56,27 @@ const Onboarding = () => {
 
     fetchBots();
   }, []);
+
+  const handleDeleteBot = async (botId: string, botName: string) => {
+    const confirmed = window.confirm(`Delete "${botName}"? This action cannot be undone.`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await deleteBot(botId);
+      if (response.error || !response.data?.success) {
+        toast.error(response.error || 'Failed to delete bot');
+        return;
+      }
+
+      setBots((prev) => prev.filter((bot) => bot.id !== botId));
+      toast.success(`Deleted "${botName}"`);
+    } catch (error) {
+      console.error('Error deleting bot:', error);
+      toast.error('Failed to delete bot');
+    }
+  };
 
   return (
     <>
@@ -139,10 +161,13 @@ const Onboarding = () => {
                         }}>
                           View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={(e) => e.stopPropagation()}>
-                          Duplicate
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteBot(bot.id, bot.name);
+                          }}
+                        >
                           Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>

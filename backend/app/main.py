@@ -1,11 +1,14 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.api.v1 import api_router
+from app.api.public import embed_config
 # Import all models to register them with Base
-from app.models import User, Bot, InstallationSnippet  # noqa: F401
+from app.models import User, Bot, InstallationSnippet, UiConfig  # noqa: F401
 
 # Create database tables (development only - use migrations in production)
 # This auto-creates tables if they don't exist, convenient for development
@@ -22,8 +25,8 @@ app = FastAPI(
 cors_origins = settings.get_cors_origins()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for public endpoints (widget.js)
+    allow_credentials=False,  # Disable credentials for public endpoints
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
     expose_headers=["*"],
@@ -31,6 +34,14 @@ app.add_middleware(
 
 # Include API routes FIRST
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+# Include public routes (no authentication required)
+app.include_router(embed_config.router)
+
+# Serve static files (widget.js)
+static_dir = Path(__file__).parent.parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # Handle OPTIONS requests explicitly AFTER routes are registered
 # This catches any OPTIONS requests that the middleware might miss

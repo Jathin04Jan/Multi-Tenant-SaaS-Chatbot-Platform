@@ -25,6 +25,7 @@ async def create_bot(
     - name: Bot name (required)
     - description: Bot description (optional)
     - slug: URL-friendly identifier (optional)
+    - ui_config_id: UI configuration ID (optional, FK to ui_configs.id)
     - branding: Branding configuration (JSONB)
     - llm_config: LLM configuration (JSONB)
     - guardrails: Guardrails configuration (JSONB)
@@ -38,6 +39,8 @@ async def create_bot(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -120,6 +123,7 @@ async def update_bot(
     - name: Bot name
     - description: Bot description
     - status: Bot status (draft, active, paused, archived)
+    - ui_config_id: UI configuration ID (FK to ui_configs.id, must belong to user)
     - branding: Branding configuration (JSONB)
     - llm_config: LLM configuration (JSONB)
     - guardrails: Guardrails configuration (JSONB)
@@ -140,6 +144,11 @@ async def update_bot(
             )
         
         return BotResponse.from_orm(bot)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
     except HTTPException:
         raise
     except Exception as e:

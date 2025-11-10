@@ -12,7 +12,7 @@ Usage:
 import sys
 from app.core.database import engine, Base
 from app.core.config import settings
-from app.models import User, Bot, InstallationSnippet  # Import all models to register them
+from app.models import User, Bot, InstallationSnippet, UiConfig  # Import all models to register them
 
 
 def reset_minio():

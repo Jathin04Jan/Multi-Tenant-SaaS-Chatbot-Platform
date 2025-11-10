@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getBot, type BotDTO, updateBot } from '@/lib/api';
+import { getBot, type BotDTO, updateBot, getUiConfig, type UiConfigDTO, createUiConfig, updateUiConfig } from '@/lib/api';
 import {
   Bot,
   MessageSquare,
@@ -151,6 +151,8 @@ const BotDetail = () => {
   const [botName, setBotName] = useState('');
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [selectedColor, setSelectedColor] = useState('#6366f1');
+  const [uiConfigId, setUiConfigId] = useState<string | null>(null);
+  const [uiConfig, setUiConfig] = useState<UiConfigDTO | null>(null);
   
   // Tone Configuration State
   const [llmTemperature, setLlmTemperature] = useState(0.7);
@@ -196,6 +198,38 @@ const BotDetail = () => {
         setWelcomeMessage(branding.welcome_message || 'Hello! How can I help you today?');
         setSelectedColor(branding.primary_color || '#6366f1');
         
+        // Load UI configuration if linked
+        if (botData.ui_config_id) {
+          try {
+            const uiConfigResponse = await getUiConfig(botData.ui_config_id);
+            if (uiConfigResponse.error) {
+              toast.warning(uiConfigResponse.error || 'Unable to load UI configuration. Using branding defaults.');
+              setUiConfigId(botData.ui_config_id);
+              setUiConfig(null);
+            } else {
+              const uiConfigData = uiConfigResponse.data;
+              setUiConfigId(uiConfigData.id);
+              setUiConfig(uiConfigData);
+              if (uiConfigData.chat_title) {
+                setBotName(uiConfigData.chat_title);
+              }
+              if (uiConfigData.intro_message) {
+                setWelcomeMessage(uiConfigData.intro_message);
+              }
+              if (uiConfigData.primary_color) {
+                setSelectedColor(uiConfigData.primary_color);
+              }
+            }
+          } catch (uiError) {
+            console.error('Error fetching UI config:', uiError);
+            setUiConfigId(botData.ui_config_id);
+            setUiConfig(null);
+          }
+        } else {
+          setUiConfigId(null);
+          setUiConfig(null);
+        }
+
         // Extract LLM config
         const llmConfig = botData.llm_config as any || {};
         setLlmTemperature(llmConfig.temperature || 0.7);
@@ -277,6 +311,46 @@ const BotDetail = () => {
     if (!bot) return;
 
     try {
+      // Prepare UI config payload
+      const uiPayload = {
+        name: `${botName} Theme`,
+        primary_color: selectedColor,
+        background_color: '#0f172a',
+        chat_title: botName,
+        intro_message: welcomeMessage,
+        avatar_url: ((bot.branding as any) || {}).logo_url || null,
+        position: uiConfig?.position ?? 'bottom-right',
+        height: uiConfig?.height ?? 600,
+        width: uiConfig?.width ?? 400,
+      };
+
+      let currentUiConfigId = uiConfigId;
+
+      try {
+        if (currentUiConfigId) {
+          const uiUpdateResponse = await updateUiConfig(currentUiConfigId, uiPayload);
+          if (uiUpdateResponse.error) {
+            toast.error(uiUpdateResponse.error || 'Failed to update UI configuration');
+            return;
+          }
+          setUiConfigId(currentUiConfigId);
+          setUiConfig(uiUpdateResponse.data);
+        } else {
+          const uiCreateResponse = await createUiConfig(uiPayload);
+          if (uiCreateResponse.error) {
+            toast.error(uiCreateResponse.error || 'Failed to create UI configuration');
+            return;
+          }
+          currentUiConfigId = uiCreateResponse.data.id;
+          setUiConfigId(currentUiConfigId);
+          setUiConfig(uiCreateResponse.data);
+        }
+      } catch (uiError) {
+        console.error('Error saving UI config:', uiError);
+        toast.error('Failed to save UI configuration');
+        return;
+      }
+
       const updatedBranding = {
         ...(bot.branding as any || {}),
         welcome_message: welcomeMessage,
@@ -287,6 +361,7 @@ const BotDetail = () => {
       const response = await updateBot(bot.id, {
         name: botName,
         branding: updatedBranding,
+        ui_config_id: currentUiConfigId,
       });
 
       if (response.error) {
@@ -363,6 +438,8 @@ const BotDetail = () => {
     }
   };
 
+  type AnalyticsTrend = 'neutral' | 'up' | 'down';
+
   // Analytics cards - using placeholder data until conversations table is implemented
   const analyticsCards = bot ? [
     {
@@ -370,7 +447,7 @@ const BotDetail = () => {
       value: '0', // TODO: Calculate from conversations table
       icon: MessageSquare,
       change: 'No data yet',
-      trend: 'neutral' as const,
+      trend: 'neutral' as AnalyticsTrend,
       color: 'text-blue-500',
     },
     {
@@ -378,7 +455,7 @@ const BotDetail = () => {
       value: '0', // TODO: Calculate from conversations table
       icon: Users,
       change: 'No data yet',
-      trend: 'neutral' as const,
+      trend: 'neutral' as AnalyticsTrend,
       color: 'text-green-500',
     },
     {
@@ -386,7 +463,7 @@ const BotDetail = () => {
       value: 'N/A', // TODO: Calculate from conversations table
       icon: Clock,
       change: 'No data yet',
-      trend: 'neutral' as const,
+      trend: 'neutral' as AnalyticsTrend,
       color: 'text-purple-500',
     },
     {
@@ -394,7 +471,7 @@ const BotDetail = () => {
       value: 'N/A', // TODO: Calculate from conversations table
       icon: Star,
       change: 'No data yet',
-      trend: 'neutral' as const,
+      trend: 'neutral' as AnalyticsTrend,
       color: 'text-yellow-500',
     },
     {
@@ -402,7 +479,7 @@ const BotDetail = () => {
       value: '0', // TODO: Calculate from conversations table
       icon: TrendingUp,
       change: 'No data yet',
-      trend: 'neutral' as const,
+      trend: 'neutral' as AnalyticsTrend,
       color: 'text-cyan-500',
     },
     {
@@ -410,7 +487,7 @@ const BotDetail = () => {
       value: bot.status === 'active' ? '100%' : '0%',
       icon: RefreshCw,
       change: 'Since creation',
-      trend: 'neutral' as const,
+      trend: 'neutral' as AnalyticsTrend,
       color: 'text-emerald-500',
     },
   ] : [];

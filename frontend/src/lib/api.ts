@@ -367,6 +367,62 @@ let _guardrails: GuardrailsDTO = {
 export const mockGetGuardrails = async (): Promise<ApiResponse<GuardrailsDTO>> => { await new Promise((r)=>setTimeout(r,200)); return { data: _guardrails }; };
 export const mockSaveGuardrails = async (g: GuardrailsDTO): Promise<ApiResponse<GuardrailsDTO>> => { await new Promise((r)=>setTimeout(r,250)); _guardrails = g; return { data: _guardrails }; };
 
+// UI Configs
+export interface UiConfigDTO {
+  id: string;
+  user_id: string;
+  name: string | null;
+  primary_color: string | null;
+  background_color: string | null;
+  chat_title: string | null;
+  intro_message: string | null;
+  avatar_url: string | null;
+  position: string | null;
+  height: number | null;
+  width: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type UiConfigPayload = {
+  name?: string | null;
+  primary_color?: string | null;
+  background_color?: string | null;
+  chat_title?: string | null;
+  intro_message?: string | null;
+  avatar_url?: string | null;
+  position?: string | null;
+  height?: number | null;
+  width?: number | null;
+};
+
+export const createUiConfig = async (
+  payload: UiConfigPayload
+): Promise<ApiResponse<UiConfigDTO>> => {
+  return apiRequest<UiConfigDTO>('/api/v1/ui-configs', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+};
+
+export const updateUiConfig = async (
+  uiConfigId: string,
+  payload: UiConfigPayload
+): Promise<ApiResponse<UiConfigDTO>> => {
+  return apiRequest<UiConfigDTO>(`/api/v1/ui-configs/${uiConfigId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+};
+
+export const getUiConfig = async (
+  uiConfigId: string
+): Promise<ApiResponse<UiConfigDTO>> => {
+  return apiRequest<UiConfigDTO>(`/api/v1/ui-configs/${uiConfigId}`, {
+    method: 'GET',
+  });
+};
+
 // Bots
 export interface BotDTO {
   id: string;
@@ -381,6 +437,7 @@ export interface BotDTO {
   retrieval_config: Record<string, unknown> | null;
   guardrails: Record<string, unknown> | null;
   branding: Record<string, unknown> | null;
+  ui_config_id: string | null;
   created_at: string;
   updated_at: string;
   conversations_count: number;
@@ -405,6 +462,7 @@ export const createBot = async (botData: {
   llm_config?: Record<string, unknown>;
   guardrails?: Record<string, unknown>;
   retrieval_config?: Record<string, unknown>;
+  ui_config_id?: string | null;
 }): Promise<ApiResponse<BotDTO>> => {
   return apiRequest<BotDTO>('/api/v1/bots', {
     method: 'POST',
@@ -422,6 +480,7 @@ export const updateBot = async (
     llm_config?: Record<string, unknown>;
     guardrails?: Record<string, unknown>;
     retrieval_config?: Record<string, unknown>;
+    ui_config_id?: string | null;
   }
 ): Promise<ApiResponse<BotDTO>> => {
   return apiRequest<BotDTO>(`/api/v1/bots/${botId}`, {

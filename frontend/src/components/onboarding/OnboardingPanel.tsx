@@ -11,8 +11,8 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Upload, Globe, Trash2, RefreshCw, ArrowRight, CheckCircle2, Bot, Circle } from 'lucide-react';
-import { mockUploadFile, mockStartCrawl, mockGetGuardrails, mockSaveGuardrails, createBot } from '@/lib/api';
+import { Upload, Globe, Trash2, RefreshCw, ArrowRight, ArrowLeft, CheckCircle2, Bot, Circle } from 'lucide-react';
+import { mockUploadFile, mockStartCrawl, mockGetGuardrails, mockSaveGuardrails, createBot, updateBot, createUiConfig } from '@/lib/api';
 import { toast } from 'sonner';
 
 const steps = [
@@ -48,6 +48,8 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
   const [crawlUrl, setCrawlUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isCrawling, setIsCrawling] = useState(false);
+  const [createdBotId, setCreatedBotId] = useState<string | null>(null);
+  const [createdBotSlug, setCreatedBotSlug] = useState<string | null>(null);
   const [indexingStatus, setIndexingStatus] = useState<'idle' | 'indexing' | 'completed'>('idle');
   const [indexingProgress, setIndexingProgress] = useState(0);
   const [testMessage, setTestMessage] = useState('');
@@ -197,6 +199,32 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
       // Get bot name from persona (BrandingForm updates persona.botName)
       const botName = persona.botName || 'My Bot';
       
+      // Create UI config for the bot (reusable theme)
+      let uiConfigId: string | null = null;
+      const uiConfigPayload = {
+        name: `${botName} Theme`,
+        primary_color: branding.primaryColor || '#6366f1',
+        background_color: '#0f172a',
+        chat_title: botName,
+        intro_message: branding.welcomeMessage || 'Hello! How can I help you today?',
+        avatar_url: branding.logo || null,
+        position: 'bottom-right',
+        height: 600,
+        width: 400,
+      };
+
+      try {
+        const uiConfigResponse = await createUiConfig(uiConfigPayload);
+        if (uiConfigResponse.error) {
+          toast.warning(uiConfigResponse.error || 'Created bot without UI theme (using defaults).');
+        } else {
+          uiConfigId = uiConfigResponse.data.id;
+        }
+      } catch (uiError) {
+        console.error('Error creating UI config:', uiError);
+        toast.warning('Created bot without UI theme (using defaults).');
+      }
+
       // Prepare bot data from wizard store
       const botData = {
         name: botName,
@@ -234,6 +262,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           chunk_overlap: 200,
           embedding_model: 'text-embedding-ada-002',
         },
+        ui_config_id: uiConfigId,
       };
       
       // Create bot via API
@@ -244,16 +273,27 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
         return;
       }
       
-      completeStep(7);
-      toast.success('Bot created successfully! 🎉');
+      // Store bot ID and slug for embed code
+      if (response.data) {
+        setCreatedBotId(response.data.id);
+        setCreatedBotSlug(response.data.slug || response.data.id);
+        
+        // PRODUCTION: Automatically activate the bot after creation
+        // This makes the bot immediately embeddable
+        try {
+          const activateResponse = await updateBot(response.data.id, { status: 'active' });
+          if (activateResponse.error) {
+            toast.warning('Bot created but activation failed. Please activate it manually.');
+          } else {
+            toast.success('Bot created and activated successfully! 🎉');
+          }
+        } catch (activateError) {
+          console.error('Error activating bot:', activateError);
+          toast.warning('Bot created but activation failed. Please activate it manually.');
+        }
+      }
       
-      setTimeout(() => {
-        onOpenChange(false);
-        // Reset for next time
-        resetWizard();
-        // Refresh the page to show the new bot
-        window.location.reload();
-      }, 1000);
+      completeStep(7);
     } catch (error) {
       console.error('Error creating bot:', error);
       toast.error('Failed to create bot. Please try again.');
@@ -653,37 +693,64 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
             <div className="glass-card p-6 space-y-4">
               <div className="space-y-3">
                 <label className="text-sm font-medium text-muted-foreground">Embed Code</label>
-                <div className="relative">
-                  <div className="p-4 bg-muted rounded-lg font-mono text-xs overflow-x-auto border border-border/50">
-                    <code className="text-xs whitespace-pre">
+                {createdBotId ? (
+                  <>
+                    <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg mb-4">
+                      <div className="flex items-center gap-2 text-sm text-green-800 dark:text-green-200">
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span className="font-medium">Bot is active and ready to embed!</span>
+                      </div>
+                    </div>
+                    <div className="relative">
+                      <div className="p-4 bg-muted rounded-lg font-mono text-xs overflow-x-auto border border-border/50">
+                        <code className="text-xs whitespace-pre">
 {`<!-- Add this before closing </body> tag -->
 <script 
-  src="https://yourbot.com/widget.js"
-  data-bot-id="your-bot-id"
-  data-theme="auto"
+  src="${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/static/widget.js"
+  data-bot-id="${createdBotSlug || createdBotId}"
   async>
 </script>`}
-                    </code>
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="absolute top-2 right-2 h-7 px-3 text-xs"
-                    onClick={() => {
-                      const embedCode = `<!-- Add this before closing </body> tag -->
+                        </code>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="absolute top-2 right-2 h-7 px-3 text-xs"
+                        onClick={() => {
+                          const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+                          const embedCode = `<!-- Add this before closing </body> tag -->
 <script 
-  src="https://yourbot.com/widget.js"
-  data-bot-id="your-bot-id"
-  data-theme="auto"
+  src="${apiBase}/static/widget.js"
+  data-bot-id="${createdBotSlug || createdBotId}"
   async>
 </script>`;
-                      navigator.clipboard.writeText(embedCode);
-                      toast.success('Code copied to clipboard!');
-                    }}
-                  >
-                    Copy
-                  </Button>
-                </div>
+                          navigator.clipboard.writeText(embedCode);
+                          toast.success('Code copied to clipboard!');
+                        }}
+                      >
+                        Copy
+                      </Button>
+                    </div>
+                    <div className="space-y-2 text-xs text-muted-foreground">
+                      <p>
+                        <strong>Instructions:</strong>
+                      </p>
+                      <ol className="list-decimal list-inside space-y-1 ml-2">
+                        <li>Copy the embed code above</li>
+                        <li>Paste it into your website's HTML before the closing <code>&lt;/body&gt;</code> tag</li>
+                        <li>The chatbot widget will appear on your website</li>
+                      </ol>
+                      <p className="mt-2 text-xs">
+                        <strong>Note:</strong> The widget will only work if your bot status is <strong>active</strong>. 
+                        You can manage bot status from the bot detail page.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground">
+                    Complete the bot creation to generate embed code.
+                  </div>
+                )}
               </div>
             </div>
 
@@ -696,9 +763,25 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
               >
                 <ArrowLeft className="mr-2 h-4 w-4" /> Previous
               </Button>
-              <Button onClick={handleFinish} size="default" className="flex-1">
-                Complete Setup <CheckCircle2 className="ml-2 h-4 w-4" />
-              </Button>
+              {createdBotId ? (
+                <Button 
+                  onClick={() => {
+                    onOpenChange(false);
+                    resetWizard();
+                    setCreatedBotId(null);
+                    setCreatedBotSlug(null);
+                    window.location.reload();
+                  }} 
+                  size="default" 
+                  className="flex-1"
+                >
+                  Finish <CheckCircle2 className="ml-2 h-4 w-4" />
+                </Button>
+              ) : (
+                <Button onClick={handleFinish} size="default" className="flex-1">
+                  Complete Setup <CheckCircle2 className="ml-2 h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         );

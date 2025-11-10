@@ -44,19 +44,17 @@ export const Sidebar = () => {
           isCollapsed ? 'w-16' : 'w-64'
         )}
       >
-        {/* Toggle Button - positioned on the border at the top right */}
-        {!isCollapsed && (
-          <Button
-            onClick={toggleSidebar}
-            variant="ghost"
-            size="icon"
-            className="absolute -right-3.5 top-3 h-7 w-7 rounded-lg glass hover:bg-muted shadow-lg z-10 border border-border/50"
-            aria-label="Collapse sidebar"
-          >
-            <SidebarIcon className="h-4 w-4" />
-            <span className="sr-only">Toggle Sidebar</span>
-          </Button>
-        )}
+        {/* Toggle Button - positioned on the border at the top right, always visible */}
+        <Button
+          onClick={toggleSidebar}
+          variant="ghost"
+          size="icon"
+          className="absolute -right-3.5 top-3 h-7 w-7 rounded-lg glass hover:bg-muted shadow-lg z-10 border border-border/50"
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <SidebarIcon className="h-4 w-4" />
+          <span className="sr-only">Toggle Sidebar</span>
+        </Button>
 
         {/* Header Section with Logo and Title */}
         <div className={cn(
@@ -105,20 +103,6 @@ export const Sidebar = () => {
             );
           })}
         </nav>
-
-        {/* Toggle Button - shows when collapsed, positioned inside sidebar */}
-        {isCollapsed && (
-          <Button
-            onClick={toggleSidebar}
-            variant="ghost"
-            size="icon"
-            className="mx-auto mb-4 h-7 w-7 rounded-lg glass hover:bg-muted shadow-lg"
-            aria-label="Expand sidebar"
-          >
-            <SidebarIcon className="h-4 w-4" />
-            <span className="sr-only">Toggle Sidebar</span>
-          </Button>
-        )}
       </aside>
     </div>
   );

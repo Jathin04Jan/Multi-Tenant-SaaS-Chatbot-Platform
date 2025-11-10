@@ -230,6 +230,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
             name: ds.name,
             type: ds.type,
             status: ds.status,
+            updatedAt: ds.updatedAt,
           })),
           chunk_size: 1000,
           chunk_overlap: 200,

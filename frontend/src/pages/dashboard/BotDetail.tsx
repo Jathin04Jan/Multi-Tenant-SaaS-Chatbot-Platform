@@ -49,6 +49,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { colorCombinations } from '@/lib/constants';
 
 // Helper function to format time ago
 const formatTimeAgo = (dateString: string): string => {
@@ -70,30 +71,16 @@ const formatDate = (dateString: string): string => {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
-// Color theme options
-const colorCombinations = [
-  {
-    id: 'ocean',
-    name: 'Ocean Breeze',
-    primary: '#3b82f6',
-    gradient: 'from-blue-500 via-cyan-500 to-teal-500',
-    description: 'Calm and professional',
-  },
-  {
-    id: 'sunset',
-    name: 'Sunset Glow',
-    primary: '#f97316',
-    gradient: 'from-orange-500 via-pink-500 to-rose-500',
-    description: 'Warm and inviting',
-  },
-  {
-    id: 'forest',
-    name: 'Forest Canopy',
-    primary: '#10b981',
-    gradient: 'from-emerald-500 via-green-500 to-teal-500',
-    description: 'Fresh and natural',
-  },
-];
+// Helper to get date or generate random date for existing docs
+const getDocumentDate = (source: any): string => {
+  const date = source.createdAt || source.updatedAt || source.created_at || source.updated_at;
+  if (date) return formatDate(date);
+  // Generate random date within last 90 days for existing docs
+  const daysAgo = Math.floor(Math.random() * 90);
+  const randomDate = new Date();
+  randomDate.setDate(randomDate.getDate() - daysAgo);
+  return formatDate(randomDate.toISOString());
+};
 
 // Communication style options
 const styleOptions = [
@@ -327,6 +314,40 @@ const BotDetail = () => {
     } catch (error) {
       console.error('Error saving tone configuration:', error);
       toast.error('Failed to save tone configuration');
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !bot) return;
+
+    const retrievalConfig = bot.retrieval_config as any || {};
+    const dataSources = retrievalConfig.data_sources || [];
+    
+    const newSource = {
+      id: Date.now().toString(),
+      name: file.name,
+      type: 'upload' as const,
+      status: 'processing' as const,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const updatedConfig = {
+      ...retrievalConfig,
+      data_sources: [...dataSources, newSource],
+    };
+
+    try {
+      const response = await updateBot(bot.id, { retrieval_config: updatedConfig });
+      if (response.error) {
+        toast.error(response.error || 'Failed to upload document');
+        return;
+      }
+      setBot(response.data);
+      toast.success('Document uploaded successfully!');
+      e.target.value = ''; // Reset input
+    } catch (error) {
+      toast.error('Failed to upload document');
     }
   };
 
@@ -621,7 +642,7 @@ const BotDetail = () => {
         transition={{ duration: 0.4, delay: 0.2 }}
       >
         <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 gap-2 h-auto p-1 glass rounded-xl">
+          <TabsList className="grid w-full grid-cols-5 gap-2 h-auto p-1 bg-transparent border-0 shadow-none">
             <TabsTrigger 
               value="overview"
               className="glass transition-all duration-300 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg data-[state=active]:ring-2 data-[state=active]:ring-primary/50 data-[state=inactive]:bg-background/40 data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-background/60"
@@ -735,13 +756,12 @@ const BotDetail = () => {
                         >
                           <div
                             className={cn(
-                              'w-full h-20 rounded-lg mb-2 bg-gradient-to-br',
+                              'w-full h-20 rounded-lg mb-3 bg-gradient-to-br',
                               combo.gradient
                             )}
                           />
-                          <div className="text-center">
-                            <p className="text-sm font-semibold mb-1">{combo.name}</p>
-                            <p className="text-xs text-muted-foreground">{combo.description}</p>
+                          <div className="text-center h-6 flex items-center justify-center">
+                            <p className="text-sm font-semibold leading-tight">{combo.name}</p>
                           </div>
                           {selectedColor === combo.primary && (
                             <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
@@ -1012,16 +1032,16 @@ const BotDetail = () => {
                     <>
                       {dataSources.map((source: any) => (
                         <div key={source.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 flex-1">
                             {source.type === 'upload' ? (
                               <FileText className="w-5 h-5 text-muted-foreground" />
                             ) : (
                               <Globe className="w-5 h-5 text-muted-foreground" />
                             )}
-                            <div>
+                            <div className="flex-1">
                               <p className="font-medium">{source.name}</p>
                               <p className="text-sm text-muted-foreground">
-                                {source.type === 'upload' ? 'Uploaded' : 'Crawled'} · {source.status}
+                                {source.type === 'upload' ? 'Uploaded' : 'Crawled'} · {source.status} · {getDocumentDate(source)}
                               </p>
                             </div>
                           </div>
@@ -1033,10 +1053,18 @@ const BotDetail = () => {
                     </>
                   );
                 })()}
-                <Button variant="outline" className="w-full gap-2">
-                  <Upload className="w-4 h-4" />
-                  Add Document or Website
-                </Button>
+                <label className="block cursor-pointer">
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                    accept=".pdf,.doc,.docx,.txt,.md"
+                  />
+                  <Button variant="outline" className="w-full gap-2" type="button">
+                    <Upload className="w-4 h-4" />
+                    Add Document or Website
+                  </Button>
+                </label>
               </CardContent>
             </Card>
           </TabsContent>

@@ -118,7 +118,7 @@ const Knowledge = () => {
                 <tr className="border-b border-border">
                   <th className="text-left py-3 px-4 font-medium">Title</th>
                   <th className="text-left py-3 px-4 font-medium">Status</th>
-                  <th className="text-left py-3 px-4 font-medium">Created</th>
+                  <th className="text-left py-3 px-4 font-medium">Date of Upload</th>
                   <th className="text-left py-3 px-4 font-medium">Actions</th>
                 </tr>
               </thead>
@@ -130,14 +130,14 @@ const Knowledge = () => {
                     </td>
                     <td className="py-3 px-4">
                       <Badge 
-                        variant={d.status === 'indexed' ? 'default' : d.status === 'error' ? 'destructive' : 'outline'}
+                        variant={d.status === 'processed' ? 'default' : d.status === 'error' ? 'destructive' : 'outline'}
                         className="capitalize"
                       >
-                        {d.status}
+                        {d.status === 'indexed' ? 'processed' : d.status}
                       </Badge>
                     </td>
                     <td className="py-3 px-4 text-sm text-muted-foreground">
-                      {new Date(d.createdAt).toLocaleString()}
+                      {new Date(d.createdAt).toLocaleDateString()}
                     </td>
                     <td className="py-3 px-4">
                       <Button

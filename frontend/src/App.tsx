@@ -1,7 +1,7 @@
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeInitializer } from "@/components/ThemeInitializer";
 
 // Pages
@@ -25,7 +25,7 @@ import Team from "./pages/dashboard/settings/Team";
 import Billing from "./pages/dashboard/settings/Billing";
 import ApiKeys from "./pages/dashboard/settings/ApiKeys";
 import Tenant from "./pages/dashboard/settings/Tenant";
-import Settings from "./pages/dashboard/settings/Settings";
+import Appearance from "./pages/dashboard/settings/Appearance";
 import Guardrails from "./pages/dashboard/Guardrails";
 import Agents from "./pages/dashboard/Agents";
 import Sources from "./pages/dashboard/Sources";
@@ -79,7 +79,8 @@ const App = () => (
             <Route path="onboarding/install" element={<Install />} />
 
             {/* Settings */}
-            <Route path="settings" element={<Settings />} />
+            <Route path="settings" element={<Navigate to="/dashboard/settings/appearance" replace />} />
+            <Route path="settings/appearance" element={<Appearance />} />
             <Route path="settings/profile" element={<Profile />} />
             <Route path="settings/team" element={<Team />} />
             <Route path="settings/billing" element={<Billing />} />

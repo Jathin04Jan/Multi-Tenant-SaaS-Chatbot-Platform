@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getBot, type BotDTO, updateBot } from '@/lib/api';
+import { getBot, type BotDTO, updateBot, getUiConfig, type UiConfigDTO, createUiConfig, updateUiConfig } from '@/lib/api';
 import {
   Bot,
   MessageSquare,
@@ -49,7 +49,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { colorCombinations } from '@/lib/constants';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 // Helper function to format time ago
 const formatTimeAgo = (dateString: string): string => {
@@ -133,11 +139,14 @@ const BotDetail = () => {
   const navigate = useNavigate();
   const [bot, setBot] = useState<BotDTO | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isEmbedDialogOpen, setIsEmbedDialogOpen] = useState(false);
   
   // Bot Configuration State
   const [botName, setBotName] = useState('');
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [selectedColor, setSelectedColor] = useState('#6366f1');
+  const [uiConfigId, setUiConfigId] = useState<string | null>(null);
+  const [uiConfig, setUiConfig] = useState<UiConfigDTO | null>(null);
   
   // Tone Configuration State
   const [llmTemperature, setLlmTemperature] = useState(0.7);
@@ -183,6 +192,38 @@ const BotDetail = () => {
         setWelcomeMessage(branding.welcome_message || 'Hello! How can I help you today?');
         setSelectedColor(branding.primary_color || '#6366f1');
         
+        // Load UI configuration if linked
+        if (botData.ui_config_id) {
+          try {
+            const uiConfigResponse = await getUiConfig(botData.ui_config_id);
+            if (uiConfigResponse.error) {
+              toast.warning(uiConfigResponse.error || 'Unable to load UI configuration. Using branding defaults.');
+              setUiConfigId(botData.ui_config_id);
+              setUiConfig(null);
+            } else {
+              const uiConfigData = uiConfigResponse.data;
+              setUiConfigId(uiConfigData.id);
+              setUiConfig(uiConfigData);
+              if (uiConfigData.chat_title) {
+                setBotName(uiConfigData.chat_title);
+              }
+              if (uiConfigData.intro_message) {
+                setWelcomeMessage(uiConfigData.intro_message);
+              }
+              if (uiConfigData.primary_color) {
+                setSelectedColor(uiConfigData.primary_color);
+              }
+            }
+          } catch (uiError) {
+            console.error('Error fetching UI config:', uiError);
+            setUiConfigId(botData.ui_config_id);
+            setUiConfig(null);
+          }
+        } else {
+          setUiConfigId(null);
+          setUiConfig(null);
+        }
+
         // Extract LLM config
         const llmConfig = botData.llm_config as any || {};
         setLlmTemperature(llmConfig.temperature || 0.7);
@@ -252,6 +293,31 @@ const BotDetail = () => {
     toast.success('Bot duplicated successfully');
   };
 
+  const handleShowEmbedCode = (event?: React.MouseEvent) => {
+    if (event) {
+      event.stopPropagation();
+    }
+    if (!bot) {
+      toast.error('Bot not loaded');
+      return;
+    }
+    setIsEmbedDialogOpen(true);
+  };
+
+  const handleCopyEmbedCode = async () => {
+    if (!bot) return;
+    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    const embedCode = `<!-- Add this before closing </body> tag -->\n<script \n  src="${apiBase}/static/widget.js"\n  data-bot-id="${bot.slug || bot.id}"\n  async>\n</script>`;
+
+    try {
+      await navigator.clipboard.writeText(embedCode);
+      toast.success('Embed code copied to clipboard');
+    } catch (error) {
+      console.error('Failed to copy embed code:', error);
+      toast.error('Failed to copy embed code');
+    }
+  };
+
   // Update style prompt when communication style changes
   useEffect(() => {
     const selectedOption = styleOptions.find(opt => opt.value === communicationStyle);
@@ -264,6 +330,46 @@ const BotDetail = () => {
     if (!bot) return;
 
     try {
+      // Prepare UI config payload
+      const uiPayload = {
+        name: `${botName} Theme`,
+        primary_color: selectedColor,
+        background_color: '#0f172a',
+        chat_title: botName,
+        intro_message: welcomeMessage,
+        avatar_url: ((bot.branding as any) || {}).logo_url || null,
+        position: uiConfig?.position ?? 'bottom-right',
+        height: uiConfig?.height ?? 600,
+        width: uiConfig?.width ?? 400,
+      };
+
+      let currentUiConfigId = uiConfigId;
+
+      try {
+        if (currentUiConfigId) {
+          const uiUpdateResponse = await updateUiConfig(currentUiConfigId, uiPayload);
+          if (uiUpdateResponse.error) {
+            toast.error(uiUpdateResponse.error || 'Failed to update UI configuration');
+            return;
+          }
+          setUiConfigId(currentUiConfigId);
+          setUiConfig(uiUpdateResponse.data);
+        } else {
+          const uiCreateResponse = await createUiConfig(uiPayload);
+          if (uiCreateResponse.error) {
+            toast.error(uiCreateResponse.error || 'Failed to create UI configuration');
+            return;
+          }
+          currentUiConfigId = uiCreateResponse.data.id;
+          setUiConfigId(currentUiConfigId);
+          setUiConfig(uiCreateResponse.data);
+        }
+      } catch (uiError) {
+        console.error('Error saving UI config:', uiError);
+        toast.error('Failed to save UI configuration');
+        return;
+      }
+
       const updatedBranding = {
         ...(bot.branding as any || {}),
         welcome_message: welcomeMessage,
@@ -274,6 +380,7 @@ const BotDetail = () => {
       const response = await updateBot(bot.id, {
         name: botName,
         branding: updatedBranding,
+        ui_config_id: currentUiConfigId,
       });
 
       if (response.error) {
@@ -384,6 +491,8 @@ const BotDetail = () => {
     }
   };
 
+  type AnalyticsTrend = 'neutral' | 'up' | 'down';
+
   // Analytics cards - using placeholder data until conversations table is implemented
   const analyticsCards = bot ? [
     {
@@ -391,7 +500,7 @@ const BotDetail = () => {
       value: '0', // TODO: Calculate from conversations table
       icon: MessageSquare,
       change: 'No data yet',
-      trend: 'neutral' as const,
+      trend: 'neutral' as AnalyticsTrend,
       color: 'text-blue-500',
     },
     {
@@ -399,7 +508,7 @@ const BotDetail = () => {
       value: '0', // TODO: Calculate from conversations table
       icon: Users,
       change: 'No data yet',
-      trend: 'neutral' as const,
+      trend: 'neutral' as AnalyticsTrend,
       color: 'text-green-500',
     },
     {
@@ -407,7 +516,7 @@ const BotDetail = () => {
       value: 'N/A', // TODO: Calculate from conversations table
       icon: Clock,
       change: 'No data yet',
-      trend: 'neutral' as const,
+      trend: 'neutral' as AnalyticsTrend,
       color: 'text-purple-500',
     },
     {
@@ -415,7 +524,7 @@ const BotDetail = () => {
       value: 'N/A', // TODO: Calculate from conversations table
       icon: Star,
       change: 'No data yet',
-      trend: 'neutral' as const,
+      trend: 'neutral' as AnalyticsTrend,
       color: 'text-yellow-500',
     },
     {
@@ -423,7 +532,7 @@ const BotDetail = () => {
       value: '0', // TODO: Calculate from conversations table
       icon: TrendingUp,
       change: 'No data yet',
-      trend: 'neutral' as const,
+      trend: 'neutral' as AnalyticsTrend,
       color: 'text-cyan-500',
     },
     {
@@ -431,7 +540,7 @@ const BotDetail = () => {
       value: bot.status === 'active' ? '100%' : '0%',
       icon: RefreshCw,
       change: 'Since creation',
-      trend: 'neutral' as const,
+      trend: 'neutral' as AnalyticsTrend,
       color: 'text-emerald-500',
     },
   ] : [];
@@ -579,13 +688,13 @@ const BotDetail = () => {
                 <Copy className="w-4 h-4 mr-2" />
                 Duplicate Bot
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleShowEmbedCode}>
+                <Code className="w-4 h-4 mr-2" />
+                Embed Code
+              </DropdownMenuItem>
               <DropdownMenuItem>
                 <Share2 className="w-4 h-4 mr-2" />
                 Share
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Code className="w-4 h-4 mr-2" />
-                Embed Code
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <Download className="w-4 h-4 mr-2" />
@@ -1127,6 +1236,33 @@ const BotDetail = () => {
           </TabsContent>
         </Tabs>
       </motion.div>
+      <Dialog open={isEmbedDialogOpen} onOpenChange={setIsEmbedDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Embed Code</DialogTitle>
+            <DialogDescription>
+              Add this snippet to your website before the closing <code>&lt;/body&gt;</code> tag.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto border border-border/50">
+{`<!-- Add this before closing </body> tag -->
+<script 
+  src="${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/static/widget.js"
+  data-bot-id="${bot?.slug || bot?.id || ''}"
+  async>
+</script>`}
+            </pre>
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>Your bot must stay <strong>active</strong> for this snippet to render.</span>
+              <Button onClick={handleCopyEmbedCode} size="sm" variant="outline">
+                <Copy className="w-4 h-4 mr-2" />
+                Copy
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

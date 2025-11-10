@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YourBot Widget Test - Production Ready</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+        .info-box {
+            background: #f0f9ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .info-box strong {
+            color: #1e40af;
+        }
+        code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        .instructions {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .instructions ol {
+            margin-left: 20px;
+            line-height: 2;
+        }
+        .warning {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .warning strong {
+            color: #92400e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 YourBot Widget Test Page</h1>
+        <p class="subtitle">Production-Ready Chatbot Embedding</p>
+        
+        <div class="info-box">
+            <strong>✅ Production Mode:</strong> Only <strong>ACTIVE</strong> bots can be embedded. 
+            Make sure your bot status is set to <code>active</code> in the dashboard.
+        </div>
+
+        <div class="instructions">
+            <h3>How to Test:</h3>
+            <ol>
+                <li>Create a bot in the dashboard and complete the onboarding</li>
+                <li>Ensure the bot status is <strong>active</strong> (it should auto-activate after creation)</li>
+                <li>Copy your bot ID or slug from the embed code in the Install step</li>
+                <li>Replace <code>YOUR_BOT_ID_OR_SLUG</code> in the script tag below with your actual bot ID/slug</li>
+                <li>Save this file and open it in your browser</li>
+                <li>The widget should appear as a floating button in the bottom-right corner</li>
+            </ol>
+        </div>
+
+        <div class="warning">
+            <strong>⚠️ Important:</strong>
+            <ul style="margin-left: 20px; margin-top: 10px;">
+                <li>Your backend server must be running on <code>http://localhost:8000</code></li>
+                <li>The bot must have status <code>active</code> to be embeddable</li>
+                <li>For production, replace <code>localhost:8000</code> with your production API URL</li>
+            </ul>
+        </div>
+
+        <div style="margin-top: 30px;">
+            <h3>Embed Code:</h3>
+            <pre style="background: #1f2937; color: #f9fafb; padding: 15px; border-radius: 6px; overflow-x: auto;"><code>&lt;script 
+  src="http://localhost:8000/static/widget.js"
+  data-bot-id="YOUR_BOT_ID_OR_SLUG"
+  async&gt;
+&lt;/script&gt;</code></pre>
+        </div>
+    </div>
+
+    <!-- YourBot Widget Embed Code -->
+    <!-- Replace YOUR_BOT_ID_OR_SLUG with your actual bot ID or slug -->
+    <!-- The bot must be ACTIVE for the widget to work -->
+    <script 
+        src="http://localhost:8000/static/widget.js"
+        data-bot-id="YOUR_BOT_ID_OR_SLUG"
+        async>
+    </script>
+</body>
+</html>
+

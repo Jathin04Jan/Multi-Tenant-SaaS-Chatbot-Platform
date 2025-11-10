@@ -13,6 +13,7 @@ This directory contains detailed documentation for the backend API.
 - **[DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md)** - Complete database schema documentation
 - **[FINAL_SCHEMA.md](./FINAL_SCHEMA.md)** - Final database schema reference (users table)
 - **[BOTS_SCHEMA.md](./BOTS_SCHEMA.md)** - Bots table schema documentation
+- **[UI_CONFIG_SCHEMA.md](./UI_CONFIG_SCHEMA.md)** - UI configuration table schema documentation
 - **[INSTALLATION_SNIPPETS_SCHEMA.md](./INSTALLATION_SNIPPETS_SCHEMA.md)** - Installation snippets table schema documentation
 - **[MIGRATIONS_VS_CREATE_ALL.md](./MIGRATIONS_VS_CREATE_ALL.md)** - Explanation of Alembic migrations vs `create_all()`
 

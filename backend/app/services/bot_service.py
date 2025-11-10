@@ -1,8 +1,10 @@
 from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import Dict, Any, Optional
+import re
 from app.models.bot import Bot, BotStatus
 from app.models.user import User
+from app.models.ui_config import UiConfig
 from app.schemas.bot import BotCreate, BotUpdate
 
 
@@ -38,15 +40,60 @@ class BotService:
         if not name:
             raise ValueError("Bot name is required")
         
+        # Generate slug if not provided
+        slug = bot_data.get("slug")
+        if not slug:
+            # Generate slug from name: lowercase, replace spaces with hyphens, remove special chars
+            slug_base = re.sub(r'[^a-z0-9]+', '-', name.lower().strip())
+            slug_base = re.sub(r'^-+|-+$', '', slug_base)  # Remove leading/trailing hyphens
+            slug = slug_base
+            
+            # Ensure uniqueness by appending number if needed
+            counter = 1
+            original_slug = slug
+            while db.query(Bot).filter(Bot.slug == slug).first():
+                slug = f"{original_slug}-{counter}"
+                counter += 1
+        
+        # Validate ui_config_id if provided
+        ui_config_id = bot_data.get("ui_config_id")
+        if ui_config_id:
+            try:
+                ui_config_uuid = UUID(ui_config_id)
+                ui_config = db.query(UiConfig).filter(
+                    UiConfig.id == ui_config_uuid,
+                    UiConfig.user_id == user.id
+                ).first()
+                if not ui_config:
+                    raise ValueError(f"UI config with ID {ui_config_id} not found or does not belong to user")
+            except ValueError as e:
+                if "not found" in str(e):
+                    raise e
+                raise ValueError(f"Invalid UI config ID: {ui_config_id}")
+        
+        # Enhance branding with UI positioning defaults if not provided (fallback if no ui_config_id)
+        branding = bot_data.get("branding") or {}
+        if not ui_config_id:  # Only set defaults if no ui_config_id is provided
+            if "position" not in branding:
+                branding["position"] = "bottom-right"
+            if "height" not in branding:
+                branding["height"] = 600
+            if "width" not in branding:
+                branding["width"] = 400
+            if "background_color" not in branding:
+                branding["background_color"] = "#ffffff"
+        
         # Create bot instance
+        # Start as DRAFT - user must activate it after configuration is complete
         bot = Bot(
             user_id=user.id,
             name=name,
             description=bot_data.get("description"),
-            slug=bot_data.get("slug"),
-            status=BotStatus.DRAFT,  # Start as draft
-            is_active=True,
-            branding=bot_data.get("branding"),
+            slug=slug,
+            status=BotStatus.DRAFT,  # Start as draft - must be activated to be embeddable
+            is_active=True,  # is_active=True, but status must be 'active' for embedding
+            ui_config_id=UUID(ui_config_id) if ui_config_id else None,
+            branding=branding,
             llm_config=bot_data.get("llm_config"),
             guardrails=bot_data.get("guardrails"),
             retrieval_config=bot_data.get("retrieval_config"),
@@ -86,8 +133,25 @@ class BotService:
         if not bot:
             return None
         
-        # Update only provided fields
+        # Validate ui_config_id if provided
         update_data = bot_update.model_dump(exclude_unset=True)
+        ui_config_id = update_data.get("ui_config_id")
+        if ui_config_id:
+            try:
+                ui_config_uuid = UUID(ui_config_id)
+                ui_config = db.query(UiConfig).filter(
+                    UiConfig.id == ui_config_uuid,
+                    UiConfig.user_id == user_id
+                ).first()
+                if not ui_config:
+                    raise ValueError(f"UI config with ID {ui_config_id} not found or does not belong to user")
+                update_data["ui_config_id"] = ui_config_uuid
+            except ValueError as e:
+                if "not found" in str(e):
+                    raise e
+                raise ValueError(f"Invalid UI config ID: {ui_config_id}")
+        
+        # Update only provided fields
         for field, value in update_data.items():
             setattr(bot, field, value)
         

@@ -6,7 +6,8 @@ This document provides the complete database schema for the Multi-Tenant SaaS Ch
 
 1. **`users`** - User/Tenant accounts (users = tenants)
 2. **`bots`** - Bot/Agent configurations
-3. **`installation_snippets`** - Embed codes and installation scripts
+3. **`ui_configs`** - UI configuration themes for chatbots
+4. **`installation_snippets`** - Embed codes and installation scripts
 
 ---
 
@@ -137,6 +138,7 @@ Stores all chatbot/bot configurations and settings for each user/tenant.
 | `retrieval_config` | JSONB | NULLABLE | RAG/Retrieval configuration (Vector DB, filters, chunking, etc.) |
 | `guardrails` | JSONB | NULLABLE | Content guardrails (moderation, blocked phrases, filters) |
 | `branding` | JSONB | NULLABLE | Branding (logo, colors, welcome message, assistant name) |
+| `ui_config_id` | UUID | FOREIGN KEY → ui_configs.id, NULLABLE, INDEXED | Optional UI configuration reference |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
 
@@ -149,9 +151,42 @@ Stores all chatbot/bot configurations and settings for each user/tenant.
 ### Indexes
 - **Primary Key**: `id` (UUID)
 - **Foreign Key Index**: `user_id`
+- **Foreign Key Index**: `ui_config_id`
 - **Unique Index**: `slug`
 - **Status Index**: `status`
 - **Created At Index**: `created_at`
+
+---
+
+## 📊 `ui_configs` Table
+
+Stores reusable UI configuration themes for chatbots. Allows users to create multiple UI themes and share them across bots.
+
+### Complete Table Structure
+
+| Column Name | Type | Constraints | Description |
+|------------|------|-------------|-------------|
+| `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique UI config identifier |
+| `user_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Owner/tenant reference |
+| `name` | VARCHAR(100) | NULLABLE | Optional name for this UI config |
+| `primary_color` | VARCHAR(20) | NULLABLE | Primary theme color (e.g., '#6366f1') |
+| `background_color` | VARCHAR(20) | NULLABLE | Background color (e.g., '#ffffff') |
+| `chat_title` | VARCHAR(150) | NULLABLE | Chat widget title |
+| `intro_message` | TEXT | NULLABLE | Welcome/intro message shown to users |
+| `avatar_url` | TEXT | NULLABLE | Avatar/logo URL for the chatbot |
+| `position` | VARCHAR(50) | NULLABLE | Widget position (e.g., 'bottom-right', 'bottom-left') |
+| `height` | INTEGER | NULLABLE | Chat window height in pixels |
+| `width` | INTEGER | NULLABLE | Chat window width in pixels |
+| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
+| `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
+
+### Indexes
+- **Primary Key**: `id` (UUID)
+- **Foreign Key Index**: `user_id`
+
+### Relationships
+- **Users → UI Configs**: One-to-Many (one user can have many UI configs)
+- **Bots → UI Configs**: Many-to-One (multiple bots can use the same UI config)
 
 ---
 
@@ -242,6 +277,7 @@ CREATE TABLE bots (
     retrieval_config JSONB,
     guardrails JSONB,
     branding JSONB,
+    ui_config_id UUID REFERENCES ui_configs(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -251,7 +287,32 @@ CREATE INDEX idx_bots_user_id ON bots(user_id);
 CREATE INDEX idx_bots_id ON bots(id);
 CREATE INDEX idx_bots_slug ON bots(slug);
 CREATE INDEX idx_bots_status ON bots(status);
+CREATE INDEX idx_bots_ui_config_id ON bots(ui_config_id);
 CREATE INDEX idx_bots_created_at ON bots(created_at);
+```
+
+### UI Configs Table
+```sql
+-- Create ui_configs table
+CREATE TABLE ui_configs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name VARCHAR(100),
+    primary_color VARCHAR(20),
+    background_color VARCHAR(20),
+    chat_title VARCHAR(150),
+    intro_message TEXT,
+    avatar_url TEXT,
+    position VARCHAR(50),
+    height INTEGER,
+    width INTEGER,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes
+CREATE INDEX idx_ui_configs_user_id ON ui_configs(user_id);
+CREATE INDEX idx_ui_configs_id ON ui_configs(id);
 ```
 
 ### Installation Snippets Table
@@ -288,17 +349,21 @@ CREATE INDEX idx_installation_snippets_user_bot ON installation_snippets(user_id
 ## 🔗 Relationships
 
 1. **Users → Bots**: One-to-Many (one user can have many bots)
-2. **Users → Installation Snippets**: One-to-Many (one user can have many snippets)
-3. **Bots → Installation Snippets**: One-to-Many (one bot can have many snippets for different environments)
-4. **Cascade Delete**: 
-   - Deleting a user deletes all their bots and snippets
+2. **Users → UI Configs**: One-to-Many (one user can have many UI configs)
+3. **Users → Installation Snippets**: One-to-Many (one user can have many snippets)
+4. **Bots → UI Configs**: Many-to-One (multiple bots can share the same UI config)
+5. **Bots → Installation Snippets**: One-to-Many (one bot can have many snippets for different environments)
+6. **Cascade Delete**: 
+   - Deleting a user deletes all their bots, UI configs, and snippets
    - Deleting a bot deletes all its snippets
+   - Deleting a UI config sets `bot.ui_config_id` to NULL (SET NULL)
 
 ---
 
 ## 🎯 Summary
 
-- **3 Tables**: `users`, `bots`, `installation_snippets`
+- **4 Tables**: `users`, `bots`, `ui_configs`, `installation_snippets`
 - **2 Enums**: `user_status`, `bot_status`
 - **All relationships** properly configured with foreign keys and CASCADE DELETE
 - **All indexes** optimized for common query patterns
+- **UI Configs**: Optional reusable UI themes that can be shared across multiple bots

@@ -83,12 +83,22 @@ class Bot(Base):
         comment="Branding: logo URL, theme color, font, welcome message, assistant name"
     )
     
+    # UI Configuration (Optional foreign key to ui_configs table)
+    ui_config_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("ui_configs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Optional UI configuration reference (FK to ui_configs.id)"
+    )
+    
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     
     # Relationships
     user = relationship("User", backref="bots")
+    ui_config = relationship("UiConfig", backref="bots")
     
     def __repr__(self):
         return f"<Bot(id={self.id}, name={self.name}, status={self.status}, user_id={self.user_id})>"

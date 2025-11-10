@@ -16,18 +16,17 @@ interface StepperProps {
 export const Stepper = ({ steps, currentStep }: StepperProps) => {
   return (
     <nav aria-label="Progress" className="w-full overflow-visible">
-      <ol className="flex items-start justify-between w-full gap-4 pb-20">
+      <ol className="flex items-center justify-center w-full py-6 px-4">
         {steps.map((step, index) => {
           const isCompleted = step.completed;
           const isCurrent = step.number === currentStep;
-          const isUpcoming = step.number > currentStep && !step.completed;
 
           return (
             <li
               key={step.number}
-              className="relative flex items-start flex-1 min-w-0"
+              className="relative flex items-center flex-shrink-0"
             >
-              <div className="flex items-start w-full">
+              <div className="flex items-center">
                 {/* Step Circle */}
                 <div className="relative flex-shrink-0 z-10">
                   <motion.div
@@ -77,10 +76,10 @@ export const Stepper = ({ steps, currentStep }: StepperProps) => {
                     </AnimatePresence>
                   </motion.div>
                   {/* Step Label */}
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 whitespace-nowrap">
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 px-1">
                     <p
                       className={cn(
-                        'text-sm font-medium hidden sm:block transition-colors duration-300',
+                        'text-xs font-medium hidden sm:block transition-colors duration-300 text-center leading-tight whitespace-nowrap',
                         isCurrent
                           ? 'text-foreground font-semibold'
                           : isCompleted
@@ -95,7 +94,7 @@ export const Stepper = ({ steps, currentStep }: StepperProps) => {
 
                 {/* Connector Line */}
                 {index !== steps.length - 1 && (
-                  <div className="flex-1 mx-3 relative mt-7">
+                  <div className="relative flex-shrink-0 w-[60px] ml-2 mr-2">
                     <div className="absolute inset-0 flex items-center">
                       <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
                         <motion.div

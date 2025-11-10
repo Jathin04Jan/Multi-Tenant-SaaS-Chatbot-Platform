@@ -8,35 +8,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { brandingSchema, type BrandingInput } from '@/lib/zod-schemas';
 import { useWizardStore } from '@/store/wizard';
 import { cn } from '@/lib/utils';
+import { colorCombinations } from '@/lib/constants';
 
 interface BrandingFormProps {
   onComplete: () => void;
 }
-
-// Beautiful dynamic color combinations
-const colorCombinations = [
-  {
-    id: 'ocean',
-    name: 'Ocean Breeze',
-    primary: '#3b82f6',
-    gradient: 'from-blue-500 via-cyan-500 to-teal-500',
-    description: 'Calm and professional',
-  },
-  {
-    id: 'sunset',
-    name: 'Sunset Glow',
-    primary: '#f97316',
-    gradient: 'from-orange-500 via-pink-500 to-rose-500',
-    description: 'Warm and inviting',
-  },
-  {
-    id: 'forest',
-    name: 'Forest Canopy',
-    primary: '#10b981',
-    gradient: 'from-emerald-500 via-green-500 to-teal-500',
-    description: 'Fresh and natural',
-  },
-];
 
 export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
   const { branding, updateBranding, updatePersona } = useWizardStore();
@@ -125,13 +101,12 @@ export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
             >
               <div
                 className={cn(
-                  'w-full h-20 rounded-lg mb-2 bg-gradient-to-br',
+                  'w-full h-20 rounded-lg mb-3 bg-gradient-to-br',
                   combo.gradient
                 )}
               />
-              <div className="text-center">
-                <p className="text-sm font-semibold mb-1">{combo.name}</p>
-                <p className="text-xs text-muted-foreground">{combo.description}</p>
+              <div className="text-center h-6 flex items-center justify-center">
+                <p className="text-sm font-semibold leading-tight">{combo.name}</p>
               </div>
               {selectedColor === combo.primary && (
                 <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">

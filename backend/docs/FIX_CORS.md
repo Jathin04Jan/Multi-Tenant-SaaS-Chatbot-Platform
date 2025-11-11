@@ -1,5 +1,7 @@
 # CORS Fix Summary
 
+[← Docs Index](./README.md) · [Backend Quick Start](../README.md) · [Project Overview](../../README.md)
+
 ## Issues Found
 
 1. **Routes Not Registering**: The server is running but routes aren't being loaded. Only `/api/inngest` appears in OpenAPI schema instead of our `/api/v1/auth/*` routes.

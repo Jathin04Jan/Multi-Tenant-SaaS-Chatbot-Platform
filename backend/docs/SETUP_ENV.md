@@ -1,5 +1,7 @@
 # Environment Variables Setup
 
+[← Docs Index](./README.md) · [Backend Quick Start](../README.md) · [Project Overview](../../README.md)
+
 ## 🔒 Important: Security Best Practices
 
 **Never commit `.env` files to Git!** They contain sensitive credentials.

@@ -33,6 +33,14 @@ npm run dev                # http://localhost:8080
 
 > The backend auto-creates tables for local development. Use Alembic migrations in staging/production.
 
+## 📚 Documentation Map
+
+- [Backend Quick Start (`backend/README.md`)](backend/README.md)
+- [Backend Docs Index (`backend/docs/README.md`)](backend/docs/README.md)
+- [Setup Guides](backend/docs/README.md#setup--configuration) – virtualenv, database, MinIO
+- [Database Schema References](backend/docs/README.md#database) – users, bots, ui configs, installation snippets
+- [Security & Troubleshooting](backend/docs/README.md#security) – JWT, CORS, diagnostics
+
 ## 📁 Project Structure
 
 ```

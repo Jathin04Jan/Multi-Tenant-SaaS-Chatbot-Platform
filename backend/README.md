@@ -1,5 +1,7 @@
 # Backend API
 
+[← Project Overview](../README.md) · [Backend Docs Index](docs/README.md)
+
 Production-ready FastAPI backend for the YourBot platform with clean architecture and modular design.
 
 ## 🚀 Quick Start

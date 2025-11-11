@@ -1,5 +1,7 @@
 # UI Configuration Schema
 
+[← Docs Index](./README.md) · [Backend Quick Start](../README.md) · [Project Overview](../../README.md)
+
 ## Overview
 The `ui_configs` table stores chatbot UI customization settings. This allows users to create reusable UI configurations that can be shared across multiple bots.
 

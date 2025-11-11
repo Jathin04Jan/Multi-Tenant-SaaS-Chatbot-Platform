@@ -1,5 +1,7 @@
 # What Happens If You Skip `alembic upgrade head`?
 
+[← Docs Index](./README.md) · [Backend Quick Start](../README.md) · [Project Overview](../../README.md)
+
 ## Quick Answer
 
 **If you skip `alembic upgrade head` and run `python run.py`:**

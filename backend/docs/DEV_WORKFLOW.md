@@ -1,5 +1,7 @@
 # Development Workflow
 
+[← Docs Index](./README.md) · [Backend Quick Start](../README.md) · [Project Overview](../../README.md)
+
 ## Quick Development Setup (No Migrations Needed)
 
 Since we're in development, you can use the simplified workflow:

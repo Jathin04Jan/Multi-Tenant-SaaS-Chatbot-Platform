@@ -1,5 +1,7 @@
 # Installation Snippets Table Schema
 
+[← Docs Index](./README.md) · [Backend Quick Start](../README.md) · [Project Overview](../../README.md)
+
 ## 📊 `installation_snippets` Table
 
 Stores embed codes and script URLs for installing bots on customer websites. Each snippet is tied to a specific bot and user/tenant and integrates with the public endpoint (`GET /public/embed-config`) that only serves ACTIVE bots.

@@ -1,5 +1,7 @@
 # Bots Table Schema
 
+[← Docs Index](./README.md) · [Backend Quick Start](../README.md) · [Project Overview](../../README.md)
+
 ## 📊 `bots` Table
 
 Stores all chatbot/bot configurations and settings for each user/tenant.

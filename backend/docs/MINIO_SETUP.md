@@ -1,5 +1,7 @@
 # MinIO Setup Guide
 
+[← Docs Index](./README.md) · [Backend Quick Start](../README.md) · [Project Overview](../../README.md)
+
 MinIO is an S3-compatible object storage service for storing documents and files.
 
 ## 🚀 Quick Start

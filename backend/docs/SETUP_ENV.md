@@ -33,6 +33,13 @@ CORS_ORIGINS=http://localhost:5173,http://localhost:8080
 
 # Email Verification
 EMAIL_VERIFICATION_REQUIRED=false
+
+# MinIO Object Storage
+MINIO_ENDPOINT=localhost:9000
+MINIO_ACCESS_KEY=yourbot_minio_admin
+MINIO_SECRET_KEY=yourbot_minio_password
+MINIO_SECURE=false
+MINIO_BUCKET_NAME=yourbot-documents
 ```
 
 ### 3. Generate a Strong Secret Key
@@ -69,6 +76,11 @@ It should show `.env` in the ignore list.
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | Token expiration time (minutes) | `10080` (7 days) | No |
 | `CORS_ORIGINS` | Allowed frontend origins (comma-separated) | `http://localhost:5173,...` | No |
 | `EMAIL_VERIFICATION_REQUIRED` | Require email verification | `false` | No |
+| `MINIO_ENDPOINT` | MinIO host:port | `localhost:9000` | ✅ Yes (when MinIO enabled) |
+| `MINIO_ACCESS_KEY` | MinIO access key | `yourbot_minio_admin` | ✅ Yes |
+| `MINIO_SECRET_KEY` | MinIO secret key | `yourbot_minio_password` | ✅ Yes |
+| `MINIO_SECURE` | Use HTTPS when connecting to MinIO | `false` | No (set `true` in prod) |
+| `MINIO_BUCKET_NAME` | Default bucket name | `yourbot-documents` | ✅ Yes |
 
 ## Database URL Format
 

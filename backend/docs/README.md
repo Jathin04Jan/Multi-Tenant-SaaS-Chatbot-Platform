@@ -5,6 +5,9 @@ This directory contains detailed documentation for the backend API.
 ## 📚 Documentation Index
 
 ### Setup & Configuration
+- **[BACKEND_SETUP.md](./BACKEND_SETUP.md)** - Complete backend setup walkthrough
+- **[DATABASE_SETUP.md](./DATABASE_SETUP.md)** - PostgreSQL container management guide
+- **[MINIO_SETUP.md](./MINIO_SETUP.md)** - MinIO object storage setup
 - **[SETUP_ENV.md](./SETUP_ENV.md)** - Environment variable setup guide
 - **[DEV_WORKFLOW.md](./DEV_WORKFLOW.md)** - Development workflow and best practices
 - **[README_DEV.md](./README_DEV.md)** - Additional development documentation

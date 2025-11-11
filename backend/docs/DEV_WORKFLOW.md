@@ -4,10 +4,10 @@
 
 Since we're in development, you can use the simplified workflow:
 
-### 1. Start PostgreSQL
+### 1. Start Infrastructure
 ```bash
 # From project root
-docker-compose up -d postgres
+docker-compose up -d
 ```
 
 ### 2. Start Backend (No migrations needed!)
@@ -31,8 +31,8 @@ Type `RESET` when prompted to confirm.
 
 ### Normal Development Flow:
 ```bash
-# 1. Start PostgreSQL (if not running)
-docker-compose up -d postgres
+# 1. Start services (if not running)
+docker-compose up -d
 
 # 2. Start backend (tables auto-created)
 python run.py
@@ -55,7 +55,8 @@ alembic upgrade head
 The `reset_db.py` script will:
 - ✅ Drop all existing tables
 - ✅ Recreate all tables from your models
-- ✅ Delete all data (⚠️ development only!)
+- ✅ Delete all MinIO objects in the configured bucket
+- ✅ Reset everything for a clean development state (⚠️ development only!)
 
 ### Usage:
 ```bash
@@ -91,7 +92,7 @@ python reset_db.py
 
 ```bash
 # Start PostgreSQL
-docker-compose up -d postgres
+docker-compose up -d
 
 # Start backend (no migrations needed in dev!)
 python run.py
@@ -99,14 +100,17 @@ python run.py
 # Reset database
 python reset_db.py
 
-# Check if PostgreSQL is running
-docker-compose ps postgres
+# Check container status
+docker-compose ps
 
 # View PostgreSQL logs
 docker-compose logs -f postgres
 
-# Stop PostgreSQL
-docker-compose stop postgres
+# View MinIO logs
+docker-compose logs -f minio
+
+# Stop services
+docker-compose stop
 ```
 
 ---

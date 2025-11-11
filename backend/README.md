@@ -10,10 +10,10 @@ Production-ready FastAPI backend for the YourBot platform with clean architectur
 
 ### Setup
 
-1. **Start PostgreSQL:**
+1. **Start infrastructure:**
 ```bash
 # From project root
-docker-compose up -d postgres
+docker-compose up -d
 ```
 
 2. **Set up Python environment:**
@@ -46,8 +46,18 @@ Once the server is running:
 ## 🔐 Authentication Endpoints
 
 - **POST** `/api/v1/auth/signup` - Register new user
-- **POST** `/api/v1/auth/signin` - Login user  
-- **GET** `/api/v1/auth/me` - Get current user (requires auth token)
+- **POST** `/api/v1/auth/signin` - Login user
+- **GET** `/api/v1/auth/me` - Get current user profile
+- **PATCH** `/api/v1/auth/me` - Update profile details (full name, company, domain)
+
+## 🤖 Bot & UI Config Endpoints
+
+- **GET** `/api/v1/bots` - List bots for the current user
+- **POST** `/api/v1/bots` - Create a bot (branding, guardrails, llm_config, retrieval_config, ui_config linkage)
+- **PATCH** `/api/v1/bots/{bot_id}` - Update bot details and configuration
+- **DELETE** `/api/v1/bots/{bot_id}` - Delete a bot and its dependent records
+- **POST/GET/PATCH/DELETE** `/api/v1/ui-configs` - Manage reusable chatbot UI themes
+- **GET** `/public/embed-config?bot_id=...` - Public endpoint used by `static/widget.js` (ACTIVE bots only)
 
 ## 🏗️ Architecture
 
@@ -72,8 +82,8 @@ backend/
 For development, you can skip migrations and use auto-creation:
 
 ```bash
-# Start PostgreSQL
-docker-compose up -d postgres
+# Start services (PostgreSQL + MinIO)
+docker-compose up -d
 
 # Start backend (tables auto-created)
 python run.py
@@ -131,7 +141,7 @@ See `SECURITY.md` for detailed security documentation.
 - Console Port: `9001`
 - Used for document storage
 
-See `../MINIO_SETUP.md` for MinIO setup instructions.
+See `docs/MINIO_SETUP.md` for detailed MinIO setup instructions.
 
 ## 📖 Additional Documentation
 

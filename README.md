@@ -1,6 +1,6 @@
 # YourBot - Multi-Tenant SaaS Chatbot Platform
 
-A production-ready, ultra-modern chatbot platform with glassmorphism UI, built with React, TypeScript, and Vite.
+A production-ready, multi-tenant chatbot platform with glassmorphism UI on React/Vite and a FastAPI + PostgreSQL backend delivering authentication, bot management, RAG configuration, and an embeddable widget system.
 
 ## 🎨 Design System
 
@@ -14,23 +14,24 @@ A production-ready, ultra-modern chatbot platform with glassmorphism UI, built w
 ## 🚀 Quick Start
 
 ```bash
-# Navigate to frontend directory
-cd frontend
+# 1. Start required services
+docker-compose up -d
 
-# Install dependencies
+# 2. Launch the FastAPI backend
+cd backend
+python3 -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env       # update if needed
+python run.py              # http://localhost:8000
+
+# 3. Run the React frontend
+cd ../frontend
 npm install
-
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
+npm run dev                # http://localhost:8080
 ```
 
-The development server will start on `http://localhost:8080` (or the next available port).
+> The backend auto-creates tables for local development. Use Alembic migrations in staging/production.
 
 ## 📁 Project Structure
 
@@ -55,9 +56,10 @@ Multi-Tenant-SaaS-Chatbot-Platform/
 │   │   │   ├── ui/                 # shadcn/ui components
 │   │   │   └── ErrorBoundary.tsx   # Error boundary component
 │   │   ├── lib/
-│   │   │   ├── api.ts              # Mock API functions
+│   │   │   ├── api.ts              # REST client for FastAPI backend
 │   │   │   ├── theme.ts            # Theme management
 │   │   │   ├── zod-schemas.ts      # Form validation schemas
+│   │   │   ├── constants.ts        # Shared UI constants (color palettes, etc.)
 │   │   │   └── utils.ts            # Utilities
 │   │   ├── pages/
 │   │   │   ├── dashboard/          # Dashboard pages
@@ -90,13 +92,13 @@ Multi-Tenant-SaaS-Chatbot-Platform/
 3. **Dashboard** - Overview with KPIs and quick actions
 4. **Bots Management** - View all bots, create new bots, and manage existing ones
 5. **7-Step Bot Creation Wizard**:
-   - **Step 1: Brand & Persona** - Assistant name, logo, color theme, welcome message
-   - **Step 2: Tone** - LLM temperature, communication style, editable style prompts
-   - **Step 3: Data Sources** - Upload documents or crawl websites
-   - **Step 4: Indexing** - Vectorization, RAG processing with detailed stages
-   - **Step 5: Guardrails** - Content filters, blocked phrases, custom instructions
-   - **Step 6: Test Chat** - Interactive chat interface for testing
-   - **Step 7: Install** - Embed code for website integration
+   - **Step 1: Brand & Persona** - Assistant name, logo, color theme, welcome message (persisted to `branding`)
+   - **Step 2: Tone** - LLM temperature, communication style, editable prompts (stored in `llm_config`)
+   - **Step 3: Data Sources** - Upload documents or crawl websites (syncs with retrieval config)
+   - **Step 4: Indexing** - Vectorization & RAG pipeline stages with real progress indicators
+   - **Step 5: Guardrails** - Content filters, blocked phrases, custom instructions (stored in `guardrails`)
+   - **Step 6: Test Chat** - Interactive chat interface reflecting saved configuration
+   - **Step 7: Install** - Production embed code backed by `/public/embed-config`
 6. **Bot Detail Page** - Comprehensive bot management with:
    - Analytics cards (conversations, users, response time, satisfaction, etc.)
    - Full configuration editing (branding, tone, guardrails)
@@ -104,7 +106,8 @@ Multi-Tenant-SaaS-Chatbot-Platform/
    - Bot status controls (Start/Pause/Stop)
    - Settings and preferences
 7. **Analytics** - Dashboard with metrics and charts
-8. **Settings** - Profile, Team, Billing, API Keys
+8. **Settings** - Profile & API Keys management (backed by FastAPI)
+9. **Embed Widget** - Runtime-configurable widget served from FastAPI `static/widget.js`
 
 ### 🎨 Design Features
 - Glass-card utility class for consistent surfaces
@@ -119,29 +122,34 @@ Multi-Tenant-SaaS-Chatbot-Platform/
 ### 🔧 Technical Features
 - **State Management**: Zustand with persistence (Safari-compatible Set serialization)
 - **Form Validation**: React Hook Form + Zod
-- **API Layer**: TanStack Query with mock endpoints
-- **Type Safety**: Strict TypeScript
+- **API Layer**: Typed REST client communicating with the FastAPI backend
+- **Type Safety**: Strict TypeScript end-to-end
 - **Icons**: Lucide React
 - **Date Formatting**: Day.js with relative time
 - **Error Handling**: React Error Boundaries for graceful error handling
 - **Browser Compatibility**: Safari-specific fixes for Set serialization and CSS transforms
-- **Bot Management**: Complete CRUD operations for bots
+- **Bot Management**: Complete CRUD operations persisted in PostgreSQL
 - **Configuration Editing**: Full editing capabilities for all bot settings post-creation
-- **RAG Integration**: Vectorization and embedding generation for knowledge base
+- **RAG Integration**: Vectorization and embedding generation pipeline visualization
 - **Navigation**: Collapsible sidebar with persistent state
+- **Widget Delivery**: Static `widget.js` served by FastAPI with runtime theming via `/public/embed-config`
 
-## 🧪 Mock API Endpoints
+## 🔌 API Integration
 
-All API calls in `src/lib/api.ts` are mocked for UI development:
-- `mockSignUp/mockSignIn` - Authentication
-- `mockUploadFile` - Document uploads
-- `mockStartCrawl` - Website crawling
-- `mockGetIndexingStatus` - Indexing progress
-- `mockChatMessage` - Chat responses
-- `mockGetAnalytics` - Dashboard metrics
-- `mockGetGuardrails/mockSaveGuardrails` - Guardrails configuration
+The frontend talks directly to the FastAPI backend via the typed helpers in `src/lib/api.ts`.
 
-**To integrate real backend**: Replace mock functions with actual API calls.
+Key endpoints:
+- `POST /api/v1/auth/signup` / `signin` / `PATCH /auth/me` for onboarding and account updates
+- `GET/POST/PATCH/DELETE /api/v1/bots` for complete bot lifecycle management
+- `POST /api/v1/ui-configs` plus related CRUD endpoints to persist reusable widget themes
+- `GET /public/embed-config` to serve runtime embed configuration (ACTIVE bots only)
+
+Supporting services:
+- PostgreSQL for relational data (users, bots, configs, installation snippets)
+- MinIO for document storage
+- Alembic migrations for schema evolution (optional during local dev)
+
+> Need additional routes? Extend the FastAPI routers under `backend/app/api/v1/` and add matching functions in `frontend/src/lib/api.ts`.
 
 ## 🤖 Bot Management Features
 
@@ -177,7 +185,7 @@ Access by clicking any bot card from the Bots page. Features include:
 
 - **Settings Tab**: Bot status controls, access settings, auto-respond configuration
 
-- **Quick Actions**: Start/Pause/Stop bot, Edit, Duplicate, Share, Embed Code, Export Data, Delete
+- **Quick Actions**: Start/Pause/Stop bot, Edit, Share, Embed Code, Export Data, Delete (wired to backend actions)
 
 ## 🎨 Customizing Design Tokens
 
@@ -193,16 +201,32 @@ Edit `src/index.css`:
 ```
 
 ### Per-Tenant Branding
-The wizard stores brand config in `useWizardStore`:
-```typescript
-{
-  primaryColor: '#6366f1',
-  welcomeMessage: 'Hello! How can I help you today?',
-  logo: '...'
-}
-```
+Branding data captured in the wizard is persisted to PostgreSQL. Bots may either:
+- Link to a reusable UI theme via `ui_config_id` (preferred);
+- Or fall back to their `branding` JSONB payload for legacy compatibility.
 
-This can be extended to inject CSS variables dynamically per tenant.
+The public embed endpoint (`/public/embed-config`) automatically resolves the best source and delivers runtime theming to `widget.js`.
+
+## 🧪 Widget Testing (Local)
+
+To validate the production-style embed locally:
+
+1. **Start services**: `docker-compose up -d`, run `python backend/run.py`, and `npm run dev` from `frontend/`.
+2. **Create & activate a bot**: Finish the 7-step wizard (bots are auto-activated) or toggle status to `active` on the Bot Detail page.
+3. **Copy the embed snippet** from the Install step or Bot Detail → Embed Code:
+   ```html
+   <script 
+     src="http://localhost:8000/static/widget.js"
+     data-bot-id="your-bot-slug-or-id"
+     async>
+   </script>
+   ```
+4. **Drop it into HTML**: 
+   - Quick check: edit `backend/static/test.html` and swap in your bot ID or slug.  
+   - Or create your own page and paste the snippet before `</body>`.
+5. **Verify**: Only `ACTIVE` bots render. Theme, intro message, and positioning should match your bot. Use DevTools ↦ Network to inspect `/public/embed-config?bot_id=...` if debugging.
+
+> Hard-refresh after updating branding or UI settings—the widget caches aggressively.
 
 ## 🔐 Security Features
 
@@ -288,15 +312,15 @@ VITE_ENVIRONMENT=production
 - [x] Enhanced onboarding flow with 7 steps
 - [x] Vectorization and RAG processing display
 - [x] Collapsible sidebar navigation
-- [ ] Connect real backend APIs
-- [ ] Add real chat widget (deep-chat integration)
-- [ ] Implement actual authentication (JWT/OAuth)
+- [x] Connect real backend APIs
+- [x] Serve production-ready embed widget
+- [ ] Add WebSocket-powered live analytics
+- [ ] Implement deep-chat conversation engine
+- [ ] Implement advanced auth flows (OAuth/SSO/SAML)
 - [ ] Add unit tests (Vitest) and e2e tests (Playwright)
 - [ ] Set up CI/CD pipeline
-- [ ] Implement real-time analytics with charts
-- [ ] Add SSO/SAML for enterprise
-- [ ] Real-time document indexing status
-- [ ] Advanced analytics with charts and graphs
+- [ ] Build real-time document indexing status dashboard
+- [ ] Ship advanced analytics visualizations
 
 ## 📝 Notes
 

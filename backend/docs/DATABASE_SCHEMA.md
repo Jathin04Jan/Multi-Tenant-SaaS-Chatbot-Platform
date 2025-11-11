@@ -65,7 +65,7 @@ Stores all chatbot/bot configurations and settings for each user/tenant.
 | `llm_config` | JSONB | NULLABLE | LLM configuration (model, temperature, style, etc.) |
 | `retrieval_config` | JSONB | NULLABLE | RAG/Retrieval configuration (Vector DB, filters, chunking, etc.) |
 | `guardrails` | JSONB | NULLABLE | Content guardrails (moderation, blocked phrases, filters) |
-| `branding` | JSONB | NULLABLE | Branding (logo, colors, welcome message, assistant name) |
+| `branding` | JSONB | NULLABLE | Branding fallback (logo, colors, welcome message, assistant name, widget sizing) |
 | `ui_config_id` | UUID | FOREIGN KEY → ui_configs.id, NULLABLE, INDEXED | Optional UI configuration reference |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |

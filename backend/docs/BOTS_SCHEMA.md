@@ -19,7 +19,8 @@ Stores all chatbot/bot configurations and settings for each user/tenant.
 | `llm_config` | JSONB | NULLABLE | LLM configuration (model, temperature, style, etc.) |
 | `retrieval_config` | JSONB | NULLABLE | RAG/Retrieval configuration (Vector DB, filters, chunking, etc.) |
 | `guardrails` | JSONB | NULLABLE | Content guardrails (moderation, blocked phrases, filters) |
-| `branding` | JSONB | NULLABLE | Branding (logo, colors, welcome message, assistant name) |
+| `branding` | JSONB | NULLABLE | Branding fallback (logo, colors, welcome message, assistant name, default widget sizing) |
+| `ui_config_id` | UUID | FOREIGN KEY → ui_configs.id, NULLABLE, INDEXED | Optional UI configuration reference |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
 
@@ -81,16 +82,21 @@ Stores all chatbot/bot configurations and settings for each user/tenant.
 }
 ```
 
-#### `branding` Structure:
+#### `branding` Structure (fallback when no `ui_config_id` is linked):
 ```json
 {
   "logo_url": "https://example.com/logo.png",
   "primary_color": "#6366f1",
-  "font": "Inter",
   "welcome_message": "Hello! How can I help you today?",
-  "assistant_name": "Assistant"
+  "assistant_name": "Assistant",
+  "position": "bottom-right",
+  "height": 600,
+  "width": 400
 }
 ```
+
+> When a bot links to a record in `ui_configs`, the widget will use the structured data from that table.  
+> The `branding` JSONB remains as a backwards-compatible fallback and default configuration.
 
 ---
 
@@ -114,6 +120,7 @@ CREATE TABLE bots (
     retrieval_config JSONB,
     guardrails JSONB,
     branding JSONB,
+    ui_config_id UUID REFERENCES ui_configs(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -123,6 +130,7 @@ CREATE INDEX idx_bots_user_id ON bots(user_id);
 CREATE INDEX idx_bots_id ON bots(id);
 CREATE INDEX idx_bots_slug ON bots(slug);
 CREATE INDEX idx_bots_status ON bots(status);
+CREATE INDEX idx_bots_ui_config_id ON bots(ui_config_id);
 CREATE INDEX idx_bots_created_at ON bots(created_at);
 ```
 
@@ -171,8 +179,12 @@ CREATE INDEX idx_bots_created_at ON bots(created_at);
     "logo_url": "https://example.com/logo.png",
     "primary_color": "#6366f1",
     "welcome_message": "Hello! How can I help you today?",
-    "assistant_name": "Support Assistant"
+    "assistant_name": "Support Assistant",
+    "position": "bottom-right",
+    "height": 600,
+    "width": 400
   },
+  "ui_config_id": "b82dc1a8-4e6c-4c52-9a0e-7d8bce771123",
   "created_at": "2024-01-01T12:00:00Z",
   "updated_at": "2024-01-15T10:30:00Z"
 }
@@ -190,17 +202,22 @@ CREATE INDEX idx_bots_created_at ON bots(created_at);
 - `status`: Lifecycle state (draft → active → paused → archived)
 - `is_active`: Quick toggle for enabling/disabling without changing status
 
-### 3. **JSONB for Flexibility**
+### 3. **UI Config Integration**
+- `ui_config_id` links to reusable records in `ui_configs`
+- Embed endpoint prefers UI config; `branding` provides backwards-compatible defaults
+- Supports per-bot overrides while enabling shared themes
+
+### 4. **JSONB for Flexibility**
 - Allows schema evolution without migrations
 - Supports complex nested configurations
 - Enables querying with PostgreSQL JSONB operators
 
-### 4. **Slug Field**
+### 5. **Slug Field**
 - Optional but useful for URL-friendly bot identifiers
 - Unique constraint prevents conflicts
 - Can be used for public bot URLs (e.g., `/bot/support-assistant`)
 
-### 5. **Additional Fields Added**
+### 6. **Additional Fields Added**
 - `slug`: URL-friendly identifier
 - `status`: Lifecycle management (draft, active, paused, archived)
 - `is_active`: Quick enable/disable

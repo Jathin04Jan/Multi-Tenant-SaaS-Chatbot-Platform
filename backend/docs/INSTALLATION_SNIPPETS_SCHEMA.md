@@ -2,7 +2,7 @@
 
 ## 📊 `installation_snippets` Table
 
-Stores embed codes and script URLs for installing bots on customer websites. Each snippet is tied to a specific bot and user/tenant.
+Stores embed codes and script URLs for installing bots on customer websites. Each snippet is tied to a specific bot and user/tenant and integrates with the public endpoint (`GET /public/embed-config`) that only serves ACTIVE bots.
 
 ### Complete Table Structure
 
@@ -105,7 +105,7 @@ CREATE INDEX idx_installation_snippets_user_bot ON installation_snippets(user_id
   "user_id": "550e8400-e29b-41d4-a716-446655440000",
   "bot_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "script_url": "https://cdn.yourapp.com/bot-script-v1.2.3.js",
-  "embed_code": "<script src=\"https://cdn.yourapp.com/bot-script-v1.2.3.js\" data-bot-id=\"a1b2c3d4-e5f6-7890-abcd-ef1234567890\"></script>",
+  "embed_code": "<!-- Add this before closing </body> tag -->\n<script \n  src=\"https://cdn.yourapp.com/widget.js\"\n  data-bot-id=\"a1b2c3d4-e5f6-7890-abcd-ef1234567890\"\n  async>\n</script>",
   "name": "Production",
   "environment": "production",
   "is_active": true,
@@ -125,7 +125,7 @@ CREATE INDEX idx_installation_snippets_user_bot ON installation_snippets(user_id
   "user_id": "550e8400-e29b-41d4-a716-446655440000",
   "bot_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "script_url": "https://cdn-staging.yourapp.com/bot-script-dev.js",
-  "embed_code": "<script src=\"https://cdn-staging.yourapp.com/bot-script-dev.js\" data-bot-id=\"a1b2c3d4-e5f6-7890-abcd-ef1234567890\" data-env=\"staging\"></script>",
+  "embed_code": "<!-- Add this before closing </body> tag -->\n<script \n  src=\"https://cdn-staging.yourapp.com/widget-dev.js\"\n  data-bot-id=\"a1b2c3d4-e5f6-7890-abcd-ef1234567890\"\n  data-env=\"staging\"\n  async>\n</script>",
   "name": "Staging v2.0",
   "environment": "staging",
   "is_active": true,

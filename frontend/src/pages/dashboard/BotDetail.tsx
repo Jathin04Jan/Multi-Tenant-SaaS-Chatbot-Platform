@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getBot, type BotDTO, updateBot, getUiConfig, type UiConfigDTO, createUiConfig, updateUiConfig } from '@/lib/api';
+import { getBot, type BotDTO, updateBot, getUiConfig, type UiConfigDTO, createUiConfig, updateUiConfig, mockUploadFile, mockStartCrawl } from '@/lib/api';
 import { colorCombinations } from '@/lib/constants';
 import {
   Bot,
@@ -78,6 +78,12 @@ const formatDate = (dateString: string): string => {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
+// Helper function to format time
+const formatTime = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+};
+
 // Helper to get date or generate random date for existing docs
 const getDocumentDate = (source: any): string => {
   const date = source.createdAt || source.updatedAt || source.created_at || source.updated_at;
@@ -87,6 +93,27 @@ const getDocumentDate = (source: any): string => {
   const randomDate = new Date();
   randomDate.setDate(randomDate.getDate() - daysAgo);
   return formatDate(randomDate.toISOString());
+};
+
+// Helper to get time or generate random time for existing docs
+const getDocumentTime = (source: any): string => {
+  const date = source.createdAt || source.updatedAt || source.created_at || source.updated_at;
+  if (date) return formatTime(date);
+  // Generate random time for existing docs
+  const daysAgo = Math.floor(Math.random() * 90);
+  const randomDate = new Date();
+  randomDate.setDate(randomDate.getDate() - daysAgo);
+  return formatTime(randomDate.toISOString());
+};
+
+// Helper to normalize status
+const normalizeStatus = (status: string): 'Processing' | 'Processed' | 'Active' | 'Inactive' => {
+  const statusLower = status.toLowerCase();
+  if (statusLower === 'processing' || statusLower === 'queued') return 'Processing';
+  if (statusLower === 'processed' || statusLower === 'indexed') return 'Processed';
+  if (statusLower === 'active') return 'Active';
+  if (statusLower === 'inactive' || statusLower === 'failed' || statusLower === 'paused') return 'Inactive';
+  return 'Processing'; // Default
 };
 
 // Communication style options
@@ -148,6 +175,11 @@ const BotDetail = () => {
   const [selectedColor, setSelectedColor] = useState('#6366f1');
   const [uiConfigId, setUiConfigId] = useState<string | null>(null);
   const [uiConfig, setUiConfig] = useState<UiConfigDTO | null>(null);
+  
+  // Document Upload/Crawl State
+  const [crawlUrl, setCrawlUrl] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [isCrawling, setIsCrawling] = useState(false);
   
   // Tone Configuration State
   const [llmTemperature, setLlmTemperature] = useState(0.7);
@@ -429,33 +461,104 @@ const BotDetail = () => {
     const file = e.target.files?.[0];
     if (!file || !bot) return;
 
-    const retrievalConfig = bot.retrieval_config as any || {};
-    const dataSources = retrievalConfig.data_sources || [];
-    
-    const newSource = {
-      id: Date.now().toString(),
-      name: file.name,
-      type: 'upload' as const,
-      status: 'processing' as const,
-      updatedAt: new Date().toISOString(),
-    };
-
-    const updatedConfig = {
-      ...retrievalConfig,
-      data_sources: [...dataSources, newSource],
-    };
-
+    setIsUploading(true);
     try {
+      await mockUploadFile(file);
+      
+      const retrievalConfig = bot.retrieval_config as any || {};
+      const dataSources = retrievalConfig.data_sources || [];
+      
+      const newSource = {
+        id: Date.now().toString(),
+        name: file.name,
+        type: 'upload' as const,
+        status: 'processing' as const,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const updatedConfig = {
+        ...retrievalConfig,
+        data_sources: [...dataSources, newSource],
+      };
+
       const response = await updateBot(bot.id, { retrieval_config: updatedConfig });
       if (response.error) {
         toast.error(response.error || 'Failed to upload document');
         return;
       }
       setBot(response.data);
-      toast.success('Document uploaded successfully!');
+      toast.success('File uploaded successfully!');
       e.target.value = ''; // Reset input
     } catch (error) {
-      toast.error('Failed to upload document');
+      toast.error('Failed to upload file');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleCrawl = async () => {
+    if (!crawlUrl.trim() || !bot) {
+      toast.error('Please enter a valid URL');
+      return;
+    }
+
+    setIsCrawling(true);
+    try {
+      await mockStartCrawl(crawlUrl);
+      
+      const retrievalConfig = bot.retrieval_config as any || {};
+      const dataSources = retrievalConfig.data_sources || [];
+      
+      const newSource = {
+        id: Date.now().toString(),
+        name: crawlUrl,
+        type: 'crawl' as const,
+        status: 'processing' as const,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const updatedConfig = {
+        ...retrievalConfig,
+        data_sources: [...dataSources, newSource],
+      };
+
+      const response = await updateBot(bot.id, { retrieval_config: updatedConfig });
+      if (response.error) {
+        toast.error(response.error || 'Failed to start crawl');
+        return;
+      }
+      setBot(response.data);
+      setCrawlUrl('');
+      toast.success('Crawl started successfully!');
+    } catch (error) {
+      toast.error('Failed to start crawl');
+    } finally {
+      setIsCrawling(false);
+    }
+  };
+
+  const handleDeleteDataSource = async (sourceId: string) => {
+    if (!bot) return;
+
+    const retrievalConfig = bot.retrieval_config as any || {};
+    const dataSources = retrievalConfig.data_sources || [];
+    const updatedDataSources = dataSources.filter((source: any) => source.id !== sourceId);
+
+    const updatedConfig = {
+      ...retrievalConfig,
+      data_sources: updatedDataSources,
+    };
+
+    try {
+      const response = await updateBot(bot.id, { retrieval_config: updatedConfig });
+      if (response.error) {
+        toast.error(response.error || 'Failed to delete document');
+        return;
+      }
+      setBot(response.data);
+      toast.success('Document deleted successfully!');
+    } catch (error) {
+      toast.error('Failed to delete document');
     }
   };
 
@@ -1139,42 +1242,107 @@ const BotDetail = () => {
                   }
                   
                   return (
-                    <>
-                      {dataSources.map((source: any) => (
-                        <div key={source.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex items-center gap-3 flex-1">
-                            {source.type === 'upload' ? (
-                              <FileText className="w-5 h-5 text-muted-foreground" />
-                            ) : (
-                              <Globe className="w-5 h-5 text-muted-foreground" />
-                            )}
-                            <div className="flex-1">
-                              <p className="font-medium">{source.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {source.type === 'upload' ? 'Uploaded' : 'Crawled'} · {source.status} · {getDocumentDate(source)}
-                              </p>
-                            </div>
-                          </div>
-                          <Button variant="ghost" size="sm">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="text-left py-3 px-4 font-medium">Name</th>
+                            <th className="text-left py-3 px-4 font-medium">Type</th>
+                            <th className="text-left py-3 px-4 font-medium">Date</th>
+                            <th className="text-left py-3 px-4 font-medium">Time</th>
+                            <th className="text-left py-3 px-4 font-medium">Status</th>
+                            <th className="text-left py-3 px-4 font-medium">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dataSources.map((source: any) => {
+                            const normalizedStatus = normalizeStatus(source.status);
+                            return (
+                              <tr key={source.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-2">
+                                    {source.type === 'upload' ? (
+                                      <FileText className="w-4 h-4 text-muted-foreground" />
+                                    ) : (
+                                      <Globe className="w-4 h-4 text-muted-foreground" />
+                                    )}
+                                    <span className="font-medium">{source.name}</span>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-sm text-muted-foreground">
+                                  {source.type === 'upload' ? 'Uploaded' : 'Crawled'}
+                                </td>
+                                <td className="py-3 px-4 text-sm text-muted-foreground">
+                                  {getDocumentDate(source)}
+                                </td>
+                                <td className="py-3 px-4 text-sm text-muted-foreground">
+                                  {getDocumentTime(source)}
+                                </td>
+                                <td className="py-3 px-4">
+                                  <Badge
+                                    variant={
+                                      normalizedStatus === 'Processed' || normalizedStatus === 'Active'
+                                        ? 'default'
+                                        : normalizedStatus === 'Inactive'
+                                        ? 'destructive'
+                                        : 'outline'
+                                    }
+                                    className="capitalize"
+                                  >
+                                    {normalizedStatus}
+                                  </Badge>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => handleDeleteDataSource(source.id)}
+                                    className="text-foreground hover:bg-muted/50"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   );
                 })()}
-                <label className="block cursor-pointer">
-                  <input
-                    type="file"
-                    className="hidden"
-                    onChange={handleFileUpload}
-                    accept=".pdf,.doc,.docx,.txt,.md"
-                  />
-                  <Button variant="outline" className="w-full gap-2" type="button">
-                    <Upload className="w-4 h-4" />
-                    Add Document or Website
-                  </Button>
-                </label>
+                
+                {/* File Upload */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-base">Upload Files</h3>
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-primary/30 rounded-xl cursor-pointer hover:border-primary/50 transition-colors">
+                    <Upload className="w-8 h-8 text-primary mb-2" />
+                    <span className="text-sm text-muted-foreground">Click to upload or drag and drop</span>
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={handleFileUpload}
+                      disabled={isUploading}
+                      accept=".pdf,.doc,.docx,.txt,.md"
+                    />
+                  </label>
+                </div>
+
+                {/* Website Crawl */}
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-base">Crawl Website</h3>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="https://example.com"
+                      value={crawlUrl}
+                      onChange={(e) => setCrawlUrl(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button onClick={handleCrawl} disabled={isCrawling || !crawlUrl.trim()}>
+                      {isCrawling ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Globe className="w-4 h-4 mr-2" />}
+                      Crawl
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

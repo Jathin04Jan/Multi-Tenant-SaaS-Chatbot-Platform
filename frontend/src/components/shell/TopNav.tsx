@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, LogOut, User, Palette, Key, Building2, Users } from 'lucide-react';
+import { Bell, LogOut, User, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ThemeToggle } from './ThemeToggle';
@@ -143,27 +143,6 @@ export const TopNav = () => {
                 >
                   <Palette className="w-5 h-5" />
                   <span>Appearance</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer"
-                  onClick={() => navigate('/dashboard/settings/api-keys')}
-                >
-                  <Key className="w-5 h-5" />
-                  <span>API Keys</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer"
-                  onClick={() => navigate('/dashboard/settings/tenant')}
-                >
-                  <Building2 className="w-5 h-5" />
-                  <span>Tenant Settings</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer"
-                  onClick={() => navigate('/dashboard/settings/team')}
-                >
-                  <Users className="w-5 h-5" />
-                  <span>Team</span>
                 </DropdownMenuItem>
               </div>
             </DropdownMenuContent>

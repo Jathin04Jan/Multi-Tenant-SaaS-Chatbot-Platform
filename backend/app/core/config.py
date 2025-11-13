@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     
     # Database - Load from environment
     DATABASE_URL: str = Field(
-        default="postgresql://yourbot_user:yourbot_password@localhost:5432/yourbot_db",
-        description="PostgreSQL database connection URL"
+        default="postgresql://yourbot_user:yourbot_password@localhost:5433/yourbot_db",
+        description="PostgreSQL database connection URL (port 5433 matches docker-compose.yml)"
     )
     
     # CORS - Accept comma-separated string

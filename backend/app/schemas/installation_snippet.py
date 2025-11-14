@@ -66,11 +66,21 @@ class InstallationSnippetResponse(InstallationSnippetBase):
             
             # Handle domain_whitelist -> allowed_domains mapping
             if 'domain_whitelist' in data:
-                data['allowed_domains'] = data.pop('domain_whitelist')
-                if data['allowed_domains'] is None:
+                domain_value = data.pop('domain_whitelist')
+                # Preserve None, empty list, or list with domains
+                if domain_value is None:
                     data['allowed_domains'] = None
-                elif not isinstance(data['allowed_domains'], list):
+                elif isinstance(domain_value, list):
+                    # Preserve the list as-is (even if empty)
+                    data['allowed_domains'] = domain_value
+                else:
+                    # If it's not None and not a list, convert to empty list
                     data['allowed_domains'] = []
+            else:
+                # If domain_whitelist doesn't exist, set to None
+                data['allowed_domains'] = None
+            
+            print(f"DEBUG Schema: domain_whitelist was {getattr(obj, 'domain_whitelist', 'NOT_FOUND')}, allowed_domains is {data.get('allowed_domains')}")  # Debug log
             
             return cls(**data)
         return super().model_validate(obj)

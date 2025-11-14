@@ -3,12 +3,14 @@ API endpoints for installation snippet management.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
 from app.core.database import get_db
 from app.api.dependencies import get_current_user
 from app.models.user import User
+from app.models.installation_snippet import InstallationSnippet
 from app.services.installation_snippet_service import InstallationSnippetService
 from app.schemas.installation_snippet import (
     InstallationSnippetCreate,
@@ -20,7 +22,7 @@ from app.schemas.installation_snippet import (
 router = APIRouter(prefix="/snippets", tags=["installation-snippets"])
 
 
-@router.post("/bots/{bot_id}/snippets", response_model=InstallationSnippetResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/bots/{bot_id}/snippets", response_model=InstallationSnippetResponse)
 def create_snippet_for_bot(
     bot_id: str,
     snippet_data: InstallationSnippetCreate,
@@ -28,10 +30,16 @@ def create_snippet_for_bot(
     db: Session = Depends(get_db)
 ):
     """
-    Create a new installation snippet for a bot.
+    Create or get the installation snippet for a bot.
+    
+    **One snippet per bot:** Each bot can only have one snippet. If a snippet already 
+    exists for this bot, the existing snippet will be returned (and updated if new 
+    data is provided) instead of creating a duplicate.
     
     This endpoint creates a snippet with a unique snippet_id (UUID) that will be used
     in the embed code. The snippet includes domain allow-list for security.
+    
+    Returns 201 Created if a new snippet was created, 200 OK if an existing snippet was returned.
     """
     try:
         bot_uuid = UUID(bot_id)
@@ -40,6 +48,14 @@ def create_snippet_for_bot(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid bot ID format"
         )
+    
+    # Check if snippet already exists (to determine response status code)
+    existing_snippet = db.query(InstallationSnippet).filter(
+        InstallationSnippet.bot_id == bot_uuid,
+        InstallationSnippet.user_id == current_user.id
+    ).first()
+    
+    was_existing = existing_snippet is not None
     
     snippet = InstallationSnippetService.create_snippet(
         db=db,
@@ -50,7 +66,19 @@ def create_snippet_for_bot(
         environment=snippet_data.environment
     )
     
-    return InstallationSnippetResponse.model_validate(snippet)
+    response_data = InstallationSnippetResponse.model_validate(snippet)
+    
+    # Return 200 if snippet existed, 201 if newly created
+    if was_existing:
+        return JSONResponse(
+            content=response_data.model_dump(),
+            status_code=status.HTTP_200_OK
+        )
+    
+    return JSONResponse(
+        content=response_data.model_dump(),
+        status_code=status.HTTP_201_CREATED
+    )
 
 
 @router.get("/bots/{bot_id}/snippets", response_model=List[InstallationSnippetListItem])

@@ -57,6 +57,24 @@ class InstallationSnippetService:
                 detail="Bot does not belong to current user"
             )
         
+        # Check if a snippet already exists for this bot (only one snippet per bot)
+        existing_snippet = db.query(InstallationSnippet).filter(
+            InstallationSnippet.bot_id == bot_id,
+            InstallationSnippet.user_id == user_id
+        ).first()
+        
+        if existing_snippet:
+            # Update existing snippet if new data provided, otherwise return as-is
+            if allowed_domains is not None:
+                existing_snippet.domain_whitelist = allowed_domains if allowed_domains else None
+            if name:
+                existing_snippet.name = name
+            if environment:
+                existing_snippet.environment = environment
+            db.commit()
+            db.refresh(existing_snippet)
+            return existing_snippet
+        
         # Generate embed code (will be updated with actual snippet_id after creation)
         api_base = settings.API_BASE_URL
         embed_code = f'''<!-- Add this before closing </body> tag -->
@@ -189,8 +207,36 @@ class InstallationSnippetService:
             snippet.name = update_data.name
         if update_data.environment is not None:
             snippet.environment = update_data.environment
-        if update_data.allowed_domains is not None:
-            snippet.domain_whitelist = update_data.allowed_domains if update_data.allowed_domains else None
+        
+        # Handle allowed_domains: None or empty list means "allow all domains"
+        # Non-empty list means restrict to those domains
+        # Always update if the field is provided (even if None)
+        # Use model_dump to check if field was explicitly set
+        update_dict = update_data.model_dump(exclude_unset=True)
+        print(f"DEBUG: Update dict keys: {list(update_dict.keys())}")  # Debug log
+        print(f"DEBUG: allowed_domains in update_dict: {'allowed_domains' in update_dict}")  # Debug log
+        
+        if 'allowed_domains' in update_dict:
+            allowed_domains_value = update_dict['allowed_domains']
+            print(f"DEBUG: allowed_domains_value type: {type(allowed_domains_value)}, value: {allowed_domains_value}")  # Debug log
+            
+            if allowed_domains_value is None:
+                # Explicitly set to None (allow all domains)
+                snippet.domain_whitelist = None
+                print(f"DEBUG: Set domain_whitelist to None (allow all)")  # Debug log
+            elif isinstance(allowed_domains_value, list):
+                # If it's an empty list, treat it as None (allow all)
+                if len(allowed_domains_value) == 0:
+                    snippet.domain_whitelist = None
+                    print(f"DEBUG: Set domain_whitelist to None (empty list)")  # Debug log
+                else:
+                    snippet.domain_whitelist = allowed_domains_value
+                    print(f"DEBUG: Set domain_whitelist to list: {allowed_domains_value}")  # Debug log
+            else:
+                print(f"DEBUG: WARNING - allowed_domains_value is unexpected type: {type(allowed_domains_value)}")  # Debug log
+        else:
+            print(f"DEBUG: allowed_domains not in update_dict, skipping update")  # Debug log
+        
         if update_data.status is not None:
             snippet.status = update_data.status
             snippet.is_active = (update_data.status == "active")
@@ -198,6 +244,7 @@ class InstallationSnippetService:
         try:
             db.commit()
             db.refresh(snippet)
+            print(f"DEBUG: After commit, domain_whitelist is: {snippet.domain_whitelist}")  # Debug log
             return snippet
         except IntegrityError as e:
             db.rollback()

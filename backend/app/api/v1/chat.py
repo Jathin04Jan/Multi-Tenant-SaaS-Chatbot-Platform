@@ -121,6 +121,12 @@ def chat(
                 detail="Token claims do not match snippet/bot ownership"
             )
         
+        # Update snippet usage tracking (track on every message)
+        snippet.usage_count += 1
+        from datetime import datetime, timezone
+        snippet.last_used_at = datetime.now(timezone.utc)
+        db.commit()
+        
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

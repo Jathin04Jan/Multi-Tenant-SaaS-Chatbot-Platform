@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getBot, type BotDTO, updateBot, getUiConfig, type UiConfigDTO, createUiConfig, updateUiConfig, getSnippetsForBot, createSnippet, updateSnippet, deleteSnippet, type InstallationSnippetDTO } from '@/lib/api';
@@ -172,11 +172,17 @@ const BotDetail = () => {
   // Snippet Management State
   const [snippets, setSnippets] = useState<InstallationSnippetDTO[]>([]);
   const [snippetsLoading, setSnippetsLoading] = useState(false);
+  const [isRefreshingSnippets, setIsRefreshingSnippets] = useState(false);
   const [isCreateSnippetDialogOpen, setIsCreateSnippetDialogOpen] = useState(false);
   const [editingSnippet, setEditingSnippet] = useState<InstallationSnippetDTO | null>(null);
   const [newSnippetDomains, setNewSnippetDomains] = useState<string[]>([]);
   const [newDomainInput, setNewDomainInput] = useState('');
   const [allowAllDomains, setAllowAllDomains] = useState(true);
+  
+  // Edit snippet domain state
+  const [editSnippetDomains, setEditSnippetDomains] = useState<string[]>([]);
+  const [editDomainInput, setEditDomainInput] = useState('');
+  const [editAllowAllDomains, setEditAllowAllDomains] = useState(true);
 
   // Fetch bot data from API
   useEffect(() => {
@@ -267,33 +273,76 @@ const BotDetail = () => {
     fetchBot();
   }, [botId, navigate]);
 
-  // Fetch snippets when bot is loaded
-  useEffect(() => {
-    const fetchSnippets = async () => {
-      if (!botId || !bot) return;
+  // Fetch snippets function (can be called manually or automatically)
+  const fetchSnippets = useCallback(async (showLoading = true) => {
+    if (!botId || !bot) return;
 
-      try {
+    try {
+      if (showLoading) {
         setSnippetsLoading(true);
-        const response = await getSnippetsForBot(botId);
-        
-        if (response.error) {
-          toast.error(response.error || 'Failed to load snippets');
-          return;
-        }
-
-        setSnippets(response.data || []);
-      } catch (error) {
-        console.error('Error fetching snippets:', error);
-        toast.error('Failed to load snippets');
-      } finally {
-        setSnippetsLoading(false);
+      } else {
+        setIsRefreshingSnippets(true);
       }
-    };
+      const response = await getSnippetsForBot(botId);
+      
+      if (response.error) {
+        if (showLoading) {
+          toast.error(response.error || 'Failed to load snippets');
+        }
+        return;
+      }
 
-    if (bot) {
-      fetchSnippets();
+      setSnippets(response.data || []);
+    } catch (error) {
+      console.error('Error fetching snippets:', error);
+      if (showLoading) {
+        toast.error('Failed to load snippets');
+      }
+    } finally {
+      setSnippetsLoading(false);
+      setIsRefreshingSnippets(false);
     }
   }, [botId, bot]);
+
+  // Fetch snippets when bot is loaded
+  useEffect(() => {
+    if (bot) {
+      fetchSnippets(true);
+    }
+  }, [bot, fetchSnippets]);
+
+  // Auto-refresh snippets every 30 seconds
+  useEffect(() => {
+    if (!botId || !bot) return;
+
+    const interval = setInterval(() => {
+      fetchSnippets(false); // Silent refresh (no loading spinner)
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [botId, bot, fetchSnippets]);
+
+  // Initialize edit snippet state when dialog opens
+  useEffect(() => {
+    if (editingSnippet) {
+      // Handle null, undefined, or empty array as "allow all domains"
+      const domains = editingSnippet.allowed_domains || [];
+      const hasDomains = domains.length > 0;
+      setEditSnippetDomains(hasDomains ? domains : []);
+      setEditAllowAllDomains(!hasDomains); // true if no domains (allow all), false if domains exist
+      setEditDomainInput('');
+      console.log('Initializing edit snippet:', { 
+        allowed_domains: editingSnippet.allowed_domains, 
+        domains, 
+        hasDomains,
+        editAllowAllDomains: !hasDomains 
+      }); // Debug log
+    } else {
+      setEditSnippetDomains([]);
+      setEditAllowAllDomains(true);
+      setEditDomainInput('');
+    }
+  }, [editingSnippet]);
 
   // Update style prompt when communication style changes
   useEffect(() => {
@@ -397,27 +446,75 @@ const BotDetail = () => {
 
   const handleUpdateSnippet = async (snippet: InstallationSnippetDTO) => {
     try {
-      const response = await updateSnippet(snippet.id, {
+      // Prepare the update payload
+      const updatePayload: any = {
         name: snippet.name || undefined,
-        allowed_domains: snippet.allowed_domains || undefined,
         status: snippet.status,
-      });
+      };
+
+      // Handle allowed_domains based on toggle
+      console.log('DEBUG Frontend: editAllowAllDomains:', editAllowAllDomains); // Debug log
+      console.log('DEBUG Frontend: editSnippetDomains:', editSnippetDomains); // Debug log
+      console.log('DEBUG Frontend: editSnippetDomains.length:', editSnippetDomains.length); // Debug log
+      
+      if (editAllowAllDomains) {
+        // If "Allow All Domains" is ON, send null explicitly to clear restrictions
+        updatePayload.allowed_domains = null;
+        console.log('DEBUG Frontend: Setting allowed_domains to null (allow all toggle is ON)'); // Debug log
+      } else {
+        // If "Allow All Domains" is OFF, send the domain list
+        // If no domains are specified, send null (which means allow all)
+        // This is a bit counterintuitive, but empty array gets converted to null anyway
+        if (editSnippetDomains.length > 0) {
+          updatePayload.allowed_domains = editSnippetDomains;
+          console.log('DEBUG Frontend: Setting allowed_domains to list:', editSnippetDomains); // Debug log
+        } else {
+          updatePayload.allowed_domains = null;
+          console.log('DEBUG Frontend: Setting allowed_domains to null (no domains in list)'); // Debug log
+        }
+      }
+
+      console.log('Updating snippet with payload:', updatePayload); // Debug log
+      const response = await updateSnippet(snippet.id, updatePayload);
 
       if (response.error) {
         toast.error(response.error || 'Failed to update snippet');
         return;
       }
 
-      toast.success('Snippet updated successfully');
-      setEditingSnippet(null);
-      
-      // Refresh snippets list
-      if (botId) {
-        const snippetsResponse = await getSnippetsForBot(botId);
-        if (!snippetsResponse.error) {
-          setSnippets(snippetsResponse.data || []);
+      console.log('Update response:', response.data); // Debug log
+
+      // Update the snippets list with the updated snippet from the response
+      if (response.data) {
+        setSnippets(prevSnippets => {
+          const updated = prevSnippets.map(s => 
+            s.id === response.data!.id ? response.data! : s
+          );
+          // If snippet not found in list, add it
+          if (!updated.find(s => s.id === response.data!.id)) {
+            updated.push(response.data!);
+          }
+          console.log('Updated snippets state:', updated); // Debug log
+          return updated;
+        });
+      } else {
+        // Fallback: refresh from server if response doesn't have data
+        if (botId) {
+          const snippetsResponse = await getSnippetsForBot(botId);
+          if (!snippetsResponse.error) {
+            console.log('Refreshed snippets:', snippetsResponse.data); // Debug log
+            setSnippets(snippetsResponse.data || []);
+          }
         }
       }
+
+      toast.success('Snippet updated successfully');
+      
+      // Close dialog and reset state after successful update
+      setEditingSnippet(null);
+      setEditSnippetDomains([]);
+      setEditDomainInput('');
+      setEditAllowAllDomains(true);
     } catch (error) {
       console.error('Error updating snippet:', error);
       toast.error('Failed to update snippet');
@@ -478,15 +575,111 @@ const BotDetail = () => {
   };
 
   const handleAddDomain = () => {
-    const domain = newDomainInput.trim().toLowerCase();
+    const domain = extractDomain(newDomainInput);
     if (domain && !newSnippetDomains.includes(domain)) {
       setNewSnippetDomains([...newSnippetDomains, domain]);
       setNewDomainInput('');
+    } else if (domain && newSnippetDomains.includes(domain)) {
+      toast.error('Domain already added');
+    } else if (!domain) {
+      toast.error('Please enter a valid domain');
     }
   };
 
   const handleRemoveDomain = (domain: string) => {
     setNewSnippetDomains(newSnippetDomains.filter(d => d !== domain));
+  };
+
+  // Helper function to extract domain from URL or domain string
+  const extractDomain = (input: string): string | null => {
+    console.log('extractDomain called with input:', input);
+    
+    if (!input || typeof input !== 'string') {
+      console.log('extractDomain: input is empty or not a string');
+      return null;
+    }
+    
+    const trimmed = input.trim().toLowerCase();
+    console.log('extractDomain: trimmed:', trimmed);
+    
+    if (!trimmed) {
+      console.log('extractDomain: trimmed is empty');
+      return null;
+    }
+    
+    // If it's a URL, extract the hostname
+    try {
+      // Add protocol if missing for URL parsing
+      const urlString = trimmed.startsWith('http://') || trimmed.startsWith('https://') 
+        ? trimmed 
+        : `http://${trimmed}`;
+      console.log('extractDomain: trying to parse URL:', urlString);
+      const url = new URL(urlString);
+      const hostname = url.hostname;
+      console.log('extractDomain: extracted hostname:', hostname);
+      return hostname;
+    } catch (error) {
+      console.log('extractDomain: URL parsing failed, trying fallback:', error);
+      // If URL parsing fails, assume it's already a domain
+      // Remove protocol if present
+      const cleaned = trimmed.replace(/^https?:\/\//, '').split('/')[0].split('?')[0].split('#')[0];
+      console.log('extractDomain: cleaned domain:', cleaned);
+      const result = cleaned || null;
+      console.log('extractDomain: returning:', result);
+      return result;
+    }
+  };
+
+  const handleEditAddDomain = () => {
+    console.log('=== handleEditAddDomain CALLED ===');
+    console.log('editDomainInput:', editDomainInput);
+    console.log('editDomainInput.trim():', editDomainInput.trim());
+    
+    const domain = extractDomain(editDomainInput);
+    console.log('Extracted domain:', domain);
+    console.log('Current editSnippetDomains (before update):', editSnippetDomains);
+    
+    if (!domain) {
+      console.error('Domain extraction failed!');
+      toast.error('Please enter a valid domain (e.g., example.com or http://example.com)');
+      return;
+    }
+    
+    // Use functional update to ensure we have the latest state
+    setEditSnippetDomains(prevDomains => {
+      console.log('setEditSnippetDomains called with prevDomains:', prevDomains);
+      
+      if (prevDomains.includes(domain)) {
+        console.log('Domain already exists in list');
+        toast.error('Domain already added');
+        return prevDomains;
+      }
+      
+      const newDomains = [...prevDomains, domain];
+      console.log('New domains array:', newDomains);
+      
+      // Automatically turn OFF "Allow All Domains" when a domain is added
+      setEditAllowAllDomains(false);
+      
+      // Clear input
+      setEditDomainInput('');
+      
+      // Show success
+      toast.success(`Domain "${domain}" added successfully`);
+      
+      return newDomains;
+    });
+  };
+
+  const handleEditRemoveDomain = (domain: string) => {
+    const newDomains = editSnippetDomains.filter(d => d !== domain);
+    setEditSnippetDomains(newDomains);
+    // Automatically turn ON "Allow All Domains" when all domains are removed
+    if (newDomains.length === 0) {
+      setEditAllowAllDomains(true);
+      console.log('DEBUG Frontend: Turned ON Allow All Domains toggle (all domains removed)'); // Debug log
+    }
+    console.log('DEBUG Frontend: Removed domain, new editSnippetDomains:', newDomains); // Debug log
   };
 
   // Update style prompt when communication style changes
@@ -1405,22 +1598,29 @@ const BotDetail = () => {
               </CardContent>
             </Card>
 
-            {/* Installation Snippets Section */}
+            {/* Installation Snippet Section */}
             <Card className="glass-card">
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex items-start justify-between">
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <Code2 className="h-5 w-5" />
-                      Installation Snippets
+                      Installation Snippet
                     </CardTitle>
                     <CardDescription>
-                      Manage embed code snippets with domain allow-lists and analytics
+                      Your bot's embed code snippet with domain allow-list and analytics
                     </CardDescription>
                   </div>
-                  <Button onClick={() => setIsCreateSnippetDialogOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create Snippet
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => fetchSnippets(true)}
+                    disabled={snippetsLoading || isRefreshingSnippets}
+                    className="gap-2"
+                    title="Refresh snippet data"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isRefreshingSnippets ? 'animate-spin' : ''}`} />
+                    Refresh
                   </Button>
                 </div>
               </CardHeader>
@@ -1432,12 +1632,21 @@ const BotDetail = () => {
                 ) : snippets.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <Code2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-sm">No snippets created yet</p>
-                    <p className="text-xs mt-1">Create your first snippet to get started</p>
+                    <p className="text-sm">Snippet not found</p>
+                    <p className="text-xs mt-1">Snippets are automatically created when you create a bot.</p>
+                    <Button 
+                      onClick={() => setIsCreateSnippetDialogOpen(true)} 
+                      className="mt-4"
+                      variant="outline"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Snippet
+                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {snippets.map((snippet) => (
+                    {/* Show only the first snippet (there should only be one) */}
+                    {snippets.slice(0, 1).map((snippet) => (
                       <Card key={snippet.id} className="border border-border/50">
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between">
@@ -1695,27 +1904,113 @@ const BotDetail = () => {
                 </div>
               </div>
 
-              <div>
-                <Label>Allowed Domains</Label>
-                <p className="text-xs text-muted-foreground mb-2">
-                  Current domains: {editingSnippet.allowed_domains?.length || 0}
-                </p>
-                {editingSnippet.allowed_domains && editingSnippet.allowed_domains.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {editingSnippet.allowed_domains.map((domain, idx) => (
-                      <Badge key={idx} variant="secondary">
-                        {domain}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Domain editing coming soon. For now, delete and recreate the snippet to change domains.
-                </p>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Allow All Domains</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Allow the snippet to be used on any domain (recommended for testing)
+                  </p>
+                </div>
+                <Switch 
+                  checked={editAllowAllDomains} 
+                  onCheckedChange={(checked) => {
+                    setEditAllowAllDomains(checked);
+                    if (checked) {
+                      setEditSnippetDomains([]);
+                      setEditDomainInput('');
+                    }
+                  }}
+                />
               </div>
+              
+              {!editAllowAllDomains && (
+                <div>
+                  <Label>Allowed Domains</Label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Add domains to restrict where the snippet can be used.
+                  </p>
+                  {/* Debug info - remove in production */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <div className="mb-2 p-2 bg-muted rounded text-xs space-y-1">
+                      <div><strong>Debug State:</strong></div>
+                      <div>Allow All: {editAllowAllDomains ? 'YES' : 'NO'}</div>
+                      <div>Domains Array: {JSON.stringify(editSnippetDomains)}</div>
+                      <div>Domain Count: {editSnippetDomains.length}</div>
+                      <div>Input Value: "{editDomainInput}"</div>
+                      <div>Input Length: {editDomainInput.length}</div>
+                    </div>
+                  )}
+                  <div className="flex gap-2 mb-2">
+                    <Input
+                      value={editDomainInput}
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        console.log('Input onChange:', newValue);
+                        setEditDomainInput(newValue);
+                      }}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          console.log('Enter key pressed in input');
+                          handleEditAddDomain();
+                        }
+                      }}
+                      placeholder="example.com or http://example.com"
+                    />
+                    <Button 
+                      type="button" 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('=== ADD BUTTON CLICKED ===');
+                        console.log('Event:', e);
+                        console.log('editDomainInput:', editDomainInput);
+                        console.log('editDomainInput.trim():', editDomainInput.trim());
+                        console.log('editAllowAllDomains:', editAllowAllDomains);
+                        console.log('editSnippetDomains:', editSnippetDomains);
+                        handleEditAddDomain();
+                      }} 
+                      variant="outline"
+                      disabled={!editDomainInput.trim()}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add
+                    </Button>
+                  </div>
+                  <div className="mt-2">
+                    {editSnippetDomains.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {editSnippetDomains.map((domain, idx) => (
+                          <Badge key={idx} variant="secondary" className="flex items-center gap-1">
+                            <Globe className="h-3 w-3" />
+                            {domain}
+                            <button
+                              onClick={() => handleEditRemoveDomain(domain)}
+                              className="ml-1 hover:text-destructive"
+                              aria-label={`Remove domain ${domain}`}
+                              title={`Remove domain ${domain}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">
+                        No domains added yet. Add a domain above to restrict where the snippet can be used.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setEditingSnippet(null)}>
+                <Button variant="outline" onClick={() => {
+                  setEditingSnippet(null);
+                  setEditSnippetDomains([]);
+                  setEditDomainInput('');
+                  setEditAllowAllDomains(true);
+                }}>
                   Cancel
                 </Button>
                 <Button onClick={() => handleUpdateSnippet(editingSnippet)}>

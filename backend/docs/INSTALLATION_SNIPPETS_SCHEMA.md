@@ -17,10 +17,11 @@ Stores embed codes and script URLs for installing bots on customer websites. Eac
 | `embed_code` | TEXT | NOT NULL | Full JavaScript snippet for installation |
 | `name` | VARCHAR(255) | NULLABLE | Optional name/identifier (e.g., 'Production', 'Staging', 'v1.0') |
 | `environment` | VARCHAR(50) | NULLABLE | Environment type: 'production', 'staging', 'development' |
-| `is_active` | BOOLEAN | NOT NULL, DEFAULT true | Whether this snippet is currently active/enabled |
-| `domain_whitelist` | JSONB | NULLABLE | List of allowed domains (null = no restrictions) |
-| `usage_count` | INTEGER | NOT NULL, DEFAULT 0 | Number of times this snippet has been used/accessed |
-| `last_used_at` | TIMESTAMP WITH TIME ZONE | NULLABLE | Timestamp when snippet was last accessed/used |
+| `is_active` | BOOLEAN | NOT NULL, DEFAULT true | Whether this snippet is currently active/enabled (deprecated: use `status`) |
+| `status` | VARCHAR(20) | NOT NULL, DEFAULT 'active' | Snippet status: 'active' | 'revoked' |
+| `domain_whitelist` | JSONB | NULLABLE | List of allowed domains (null = no restrictions, stored as JSON array) |
+| `usage_count` | INTEGER | NOT NULL, DEFAULT 0 | Number of times this snippet has been used/accessed (tracks widget loads + chat messages) |
+| `last_used_at` | TIMESTAMP WITH TIME ZONE | NULLABLE | Timestamp when snippet was last accessed/used (updated on widget load and chat messages) |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
 | `expires_at` | TIMESTAMP WITH TIME ZONE | NULLABLE | Optional expiry timestamp (null = never expires) |
@@ -77,6 +78,7 @@ CREATE TABLE installation_snippets (
     name VARCHAR(255),
     environment VARCHAR(50),
     is_active BOOLEAN NOT NULL DEFAULT true,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
     domain_whitelist JSONB,
     usage_count INTEGER NOT NULL DEFAULT 0,
     last_used_at TIMESTAMP WITH TIME ZONE,
@@ -107,10 +109,11 @@ CREATE INDEX idx_installation_snippets_user_bot ON installation_snippets(user_id
   "user_id": "550e8400-e29b-41d4-a716-446655440000",
   "bot_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "script_url": "https://cdn.yourapp.com/bot-script-v1.2.3.js",
-  "embed_code": "<!-- Add this before closing </body> tag -->\n<script \n  src=\"https://cdn.yourapp.com/widget.js\"\n  data-bot-id=\"a1b2c3d4-e5f6-7890-abcd-ef1234567890\"\n  async>\n</script>",
+  "embed_code": "<!-- Add this before closing </body> tag -->\n<script \n  src=\"https://api.yourapp.com/static/widget.js\"\n  data-snippet-id=\"s1b2c3d4-e5f6-7890-abcd-ef1234567890\"\n  async>\n</script>",
   "name": "Production",
   "environment": "production",
   "is_active": true,
+  "status": "active",
   "domain_whitelist": ["example.com", "www.example.com"],
   "usage_count": 1250,
   "last_used_at": "2024-01-15T10:30:00Z",
@@ -127,10 +130,11 @@ CREATE INDEX idx_installation_snippets_user_bot ON installation_snippets(user_id
   "user_id": "550e8400-e29b-41d4-a716-446655440000",
   "bot_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "script_url": "https://cdn-staging.yourapp.com/bot-script-dev.js",
-  "embed_code": "<!-- Add this before closing </body> tag -->\n<script \n  src=\"https://cdn-staging.yourapp.com/widget-dev.js\"\n  data-bot-id=\"a1b2c3d4-e5f6-7890-abcd-ef1234567890\"\n  data-env=\"staging\"\n  async>\n</script>",
+  "embed_code": "<!-- Add this before closing </body> tag -->\n<script \n  src=\"https://api-staging.yourapp.com/static/widget.js\"\n  data-snippet-id=\"s2b3c4d5-e6f7-8901-bcde-f12345678901\"\n  async>\n</script>",
   "name": "Staging v2.0",
   "environment": "staging",
   "is_active": true,
+  "status": "active",
   "domain_whitelist": null,
   "usage_count": 45,
   "last_used_at": "2024-01-14T15:20:00Z",
@@ -203,9 +207,22 @@ WHERE bot_id = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
 
 ## 🔐 Security Considerations
 
-1. **Domain Whitelisting**: Restrict where snippets can be embedded
-2. **Expiry Dates**: Automatically disable snippets after a certain date
-3. **Active Flag**: Quickly disable snippets without deleting
-4. **User Verification**: Always verify `user_id` matches authenticated user before access
-5. **Bot Ownership**: Verify user owns the bot before creating/accessing snippets
+1. **Domain Whitelisting**: Restrict where snippets can be embedded (validated on `/public/embed-config`)
+2. **Status Field**: Use `status` field ('active' | 'revoked') for production-ready snippet management
+3. **Expiry Dates**: Automatically disable snippets after a certain date
+4. **Active Flag**: Legacy field, use `status` instead
+5. **User Verification**: Always verify `user_id` matches authenticated user before access
+6. **Bot Ownership**: Verify user owns the bot before creating/accessing snippets
+7. **One Snippet Per Bot**: The system enforces one snippet per bot (existing snippets are updated, not duplicated)
+8. **JWT Embed Tokens**: Short-lived tokens issued by `/public/embed-config` for secure chat API access
+9. **Usage Tracking**: Tracks both widget loads and chat messages for accurate analytics
+
+## 📊 Usage Tracking
+
+The `usage_count` and `last_used_at` fields are updated in two scenarios:
+
+1. **Widget Load**: When the widget loads and calls `/public/embed-config`, the usage count is incremented
+2. **Chat Messages**: When a user sends a chat message via `/api/v1/chat`, the usage count is incremented again
+
+This provides comprehensive analytics showing both installations and actual usage.
 

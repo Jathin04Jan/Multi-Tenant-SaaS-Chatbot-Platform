@@ -40,6 +40,7 @@ npm run dev                # http://localhost:8080
 - [Setup Guides](backend/docs/README.md#setup--configuration) – virtualenv, database, MinIO
 - [Database Schema References](backend/docs/README.md#database) – users, bots, ui configs, installation snippets
 - [Security & Troubleshooting](backend/docs/README.md#security) – JWT, CORS, diagnostics
+- **[Embed Security & Code Snippets](backend/docs/EMBED_SECURITY_AND_SNIPPETS.md)** – Complete guide to embed system, security, domain allow-list, and usage tracking
 
 ## 📁 Project Structure
 
@@ -150,7 +151,9 @@ Key endpoints:
 - `POST /api/v1/auth/signup` / `signin` / `PATCH /auth/me` for onboarding and account updates
 - `GET/POST/PATCH/DELETE /api/v1/bots` for complete bot lifecycle management
 - `POST /api/v1/ui-configs` plus related CRUD endpoints to persist reusable widget themes
-- `GET /public/embed-config` to serve runtime embed configuration (ACTIVE bots only)
+- `GET/POST/PATCH/DELETE /api/v1/snippets` for installation snippet management
+- `GET /public/embed-config` to serve runtime embed configuration with JWT tokens (ACTIVE bots only)
+- `POST /api/v1/chat` for widget chat messages (JWT-authenticated)
 
 Supporting services:
 - PostgreSQL for relational data (users, bots, configs, installation snippets)
@@ -191,7 +194,15 @@ Access by clicking any bot card from the Bots page. Features include:
 
 - **Analytics Tab**: Detailed analytics and performance metrics (placeholder)
 
-- **Settings Tab**: Bot status controls, access settings, auto-respond configuration
+- **Settings Tab**: 
+  - Bot status controls (Enable Bot, Public Access, Auto-respond)
+  - **Installation Snippet Management**:
+    - View snippet details (usage count, last used, allowed domains)
+    - Edit snippet (domain allow-list, status)
+    - Copy embed code
+    - Revoke or delete snippet
+    - Auto-refresh every 30 seconds
+    - Manual refresh button
 
 - **Quick Actions**: Start/Pause/Stop bot, Edit, Share, Embed Code, Export Data, Delete (wired to backend actions)
 
@@ -221,27 +232,62 @@ To validate the production-style embed locally:
 
 1. **Start services**: `docker-compose up -d`, run `python backend/run.py`, and `npm run dev` from `frontend/`.
 2. **Create & activate a bot**: Finish the 7-step wizard (bots are auto-activated) or toggle status to `active` on the Bot Detail page.
-3. **Copy the embed snippet** from the Install step or Bot Detail → Embed Code:
+3. **Get the embed snippet**: 
+   - After bot creation, snippet is auto-created
+   - Or go to Bot Detail → Settings → Installation Snippet
+   - Copy the embed code (uses `data-snippet-id`, not `data-bot-id`)
+4. **Copy the embed snippet**:
    ```html
+   <!-- Add this before closing </body> tag -->
    <script 
      src="http://localhost:8000/static/widget.js"
-     data-bot-id="your-bot-slug-or-id"
+     data-snippet-id="0af28c2a-764a-425e-9043-2710aa1b1011"
      async>
    </script>
    ```
-4. **Drop it into HTML**: 
-   - Quick check: edit `backend/static/test.html` and swap in your bot ID or slug.  
+5. **Drop it into HTML**: 
+   - Quick check: edit `backend/static/test.html` and swap in your snippet ID.  
    - Or create your own page and paste the snippet before `</body>`.
-5. **Verify**: Only `ACTIVE` bots render. Theme, intro message, and positioning should match your bot. Use DevTools ↦ Network to inspect `/public/embed-config?bot_id=...` if debugging.
+6. **Verify**: 
+   - Only `ACTIVE` bots render
+   - Only `active` snippets work
+   - Domain allow-list is validated (if configured)
+   - Theme, intro message, and positioning match your bot
+   - Use DevTools ↦ Network to inspect `/public/embed-config?snippet_id=...` if debugging
 
-> Hard-refresh after updating branding or UI settings—the widget caches aggressively.
+> **Note**: The widget uses `data-snippet-id` (UUID) for security. Legacy `data-bot-id` is supported but deprecated.
+
+### Installation Snippet Features
+
+- **One Snippet Per Bot**: System automatically creates/updates one snippet per bot
+- **Domain Allow-List**: Restrict where snippet can be embedded
+- **Usage Tracking**: Tracks widget loads and chat messages
+- **Auto-Refresh**: Usage stats update every 30 seconds
+- **Manual Refresh**: Click "Refresh" button for immediate update
+- **Status Management**: Activate/revoke snippets without deleting
 
 ## 🔐 Security Features
 
+### Authentication & Authorization
+- **JWT Authentication**: Secure token-based authentication for all API endpoints
+- **Password Hashing**: bcrypt with automatic salt generation
+- **Token Expiration**: Configurable token expiration (default 7 days)
+- **User Status Management**: Active, pending verification, suspended states
+
+### Embed Security
+- **Short-Lived JWT Tokens**: Widgets receive 10-minute tokens (no API keys in frontend)
+- **Domain Allow-List**: Restrict where snippets can be embedded
+- **Snippet Status Management**: Active/revoked status control
+- **Bot Status Verification**: Only ACTIVE bots can be embedded
+- **One Snippet Per Bot**: Enforced to prevent confusion
+- **Origin Tracking**: Token includes request origin for audit
+
+### Data Security
 - **Input Validation**: All forms use Zod schemas
-- **Domain Allowlist**: Restrict embed origins
-- **Mock Auth**: Replace with JWT/session auth
-- **No Hardcoded Secrets**: Use environment variables in production
+- **SQL Injection Protection**: SQLAlchemy ORM prevents injection attacks
+- **Environment Variables**: All sensitive data in `.env` (gitignored)
+- **CORS Configuration**: Restricted to frontend domains
+- **No Hardcoded Secrets**: All secrets loaded from environment
 
 ## 🌙 Theme Toggle
 
@@ -322,6 +368,11 @@ VITE_ENVIRONMENT=production
 - [x] Collapsible sidebar navigation
 - [x] Connect real backend APIs
 - [x] Serve production-ready embed widget
+- [x] Production-grade embed security with JWT tokens
+- [x] Domain allow-list management
+- [x] Usage tracking (widget loads + chat messages)
+- [x] One snippet per bot enforcement
+- [x] Auto-refresh and manual refresh for snippet analytics
 - [ ] Add WebSocket-powered live analytics
 - [ ] Implement deep-chat conversation engine
 - [ ] Implement advanced auth flows (OAuth/SSO/SAML)

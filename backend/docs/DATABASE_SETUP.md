@@ -35,26 +35,30 @@ docker-compose down -v
 ### Connection Details
 
 - **Host**: `localhost`
-- **Port**: `5432`
+- **Port**: `5433` (host port, container uses 5432)
 - **Database**: `yourbot_db`
 - **Username**: `yourbot_user`
 - **Password**: `yourbot_password`
+
+**Note:** Port `5433` is used on the host to avoid conflicts with local PostgreSQL installations. The container internally uses port `5432`.
 
 ### Connect Using psql
 
 ```bash
 # From your local machine (if psql is installed)
-psql -h localhost -U yourbot_user -d yourbot_db
+psql -h localhost -p 5433 -U yourbot_user -d yourbot_db
 
-# Or using Docker
+# Or using Docker (uses container port 5432)
 docker exec -it yourbot_postgres psql -U yourbot_user -d yourbot_db
 ```
 
 ### Connection String
 
 ```
-postgresql://yourbot_user:yourbot_password@localhost:5432/yourbot_db
+postgresql://yourbot_user:yourbot_password@localhost:5433/yourbot_db
 ```
+
+**Note:** Use port `5433` when connecting from your local machine. When connecting from within the Docker network (e.g., from pgAdmin container), use port `5432`.
 
 ## Environment Variables
 
@@ -65,7 +69,7 @@ POSTGRES_USER=yourbot_user
 POSTGRES_PASSWORD=yourbot_password
 POSTGRES_DB=yourbot_db
 POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
+POSTGRES_PORT=5433
 ```
 
 ## Data Persistence
@@ -87,12 +91,14 @@ docker-compose ps
 
 ### Port Already in Use
 
-If port 5432 is already in use, you can change it in `docker-compose.yml`:
+If port 5433 is already in use, you can change it in `docker-compose.yml`:
 
 ```yaml
 ports:
-  - "5433:5432"  # Use 5433 instead of 5432
+  - "5434:5432"  # Use 5434 (or any other port) instead of 5433
 ```
+
+Remember to update your `DATABASE_URL` in `.env` to match the new port.
 
 ### Reset Database
 

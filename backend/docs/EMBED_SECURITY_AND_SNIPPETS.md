@@ -479,8 +479,7 @@ Content-Type: application/json
 
 - [Installation Snippets Schema](./INSTALLATION_SNIPPETS_SCHEMA.md) - Complete table schema
 - [Security Implementation](./SECURITY.md) - General security features
-- [Bots Schema](./BOTS_SCHEMA.md) - Bot table structure
-- [UI Config Schema](./UI_CONFIG_SCHEMA.md) - Theme configuration
+- [Bots Schema](./BOTS_SCHEMA.md) - Bot table structure and branding JSONB configuration
 
 ---
 

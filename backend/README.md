@@ -52,21 +52,20 @@ Once the server is running:
 - **GET** `/api/v1/auth/me` - Get current user profile
 - **PATCH** `/api/v1/auth/me` - Update profile details (full name, company, domain)
 
-## 🤖 Bot & UI Config Endpoints
+## 🤖 Bot Endpoints
 
 - **GET** `/api/v1/bots` - List bots for the current user
-- **POST** `/api/v1/bots` - Create a bot (branding, guardrails, llm_config, retrieval_config, ui_config linkage)
+- **POST** `/api/v1/bots` - Create a bot (branding, guardrails, llm_config, retrieval_config)
 - **GET** `/api/v1/bots/{bot_id}` - Get bot details
 - **PATCH** `/api/v1/bots/{bot_id}` - Update bot details and configuration
 - **DELETE** `/api/v1/bots/{bot_id}` - Delete a bot and its dependent records
-- **POST/GET/PATCH/DELETE** `/api/v1/ui-configs` - Manage reusable chatbot UI themes
 
 ## 📦 Installation Snippet Endpoints
 
 - **POST** `/api/v1/bots/{bot_id}/snippets` - Create or get installation snippet (one per bot, auto-created)
 - **GET** `/api/v1/bots/{bot_id}/snippets` - List snippets for a bot
 - **GET** `/api/v1/snippets/{snippet_id}` - Get snippet details
-- **PATCH** `/api/v1/snippets/{snippet_id}` - Update snippet (domain allow-list, status, name)
+- **PATCH** `/api/v1/snippets/{snippet_id}` - Update snippet (domain allow-list, status)
 - **DELETE** `/api/v1/snippets/{snippet_id}` - Delete a snippet
 
 ## 🌐 Public & Chat Endpoints

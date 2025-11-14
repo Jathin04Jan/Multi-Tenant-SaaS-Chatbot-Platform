@@ -42,13 +42,14 @@ The backend is configured to connect to PostgreSQL running in the Docker contain
 
 ```python
 # Default connection (from docker-compose.yml)
-DATABASE_URL=postgresql://yourbot_user:yourbot_password@localhost:5432/yourbot_db
+DATABASE_URL=postgresql://yourbot_user:yourbot_password@localhost:5433/yourbot_db
 ```
 
 **Important**: 
-- The connection uses `localhost:5432`, which is the **Docker container port**
+- The connection uses `localhost:5433` (mapped from container port 5432)
 - No local PostgreSQL instance is used
 - All database operations go through the Docker container
+- Port 5433 is used to avoid conflicts with local PostgreSQL installations
 
 ### Connection Pooling
 

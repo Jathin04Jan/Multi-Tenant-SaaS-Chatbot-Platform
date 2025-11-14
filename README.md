@@ -38,7 +38,7 @@ npm run dev                # http://localhost:8080
 - [Backend Quick Start (`backend/README.md`)](backend/README.md)
 - [Backend Docs Index (`backend/docs/README.md`)](backend/docs/README.md)
 - [Setup Guides](backend/docs/README.md#setup--configuration) – virtualenv, database, MinIO
-- [Database Schema References](backend/docs/README.md#database) – users, bots, ui configs, installation snippets
+- [Database Schema References](backend/docs/README.md#database) – users, bots, installation snippets
 - [Security & Troubleshooting](backend/docs/README.md#security) – JWT, CORS, diagnostics
 - **[Embed Security & Code Snippets](backend/docs/EMBED_SECURITY_AND_SNIPPETS.md)** – Complete guide to embed system, security, domain allow-list, and usage tracking
 
@@ -150,13 +150,14 @@ The frontend talks directly to the FastAPI backend via the typed helpers in `src
 Key endpoints:
 - `POST /api/v1/auth/signup` / `signin` / `PATCH /auth/me` for onboarding and account updates
 - `GET/POST/PATCH/DELETE /api/v1/bots` for complete bot lifecycle management
-- `POST /api/v1/ui-configs` plus related CRUD endpoints to persist reusable widget themes
-- `GET/POST/PATCH/DELETE /api/v1/snippets` for installation snippet management
-- `GET /public/embed-config` to serve runtime embed configuration with JWT tokens (ACTIVE bots only)
+- `POST /api/v1/bots/{bot_id}/snippets` for installation snippet creation (auto-created, one per bot)
+- `GET /api/v1/bots/{bot_id}/snippets` for listing snippets for a bot
+- `GET/PATCH/DELETE /api/v1/snippets/{snippet_id}` for installation snippet management
+- `GET /public/embed-config?snippet_id=...` to serve runtime embed configuration with JWT tokens (ACTIVE bots only)
 - `POST /api/v1/chat` for widget chat messages (JWT-authenticated)
 
 Supporting services:
-- PostgreSQL for relational data (users, bots, configs, installation snippets)
+- PostgreSQL for relational data (users, bots, installation snippets)
 - MinIO for document storage
 - Alembic migrations for schema evolution (optional during local dev)
 
@@ -220,11 +221,15 @@ Edit `src/index.css`:
 ```
 
 ### Per-Tenant Branding
-Branding data captured in the wizard is persisted to PostgreSQL. Bots may either:
-- Link to a reusable UI theme via `ui_config_id` (preferred);
-- Or fall back to their `branding` JSONB payload for legacy compatibility.
+Branding data captured in the wizard is persisted to PostgreSQL in the `branding` JSONB field. This includes:
+- Logo and avatar URLs
+- Primary and background colors
+- Welcome and intro messages
+- Assistant name and chat title
+- Widget positioning (bottom-right, bottom-left, etc.)
+- Widget sizing (height, width)
 
-The public embed endpoint (`/public/embed-config`) automatically resolves the best source and delivers runtime theming to `widget.js`.
+The public embed endpoint (`/public/embed-config`) reads from the `branding` JSONB field and delivers runtime theming to `widget.js`.
 
 ## 🧪 Widget Testing (Local)
 

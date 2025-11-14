@@ -88,8 +88,8 @@ SELECT * FROM users;
 -- View bots table
 SELECT * FROM bots;
 
--- View ui_configs table
-SELECT * FROM ui_configs;
+-- View installation_snippets table
+SELECT * FROM installation_snippets;
 
 -- Exit
 \q
@@ -121,10 +121,25 @@ SELECT b.id, b.name, b.status, u.email as owner_email
 FROM bots b
 JOIN users u ON b.user_id = u.id;
 
--- View bots with UI configs
-SELECT b.name, b.status, uc.chat_title, uc.primary_color
+-- View bots with their branding/UI configuration
+SELECT 
+    b.name, 
+    b.status, 
+    b.branding->>'primary_color' as primary_color,
+    b.branding->>'welcome_message' as welcome_message,
+    b.branding->>'assistant_name' as assistant_name
+FROM bots b;
+
+-- View bots with their installation snippets
+SELECT 
+    b.name as bot_name,
+    b.status as bot_status,
+    s.id as snippet_id,
+    s.status as snippet_status,
+    s.usage_count,
+    s.last_used_at
 FROM bots b
-LEFT JOIN ui_configs uc ON b.ui_config_id = uc.id;
+LEFT JOIN installation_snippets s ON b.id = s.bot_id;
 
 -- View all data in a table (example: users)
 SELECT * FROM users;

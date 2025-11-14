@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getBot, type BotDTO, updateBot, getUiConfig, type UiConfigDTO, createUiConfig, updateUiConfig, getSnippetsForBot, createSnippet, updateSnippet, deleteSnippet, type InstallationSnippetDTO } from '@/lib/api';
+import { getBot, type BotDTO, updateBot, getSnippetsForBot, createSnippet, updateSnippet, deleteSnippet, type InstallationSnippetDTO } from '@/lib/api';
 import { colorCombinations } from '@/lib/constants';
 import {
   Bot,
@@ -151,8 +151,6 @@ const BotDetail = () => {
   const [botName, setBotName] = useState('');
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [selectedColor, setSelectedColor] = useState('#6366f1');
-  const [uiConfigId, setUiConfigId] = useState<string | null>(null);
-  const [uiConfig, setUiConfig] = useState<UiConfigDTO | null>(null);
   
   // Tone Configuration State
   const [llmTemperature, setLlmTemperature] = useState(0.7);
@@ -208,41 +206,13 @@ const BotDetail = () => {
         // Initialize state from bot data
         setBotName(botData.name);
         
-        // Extract branding data
+        // Extract branding/UI configuration data from JSONB
         const branding = botData.branding as any || {};
-        setWelcomeMessage(branding.welcome_message || 'Hello! How can I help you today?');
+        setWelcomeMessage(branding.intro_message || branding.welcome_message || 'Hello! How can I help you today?');
         setSelectedColor(branding.primary_color || '#6366f1');
-        
-        // Load UI configuration if linked
-        if (botData.ui_config_id) {
-          try {
-            const uiConfigResponse = await getUiConfig(botData.ui_config_id);
-            if (uiConfigResponse.error) {
-              toast.warning(uiConfigResponse.error || 'Unable to load UI configuration. Using branding defaults.');
-              setUiConfigId(botData.ui_config_id);
-              setUiConfig(null);
-            } else {
-              const uiConfigData = uiConfigResponse.data;
-              setUiConfigId(uiConfigData.id);
-              setUiConfig(uiConfigData);
-              if (uiConfigData.chat_title) {
-                setBotName(uiConfigData.chat_title);
-              }
-              if (uiConfigData.intro_message) {
-                setWelcomeMessage(uiConfigData.intro_message);
-              }
-              if (uiConfigData.primary_color) {
-                setSelectedColor(uiConfigData.primary_color);
-              }
-            }
-          } catch (uiError) {
-            console.error('Error fetching UI config:', uiError);
-            setUiConfigId(botData.ui_config_id);
-            setUiConfig(null);
-          }
-        } else {
-          setUiConfigId(null);
-          setUiConfig(null);
+        // Use chat_title or assistant_name from branding if available
+        if (branding.chat_title || branding.assistant_name) {
+          setBotName(branding.chat_title || branding.assistant_name || botData.name);
         }
 
         // Extract LLM config
@@ -398,8 +368,14 @@ const BotDetail = () => {
 
   const handleCopyEmbedCode = async () => {
     if (!bot) return;
+    // Get the first snippet (there should only be one per bot)
+    const snippet = snippets.length > 0 ? snippets[0] : null;
+    if (!snippet) {
+      toast.error('No snippet found. Please create a snippet first.');
+      return;
+    }
     const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    const embedCode = `<!-- Add this before closing </body> tag -->\n<script \n  src="${apiBase}/static/widget.js"\n  data-bot-id="${bot.slug || bot.id}"\n  async>\n</script>`;
+    const embedCode = `<!-- Add this before closing </body> tag -->\n<script \n  src="${apiBase}/static/widget.js"\n  data-snippet-id="${snippet.id}"\n  async>\n</script>`;
 
     try {
       await navigator.clipboard.writeText(embedCode);
@@ -417,7 +393,6 @@ const BotDetail = () => {
     try {
       const response = await createSnippet(botId, {
         bot_id: botId,
-        environment: 'production',
         status: 'active',
         allowed_domains: allowAllDomains ? undefined : (newSnippetDomains.length > 0 ? newSnippetDomains : undefined),
       });
@@ -448,7 +423,6 @@ const BotDetail = () => {
     try {
       // Prepare the update payload
       const updatePayload: any = {
-        name: snippet.name || undefined,
         status: snippet.status,
       };
 
@@ -695,56 +669,29 @@ const BotDetail = () => {
 
     try {
       // Prepare UI config payload
-      const uiPayload = {
-        name: `${botName} Theme`,
-        primary_color: selectedColor,
-        background_color: '#0f172a',
-        chat_title: botName,
-        intro_message: welcomeMessage,
-        avatar_url: ((bot.branding as any) || {}).logo_url || null,
-        position: uiConfig?.position ?? 'bottom-right',
-        height: uiConfig?.height ?? 600,
-        width: uiConfig?.width ?? 400,
-      };
-
-      let currentUiConfigId = uiConfigId;
-
-      try {
-        if (currentUiConfigId) {
-          const uiUpdateResponse = await updateUiConfig(currentUiConfigId, uiPayload);
-          if (uiUpdateResponse.error) {
-            toast.error(uiUpdateResponse.error || 'Failed to update UI configuration');
-            return;
-          }
-          setUiConfigId(currentUiConfigId);
-          setUiConfig(uiUpdateResponse.data);
-        } else {
-          const uiCreateResponse = await createUiConfig(uiPayload);
-          if (uiCreateResponse.error) {
-            toast.error(uiCreateResponse.error || 'Failed to create UI configuration');
-            return;
-          }
-          currentUiConfigId = uiCreateResponse.data.id;
-          setUiConfigId(currentUiConfigId);
-          setUiConfig(uiCreateResponse.data);
-        }
-      } catch (uiError) {
-        console.error('Error saving UI config:', uiError);
-        toast.error('Failed to save UI configuration');
-        return;
-      }
-
+      // Update branding JSONB with all UI configuration
       const updatedBranding = {
         ...(bot.branding as any || {}),
-        welcome_message: welcomeMessage,
+        // Logo and avatar
+        logo_url: (bot.branding as any)?.logo_url || null,
+        avatar_url: (bot.branding as any)?.avatar_url || (bot.branding as any)?.logo_url || null,
+        // Colors
         primary_color: selectedColor,
+        background_color: (bot.branding as any)?.background_color || '#ffffff',
+        // Messages
+        welcome_message: welcomeMessage,
+        intro_message: welcomeMessage,
         assistant_name: botName,
+        chat_title: botName,
+        // Widget positioning and sizing (preserve existing or use defaults)
+        position: (bot.branding as any)?.position || 'bottom-right',
+        height: (bot.branding as any)?.height || 600,
+        width: (bot.branding as any)?.width || 400,
       };
 
       const response = await updateBot(bot.id, {
         name: botName,
         branding: updatedBranding,
-        ui_config_id: currentUiConfigId,
       });
 
       if (response.error) {
@@ -1652,13 +1599,10 @@ const BotDetail = () => {
                           <div className="flex items-start justify-between">
                             <div className="flex-1 space-y-3">
                               <div className="flex items-center gap-3">
-                                <h4 className="font-semibold">{snippet.name || 'Unnamed Snippet'}</h4>
+                                <h4 className="font-semibold">Installation Snippet</h4>
                                 <Badge variant={snippet.status === 'active' ? 'default' : 'secondary'}>
                                   {snippet.status}
                                 </Badge>
-                                {snippet.environment && (
-                                  <Badge variant="outline">{snippet.environment}</Badge>
-                                )}
                               </div>
                               
                               {/* Analytics */}
@@ -1870,20 +1814,11 @@ const BotDetail = () => {
           <DialogHeader>
             <DialogTitle>Edit Snippet</DialogTitle>
             <DialogDescription>
-              Update snippet name, domain allow-list, and status
+              Update domain allow-list and status
             </DialogDescription>
           </DialogHeader>
           {editingSnippet && (
             <div className="space-y-4">
-              <div>
-                <Label htmlFor="edit-snippet-name">Snippet Name</Label>
-                <Input
-                  id="edit-snippet-name"
-                  value={editingSnippet.name || ''}
-                  onChange={(e) => setEditingSnippet({ ...editingSnippet, name: e.target.value })}
-                />
-              </div>
-              
               <div>
                 <Label>Status</Label>
                 <div className="flex gap-2 mt-2">
@@ -2031,21 +1966,41 @@ const BotDetail = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto border border-border/50">
+            {snippets.length > 0 ? (
+              <>
+                <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto border border-border/50">
 {`<!-- Add this before closing </body> tag -->
 <script 
   src="${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/static/widget.js"
-  data-bot-id="${bot?.slug || bot?.id || ''}"
+  data-snippet-id="${snippets[0].id}"
   async>
 </script>`}
-            </pre>
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>Your bot must stay <strong>active</strong> for this snippet to render.</span>
-              <Button onClick={handleCopyEmbedCode} size="sm" variant="outline">
-                <Copy className="w-4 h-4 mr-2" />
-                Copy
-              </Button>
-            </div>
+                </pre>
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>Your bot must stay <strong>active</strong> for this snippet to render.</span>
+                  <Button onClick={handleCopyEmbedCode} size="sm" variant="outline">
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-sm text-muted-foreground mb-4">
+                  No snippet found. Please create a snippet first in the Settings tab.
+                </p>
+                <Button 
+                  onClick={() => {
+                    setIsEmbedDialogOpen(false);
+                    // Navigate to Settings tab - you may need to add tab state management
+                  }}
+                  variant="outline"
+                  size="sm"
+                >
+                  Create Snippet
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

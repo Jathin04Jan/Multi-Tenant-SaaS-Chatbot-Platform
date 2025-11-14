@@ -9,8 +9,6 @@ class BotBase(BaseModel):
     """Base bot schema with common fields."""
     name: str = Field(..., description="Bot name")
     description: Optional[str] = Field(None, description="Bot persona summary/description")
-    slug: Optional[str] = Field(None, description="URL-friendly identifier")
-    ui_config_id: Optional[str] = Field(None, description="UI configuration ID (FK to ui_configs.id)")
 
 
 class BotCreate(BotBase):
@@ -22,10 +20,7 @@ class BotUpdate(BaseModel):
     """Schema for updating a bot (all fields optional)."""
     name: Optional[str] = None
     description: Optional[str] = None
-    slug: Optional[str] = None
     status: Optional[BotStatus] = None
-    is_active: Optional[bool] = None
-    ui_config_id: Optional[str] = None
     llm_config: Optional[Dict[str, Any]] = None
     retrieval_config: Optional[Dict[str, Any]] = None
     guardrails: Optional[Dict[str, Any]] = None
@@ -37,9 +32,7 @@ class BotResponse(BotBase):
     id: str  # UUID as string for JSON compatibility
     user_id: str  # UUID as string for JSON compatibility
     status: str  # BotStatus enum as string
-    is_active: bool
-    last_deployed_at: Optional[datetime] = None
-    ui_config_id: Optional[str] = None  # UUID as string for JSON compatibility
+    is_active: bool  # Computed from status (status == 'active')
     llm_config: Optional[Dict[str, Any]] = None
     retrieval_config: Optional[Dict[str, Any]] = None
     guardrails: Optional[Dict[str, Any]] = None
@@ -58,11 +51,8 @@ class BotResponse(BotBase):
             "user_id": str(obj.user_id),
             "name": obj.name,
             "description": obj.description,
-            "slug": obj.slug,
             "status": obj.status.value if hasattr(obj.status, 'value') else str(obj.status),
-            "is_active": obj.is_active,
-            "last_deployed_at": obj.last_deployed_at,
-            "ui_config_id": str(obj.ui_config_id) if obj.ui_config_id else None,
+            "is_active": obj.status.value == BotStatus.ACTIVE.value,  # Computed from status for backward compatibility
             "llm_config": obj.llm_config,
             "retrieval_config": obj.retrieval_config,
             "guardrails": obj.guardrails,

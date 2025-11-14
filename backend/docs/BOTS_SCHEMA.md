@@ -14,23 +14,23 @@ Stores all chatbot/bot configurations and settings for each user/tenant.
 | `user_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Owner/creator of the bot |
 | `name` | VARCHAR(255) | NOT NULL | Bot name |
 | `description` | TEXT | NULLABLE | Bot persona summary/description |
-| `slug` | VARCHAR(255) | NULLABLE, UNIQUE, INDEXED | URL-friendly identifier (e.g., 'support-bot') |
 | `status` | ENUM | NOT NULL, DEFAULT 'draft', INDEXED | Bot status: draft, active, paused, archived |
-| `is_active` | BOOLEAN | NOT NULL, DEFAULT true | Quick enable/disable toggle |
-| `last_deployed_at` | TIMESTAMP WITH TIME ZONE | NULLABLE | When bot was last deployed/activated |
 | `llm_config` | JSONB | NULLABLE | LLM configuration (model, temperature, style, etc.) |
 | `retrieval_config` | JSONB | NULLABLE | RAG/Retrieval configuration (Vector DB, filters, chunking, etc.) |
 | `guardrails` | JSONB | NULLABLE | Content guardrails (moderation, blocked phrases, filters) |
-| `branding` | JSONB | NULLABLE | Branding fallback (logo, colors, welcome message, assistant name, default widget sizing) |
-| `ui_config_id` | UUID | FOREIGN KEY → ui_configs.id, NULLABLE, INDEXED | Optional UI configuration reference |
+| `branding` | JSONB | NULLABLE | Branding and UI configuration (logo, colors, messages, positioning, widget sizing) |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
 
 ### Status Enum Values
 - **`draft`** - Bot is being created/configured (default)
-- **`active`** - Bot is live and operational
+- **`active`** - Bot is live and operational (can be embedded)
 - **`paused`** - Bot is temporarily disabled
 - **`archived`** - Bot is deactivated/removed
+
+**Note:** `is_active` is a computed property (not a database column) derived from `status`:
+- `status == 'active'` → `is_active = true`
+- `status == 'draft'/'paused'/'archived'` → `is_active = false`
 
 ### Key Design Decisions
 
@@ -84,21 +84,24 @@ Stores all chatbot/bot configurations and settings for each user/tenant.
 }
 ```
 
-#### `branding` Structure (fallback when no `ui_config_id` is linked):
+#### `branding` Structure (stores all UI configuration):
 ```json
 {
   "logo_url": "https://example.com/logo.png",
+  "avatar_url": "https://example.com/logo.png",
   "primary_color": "#6366f1",
+  "background_color": "#ffffff",
   "welcome_message": "Hello! How can I help you today?",
+  "intro_message": "Hello! How can I help you today?",
   "assistant_name": "Assistant",
+  "chat_title": "Assistant",
   "position": "bottom-right",
   "height": 600,
   "width": 400
 }
 ```
 
-> When a bot links to a record in `ui_configs`, the widget will use the structured data from that table.  
-> The `branding` JSONB remains as a backwards-compatible fallback and default configuration.
+> All UI configuration is stored directly in the `branding` JSONB field for simplicity and efficiency.
 
 ---
 
@@ -114,15 +117,11 @@ CREATE TABLE bots (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    slug VARCHAR(255) UNIQUE,
     status bot_status NOT NULL DEFAULT 'draft',
-    is_active BOOLEAN NOT NULL DEFAULT true,
-    last_deployed_at TIMESTAMP WITH TIME ZONE,
     llm_config JSONB,
     retrieval_config JSONB,
     guardrails JSONB,
     branding JSONB,
-    ui_config_id UUID REFERENCES ui_configs(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -130,9 +129,7 @@ CREATE TABLE bots (
 -- Create indexes
 CREATE INDEX idx_bots_user_id ON bots(user_id);
 CREATE INDEX idx_bots_id ON bots(id);
-CREATE INDEX idx_bots_slug ON bots(slug);
 CREATE INDEX idx_bots_status ON bots(status);
-CREATE INDEX idx_bots_ui_config_id ON bots(ui_config_id);
 CREATE INDEX idx_bots_created_at ON bots(created_at);
 ```
 
@@ -146,10 +143,8 @@ CREATE INDEX idx_bots_created_at ON bots(created_at);
   "user_id": "550e8400-e29b-41d4-a716-446655440000",
   "name": "Support Assistant",
   "description": "A friendly customer support bot that helps with product questions",
-  "slug": "support-assistant",
   "status": "active",
-  "is_active": true,
-  "last_deployed_at": "2024-01-15T10:30:00Z",
+  "is_active": true,  // Computed from status (status == 'active')
   "llm_config": {
     "model": "gpt-4",
     "temperature": 0.7,
@@ -186,7 +181,6 @@ CREATE INDEX idx_bots_created_at ON bots(created_at);
     "height": 600,
     "width": 400
   },
-  "ui_config_id": "b82dc1a8-4e6c-4c52-9a0e-7d8bce771123",
   "created_at": "2024-01-01T12:00:00Z",
   "updated_at": "2024-01-15T10:30:00Z"
 }
@@ -200,30 +194,24 @@ CREATE INDEX idx_bots_created_at ON bots(created_at);
 - Uses `user_id` (not `tenant_id`) since users = tenants in this system
 - `ON DELETE CASCADE` ensures bots are deleted when user account is deleted
 
-### 2. **Status vs is_active**
-- `status`: Lifecycle state (draft → active → paused → archived)
-- `is_active`: Quick toggle for enabling/disabling without changing status
+### 2. **Status Management**
+- `status`: Single source of truth for bot lifecycle (draft → active → paused → archived)
+- `is_active`: Computed property derived from `status` (for backward compatibility in API responses)
 
-### 3. **UI Config Integration**
-- `ui_config_id` links to reusable records in `ui_configs`
-- Embed endpoint prefers UI config; `branding` provides backwards-compatible defaults
-- Supports per-bot overrides while enabling shared themes
+### 3. **UI Configuration**
+- All UI configuration is stored in `branding` JSONB (no separate table needed)
+- Includes: logo, colors, messages, positioning, widget sizing
+- Simple and efficient - no joins required
 
 ### 4. **JSONB for Flexibility**
 - Allows schema evolution without migrations
 - Supports complex nested configurations
 - Enables querying with PostgreSQL JSONB operators
 
-### 5. **Slug Field**
-- Optional but useful for URL-friendly bot identifiers
-- Unique constraint prevents conflicts
-- Can be used for public bot URLs (e.g., `/bot/support-assistant`)
-
-### 6. **Additional Fields Added**
-- `slug`: URL-friendly identifier
-- `status`: Lifecycle management (draft, active, paused, archived)
-- `is_active`: Quick enable/disable
-- `last_deployed_at`: Track deployment history
+### 5. **Additional Fields Added**
+- `status`: Lifecycle management (draft, active, paused, archived) - single source of truth
+- `is_active`: Computed property (not stored) - derived from `status == 'active'`
+- `updated_at`: Automatically tracks when bot was last modified (includes activation/deployment)
 
 ---
 
@@ -231,7 +219,6 @@ CREATE INDEX idx_bots_created_at ON bots(created_at);
 
 - **Primary Key**: `id` (UUID)
 - **Foreign Key Index**: `user_id` (for efficient user → bots queries)
-- **Unique Index**: `slug` (for URL lookups)
 - **Status Index**: `status` (for filtering by status)
 - **Created At Index**: `created_at` (for sorting/ordering)
 

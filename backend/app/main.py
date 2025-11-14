@@ -8,7 +8,7 @@ from app.core.database import engine, Base
 from app.api.v1 import api_router
 from app.api.public import embed_config
 # Import all models to register them with Base
-from app.models import User, Bot, InstallationSnippet, UiConfig  # noqa: F401
+from app.models import User, Bot, InstallationSnippet  # noqa: F401
 
 # Create database tables (development only - use migrations in production)
 # This auto-creates tables if they don't exist, convenient for development

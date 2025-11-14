@@ -22,9 +22,7 @@ class InstallationSnippetService:
         db: Session,
         user_id: UUID,
         bot_id: UUID,
-        allowed_domains: Optional[List[str]] = None,
-        name: Optional[str] = None,
-        environment: Optional[str] = None
+        allowed_domains: Optional[List[str]] = None
     ) -> InstallationSnippet:
         """
         Create a new installation snippet for a bot.
@@ -34,8 +32,6 @@ class InstallationSnippetService:
             user_id: User/tenant ID
             bot_id: Bot ID
             allowed_domains: List of allowed domains (None = no restrictions)
-            name: Optional snippet name
-            environment: Optional environment type
         
         Returns:
             Created InstallationSnippet
@@ -67,10 +63,6 @@ class InstallationSnippetService:
             # Update existing snippet if new data provided, otherwise return as-is
             if allowed_domains is not None:
                 existing_snippet.domain_whitelist = allowed_domains if allowed_domains else None
-            if name:
-                existing_snippet.name = name
-            if environment:
-                existing_snippet.environment = environment
             db.commit()
             db.refresh(existing_snippet)
             return existing_snippet
@@ -88,11 +80,8 @@ class InstallationSnippetService:
         snippet = InstallationSnippet(
             user_id=user_id,
             bot_id=bot_id,
-            name=name or f"Snippet for {bot.name}",
-            environment=environment or "production",
             domain_whitelist=allowed_domains if allowed_domains else None,
-            status="active",
-            is_active=True,
+            status="active",  # is_active is computed from status
             embed_code=embed_code  # Will be updated with actual snippet_id after creation
         )
         
@@ -202,12 +191,6 @@ class InstallationSnippetService:
                 detail="Snippet does not belong to current user"
             )
         
-        # Update fields
-        if update_data.name is not None:
-            snippet.name = update_data.name
-        if update_data.environment is not None:
-            snippet.environment = update_data.environment
-        
         # Handle allowed_domains: None or empty list means "allow all domains"
         # Non-empty list means restrict to those domains
         # Always update if the field is provided (even if None)
@@ -239,7 +222,7 @@ class InstallationSnippetService:
         
         if update_data.status is not None:
             snippet.status = update_data.status
-            snippet.is_active = (update_data.status == "active")
+            # is_active is computed from status (no need to set it)
         
         try:
             db.commit()

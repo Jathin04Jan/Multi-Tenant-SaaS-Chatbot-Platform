@@ -31,7 +31,6 @@ class User(Base):
         comment="User status: active, pending_verification, or suspended"
     )
     plan = Column(String(50), nullable=True, comment="Subscription plan (free, pro, enterprise)")
-    is_verified = Column(Boolean, default=False, nullable=False, comment="Email verification status")
     settings = Column(
         JSONB,
         nullable=True,
@@ -39,6 +38,11 @@ class User(Base):
     )
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    @property
+    def is_verified(self) -> bool:
+        """Computed property: user is verified if status is ACTIVE."""
+        return self.status.value == UserStatus.ACTIVE.value
     
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, company_name={self.company_name}, status={self.status})>"

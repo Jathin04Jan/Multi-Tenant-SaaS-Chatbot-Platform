@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, Boolean, DateTime, Integer, ForeignKey
+from sqlalchemy import Column, String, Text, DateTime, Integer, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -41,29 +41,12 @@ class InstallationSnippet(Base):
         comment="Full JavaScript snippet for installation (the code users embed on their websites)"
     )
     
-    # Metadata & Organization
-    name = Column(
-        String(255),
-        nullable=True,
-        comment="Optional name/identifier for the snippet (e.g., 'Production', 'Staging', 'v1.0')"
-    )
-    environment = Column(
-        String(50),
-        nullable=True,
-        comment="Environment type: 'production', 'staging', 'development'"
-    )
-    is_active = Column(
-        Boolean,
-        default=True,
-        nullable=False,
-        comment="Whether this snippet is currently active/enabled (deprecated: use status)"
-    )
-    
     # Status field for production-ready snippet management
     status = Column(
         String(20),
         default="active",
         nullable=False,
+        index=True,
         comment="Snippet status: 'active' | 'revoked'"
     )
     
@@ -110,6 +93,11 @@ class InstallationSnippet(Base):
     user = relationship("User", backref="installation_snippets")
     bot = relationship("Bot", backref="installation_snippets")
     
+    @property
+    def is_active(self) -> bool:
+        """Computed property: snippet is active if status is 'active'."""
+        return self.status == "active"
+    
     def __repr__(self):
-        return f"<InstallationSnippet(id={self.id}, bot_id={self.bot_id}, name={self.name}, is_active={self.is_active})>"
+        return f"<InstallationSnippet(id={self.id}, bot_id={self.bot_id}, status={self.status})>"
 

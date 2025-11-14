@@ -500,8 +500,6 @@ export interface InstallationSnippetDTO {
   id: string;
   user_id: string;
   bot_id: string;
-  name: string | null;
-  environment: string | null;
   allowed_domains: string[] | null;
   status: string;
   embed_code: string | null;
@@ -516,15 +514,11 @@ export interface InstallationSnippetDTO {
 
 export interface InstallationSnippetCreate {
   bot_id: string;
-  name?: string;
-  environment?: string;
   allowed_domains?: string[];
   status?: string;
 }
 
 export interface InstallationSnippetUpdate {
-  name?: string;
-  environment?: string;
   allowed_domains?: string[];
   status?: string;
 }

@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Upload, Globe, Trash2, RefreshCw, ArrowRight, ArrowLeft, CheckCircle2, Bot, Circle } from 'lucide-react';
-import { mockUploadFile, mockStartCrawl, mockGetGuardrails, mockSaveGuardrails, createBot, updateBot, createUiConfig, createSnippet } from '@/lib/api';
+import { mockUploadFile, mockStartCrawl, mockGetGuardrails, mockSaveGuardrails, createBot, updateBot, createSnippet } from '@/lib/api';
 import { toast } from 'sonner';
 
 const steps = [
@@ -49,7 +49,6 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
   const [isUploading, setIsUploading] = useState(false);
   const [isCrawling, setIsCrawling] = useState(false);
   const [createdBotId, setCreatedBotId] = useState<string | null>(null);
-  const [createdBotSlug, setCreatedBotSlug] = useState<string | null>(null);
   const [createdSnippetId, setCreatedSnippetId] = useState<string | null>(null);
   const [indexingStatus, setIndexingStatus] = useState<'idle' | 'indexing' | 'completed'>('idle');
   const [indexingProgress, setIndexingProgress] = useState(0);
@@ -200,42 +199,28 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     try {
       // Get bot name from persona (BrandingForm updates persona.botName)
       const botName = persona.botName || 'My Bot';
-      
-      // Create UI config for the bot (reusable theme)
-      let uiConfigId: string | null = null;
-      const uiConfigPayload = {
-        name: `${botName} Theme`,
-        primary_color: branding.primaryColor || '#6366f1',
-        background_color: '#0f172a',
-        chat_title: botName,
-        intro_message: branding.welcomeMessage || 'Hello! How can I help you today?',
-        avatar_url: branding.logo || null,
-        position: 'bottom-right',
-        height: 600,
-        width: 400,
-      };
-
-      try {
-        const uiConfigResponse = await createUiConfig(uiConfigPayload);
-        if (uiConfigResponse.error) {
-          toast.warning(uiConfigResponse.error || 'Created bot without UI theme (using defaults).');
-        } else {
-          uiConfigId = uiConfigResponse.data.id;
-        }
-      } catch (uiError) {
-        console.error('Error creating UI config:', uiError);
-        toast.warning('Created bot without UI theme (using defaults).');
-      }
 
       // Prepare bot data from wizard store
+      // All UI configuration is stored in branding JSONB
       const botData = {
         name: botName,
         description: `A ${tone.communicationStyle} chatbot`,
         branding: {
+          // Logo and avatar
           logo_url: branding.logo || null,
-          primary_color: branding.primaryColor,
-          welcome_message: branding.welcomeMessage,
+          avatar_url: branding.logo || null,
+          // Colors
+          primary_color: branding.primaryColor || '#6366f1',
+          background_color: '#ffffff',
+          // Messages
+          welcome_message: branding.welcomeMessage || 'Hello! How can I help you today?',
+          intro_message: branding.welcomeMessage || 'Hello! How can I help you today?',
           assistant_name: botName,
+          chat_title: botName,
+          // Widget positioning and sizing
+          position: 'bottom-right',
+          height: 600,
+          width: 400,
         },
         llm_config: {
           model: 'gpt-4',
@@ -265,7 +250,6 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           chunk_overlap: 200,
           embedding_model: 'text-embedding-ada-002',
         },
-        ui_config_id: uiConfigId,
       };
       
       // Create bot via API
@@ -276,10 +260,9 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
         return;
       }
       
-      // Store bot ID and slug for embed code
+      // Store bot ID for embed code
       if (response.data) {
         setCreatedBotId(response.data.id);
-        setCreatedBotSlug(response.data.slug || response.data.id);
         
         // PRODUCTION: Automatically activate the bot after creation
         // This makes the bot immediately embeddable
@@ -294,7 +277,6 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
             try {
               const snippetResponse = await createSnippet(response.data.id, {
                 bot_id: response.data.id,
-                environment: 'production',
                 status: 'active',
                 // allowed_domains: undefined means allow all domains (good for testing)
               });
@@ -795,7 +777,6 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                     onOpenChange(false);
                     resetWizard();
                     setCreatedBotId(null);
-                    setCreatedBotSlug(null);
                     setCreatedSnippetId(null);
                     window.location.reload();
                   }} 

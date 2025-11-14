@@ -9,8 +9,6 @@ from datetime import datetime
 
 class InstallationSnippetBase(BaseModel):
     """Base schema for installation snippets."""
-    name: Optional[str] = Field(None, description="Optional name/identifier for the snippet")
-    environment: Optional[str] = Field(None, description="Environment type: 'production', 'staging', 'development'")
     allowed_domains: Optional[List[str]] = Field(None, description="List of allowed domains (null = no restrictions)")
     status: str = Field(default="active", description="Snippet status: 'active' | 'revoked'")
 
@@ -23,8 +21,6 @@ class InstallationSnippetCreate(InstallationSnippetBase):
 
 class InstallationSnippetUpdate(BaseModel):
     """Schema for updating an installation snippet."""
-    name: Optional[str] = None
-    environment: Optional[str] = None
     allowed_domains: Optional[List[str]] = None
     status: Optional[str] = Field(None, description="Snippet status: 'active' | 'revoked'")
 
@@ -36,54 +32,42 @@ class InstallationSnippetResponse(InstallationSnippetBase):
     bot_id: str = Field(..., description="Bot ID (UUID)")
     script_url: Optional[str] = None
     embed_code: Optional[str] = Field(None, description="Generated embed code snippet")
-    is_active: bool = Field(..., description="Whether snippet is active (deprecated: use status)")
+    is_active: bool = Field(..., description="Computed from status (status == 'active')")
     usage_count: int = Field(default=0, description="Number of times snippet has been accessed")
-    last_used_at: Optional[datetime] = None
-    created_at: datetime
-    updated_at: datetime
-    expires_at: Optional[datetime] = None
+    last_used_at: Optional[str] = Field(None, description="Last used timestamp (ISO format)")
+    created_at: str = Field(..., description="Created timestamp (ISO format)")
+    updated_at: str = Field(..., description="Updated timestamp (ISO format)")
+    expires_at: Optional[str] = Field(None, description="Expiration timestamp (ISO format)")
     
     @classmethod
-    def model_validate(cls, obj):
-        """Convert UUID fields to strings for JSON compatibility."""
-        from uuid import UUID as UUIDType
+    def from_orm(cls, obj):
+        """Convert ORM object to response, converting UUID and datetime fields to strings."""
+        data = {
+            "id": str(obj.id),
+            "user_id": str(obj.user_id),
+            "bot_id": str(obj.bot_id),
+            "status": obj.status,
+            "script_url": obj.script_url,
+            "embed_code": obj.embed_code,
+            "usage_count": obj.usage_count,
+            "is_active": obj.status == "active",  # Computed from status
+        }
         
-        # Handle SQLAlchemy ORM objects
-        if hasattr(obj, '__dict__'):
-            data = {}
-            # Get all attributes from the object
-            for key in ['id', 'user_id', 'bot_id', 'name', 'environment', 'status', 
-                       'script_url', 'embed_code', 'is_active', 'usage_count', 
-                       'last_used_at', 'created_at', 'updated_at', 'expires_at', 
-                       'domain_whitelist']:
-                if hasattr(obj, key):
-                    value = getattr(obj, key)
-                    # Convert UUIDs to strings
-                    if isinstance(value, UUIDType):
-                        data[key] = str(value)
-                    else:
-                        data[key] = value
-            
-            # Handle domain_whitelist -> allowed_domains mapping
-            if 'domain_whitelist' in data:
-                domain_value = data.pop('domain_whitelist')
-                # Preserve None, empty list, or list with domains
-                if domain_value is None:
-                    data['allowed_domains'] = None
-                elif isinstance(domain_value, list):
-                    # Preserve the list as-is (even if empty)
-                    data['allowed_domains'] = domain_value
-                else:
-                    # If it's not None and not a list, convert to empty list
-                    data['allowed_domains'] = []
-            else:
-                # If domain_whitelist doesn't exist, set to None
-                data['allowed_domains'] = None
-            
-            print(f"DEBUG Schema: domain_whitelist was {getattr(obj, 'domain_whitelist', 'NOT_FOUND')}, allowed_domains is {data.get('allowed_domains')}")  # Debug log
-            
-            return cls(**data)
-        return super().model_validate(obj)
+        # Convert datetime fields to ISO format strings
+        data["last_used_at"] = obj.last_used_at.isoformat() if obj.last_used_at else None
+        data["created_at"] = obj.created_at.isoformat()  # Should always exist
+        data["updated_at"] = obj.updated_at.isoformat()  # Should always exist
+        data["expires_at"] = obj.expires_at.isoformat() if obj.expires_at else None
+        
+        # Handle domain_whitelist -> allowed_domains mapping
+        if obj.domain_whitelist is None:
+            data["allowed_domains"] = None
+        elif isinstance(obj.domain_whitelist, list):
+            data["allowed_domains"] = obj.domain_whitelist
+        else:
+            data["allowed_domains"] = []
+        
+        return cls(**data)
     
     class Config:
         from_attributes = True

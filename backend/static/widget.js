@@ -3,11 +3,8 @@
  *
  * This script creates a chatbot widget that can be embedded on any website.
  * 
- * Production Usage (preferred):
- *   <script src="https://yourbot.com/static/widget.js" data-snippet-id="uuid-here" async></script>
- * 
- * Legacy Usage (deprecated):
- *   <script src="https://yourbot.com/static/widget.js" data-bot-id="bot-id-or-slug" async></script>
+ * Production Usage:
+ *   <script src="https://yourbot.com/static/widget.js" data-snippet-id="snippet-uuid" async></script>
  */
 
 (function () {

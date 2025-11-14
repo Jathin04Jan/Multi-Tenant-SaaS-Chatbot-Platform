@@ -31,7 +31,7 @@ class AuthService:
             company_name=user_data.company_name,  # Organization/Company name
             domain=user_data.domain,
             status=UserStatus.ACTIVE,  # Set to ACTIVE for testing (change to PENDING_VERIFICATION in production)
-            is_verified=True,  # Set to True for testing (change to False in production)
+            # Note: is_verified is now computed from status (status == ACTIVE means verified)
         )
         
         db.add(db_user)

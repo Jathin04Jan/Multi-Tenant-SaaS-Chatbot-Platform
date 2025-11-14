@@ -32,7 +32,6 @@ class Bot(Base):
     # Basic Information
     name = Column(String(255), nullable=False, comment="Bot name")
     description = Column(Text, nullable=True, comment="Bot persona summary/description")
-    slug = Column(String(255), nullable=True, unique=True, index=True, comment="URL-friendly identifier (e.g., 'support-bot')")
     
     # Status & Lifecycle
     status = Column(
@@ -42,8 +41,6 @@ class Bot(Base):
         index=True,
         comment="Bot status: draft, active, paused, or archived"
     )
-    is_active = Column(Boolean, default=True, nullable=False, comment="Quick enable/disable toggle")
-    last_deployed_at = Column(DateTime(timezone=True), nullable=True, comment="When bot was last deployed/activated")
     
     # LLM Configuration (JSONB)
     # Structure: { "model": "gpt-4", "temperature": 0.7, "top_p": 0.9, "max_tokens": 1000, 
@@ -74,22 +71,18 @@ class Bot(Base):
         comment="Content guardrails: moderation rules, blocked phrases, content filters, custom instructions"
     )
     
-    # Branding Configuration (JSONB)
-    # Structure: { "logo_url": "...", "primary_color": "#6366f1", "font": "...",
-    #              "welcome_message": "Hello! How can I help?", "assistant_name": "Assistant" }
+    # Branding/UI Configuration (JSONB)
+    # Structure: { 
+    #   "logo_url": "...", "avatar_url": "...",
+    #   "primary_color": "#6366f1", "background_color": "#ffffff",
+    #   "welcome_message": "Hello! How can I help?", "intro_message": "...",
+    #   "assistant_name": "Assistant", "chat_title": "...",
+    #   "position": "bottom-right", "height": 600, "width": 400
+    # }
     branding = Column(
         JSONB,
         nullable=True,
-        comment="Branding: logo URL, theme color, font, welcome message, assistant name"
-    )
-    
-    # UI Configuration (Optional foreign key to ui_configs table)
-    ui_config_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("ui_configs.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True,
-        comment="Optional UI configuration reference (FK to ui_configs.id)"
+        comment="Branding and UI configuration: logo, colors, messages, positioning, widget sizing"
     )
     
     # Metadata
@@ -98,7 +91,11 @@ class Bot(Base):
     
     # Relationships
     user = relationship("User", backref="bots")
-    ui_config = relationship("UiConfig", backref="bots")
+    
+    @property
+    def is_active(self) -> bool:
+        """Computed property: bot is active if status is ACTIVE."""
+        return self.status.value == BotStatus.ACTIVE.value
     
     def __repr__(self):
         return f"<Bot(id={self.id}, name={self.name}, status={self.status}, user_id={self.user_id})>"

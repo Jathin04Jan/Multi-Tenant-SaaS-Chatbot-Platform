@@ -373,6 +373,7 @@ VITE_ENVIRONMENT=production
 - [x] Usage tracking (widget loads + chat messages)
 - [x] One snippet per bot enforcement
 - [x] Auto-refresh and manual refresh for snippet analytics
+- [x] Comprehensive documentation for embed security and code snippets
 - [ ] Add WebSocket-powered live analytics
 - [ ] Implement deep-chat conversation engine
 - [ ] Implement advanced auth flows (OAuth/SSO/SAML)

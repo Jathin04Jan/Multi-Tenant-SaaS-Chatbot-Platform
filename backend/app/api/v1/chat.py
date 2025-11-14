@@ -108,7 +108,8 @@ def chat(
                 detail="Bot not found"
             )
         
-        if bot.status.value != 'active' or not bot.is_active:
+        # Verify bot is active (is_active is computed from status)
+        if bot.status.value != 'active':
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Bot is not active"

@@ -61,22 +61,21 @@ def create_snippet_for_bot(
         db=db,
         user_id=current_user.id,
         bot_id=bot_uuid,
-        allowed_domains=snippet_data.allowed_domains,
-        name=snippet_data.name,
-        environment=snippet_data.environment
+        allowed_domains=snippet_data.allowed_domains
     )
     
-    response_data = InstallationSnippetResponse.model_validate(snippet)
+    response_data = InstallationSnippetResponse.from_orm(snippet)
     
     # Return 200 if snippet existed, 201 if newly created
+    # Datetime fields are already converted to ISO format strings in from_orm
     if was_existing:
         return JSONResponse(
-            content=response_data.model_dump(),
+            content=response_data.dict(),
             status_code=status.HTTP_200_OK
         )
     
     return JSONResponse(
-        content=response_data.model_dump(),
+        content=response_data.dict(),
         status_code=status.HTTP_201_CREATED
     )
 
@@ -102,7 +101,7 @@ def list_snippets_for_bot(
         user_id=current_user.id
     )
     
-    return [InstallationSnippetListItem.model_validate(s) for s in snippets]
+    return [InstallationSnippetListItem.from_orm(s) for s in snippets]
 
 
 @router.get("/{snippet_id}", response_model=InstallationSnippetResponse)
@@ -134,7 +133,7 @@ def get_snippet(
             detail="Snippet does not belong to current user"
         )
     
-    return InstallationSnippetResponse.model_validate(snippet)
+    return InstallationSnippetResponse.from_orm(snippet)
 
 
 @router.patch("/{snippet_id}", response_model=InstallationSnippetResponse)
@@ -160,7 +159,7 @@ def update_snippet(
         update_data=update_data
     )
     
-    return InstallationSnippetResponse.model_validate(snippet)
+    return InstallationSnippetResponse.from_orm(snippet)
 
 
 @router.delete("/{snippet_id}", status_code=status.HTTP_204_NO_CONTENT)

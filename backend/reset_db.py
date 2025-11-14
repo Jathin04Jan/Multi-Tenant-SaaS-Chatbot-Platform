@@ -10,9 +10,10 @@ Usage:
 """
 
 import sys
+from sqlalchemy import text
 from app.core.database import engine, Base
 from app.core.config import settings
-from app.models import User, Bot, InstallationSnippet, UiConfig  # Import all models to register them
+from app.models import User, Bot, InstallationSnippet  # Import all models to register them
 
 
 def reset_minio():
@@ -66,7 +67,28 @@ def reset_database():
     print("🔄 Resetting database...")
     
     try:
-        # Drop all tables using SQLAlchemy (handles foreign keys automatically)
+        # First, manually clean up old ui_configs table and its foreign key constraint
+        # This handles the case where the database still has the old schema
+        print("  → Cleaning up old ui_configs table and constraints...")
+        with engine.begin() as conn:
+            # Drop the foreign key constraint from bots table if it exists
+            conn.execute(text("""
+                ALTER TABLE bots 
+                DROP CONSTRAINT IF EXISTS bots_ui_config_id_fkey;
+            """))
+            
+            # Drop the ui_config_id column from bots table if it exists
+            conn.execute(text("""
+                ALTER TABLE bots 
+                DROP COLUMN IF EXISTS ui_config_id;
+            """))
+            
+            # Drop the ui_configs table if it exists (CASCADE will drop dependent objects)
+            conn.execute(text("DROP TABLE IF EXISTS ui_configs CASCADE;"))
+        
+        print("  → Old ui_configs table and constraints removed")
+        
+        # Now drop all remaining tables using SQLAlchemy
         print("  → Dropping all tables...")
         Base.metadata.drop_all(bind=engine, checkfirst=True)
         

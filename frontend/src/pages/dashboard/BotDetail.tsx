@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getBot, type BotDTO, updateBot, getUiConfig, type UiConfigDTO, createUiConfig, updateUiConfig } from '@/lib/api';
+import { getBot, type BotDTO, updateBot, getUiConfig, type UiConfigDTO, createUiConfig, updateUiConfig, getSnippetsForBot, createSnippet, updateSnippet, deleteSnippet, type InstallationSnippetDTO } from '@/lib/api';
 import { colorCombinations } from '@/lib/constants';
 import {
   Bot,
@@ -30,6 +30,11 @@ import {
   ArrowLeft,
   Check,
   Save,
+  Code2,
+  Plus,
+  X,
+  ExternalLink,
+  Activity,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -164,6 +169,15 @@ const BotDetail = () => {
   const [blockPersonalInfo, setBlockPersonalInfo] = useState(true);
   const [customInstructions, setCustomInstructions] = useState('');
 
+  // Snippet Management State
+  const [snippets, setSnippets] = useState<InstallationSnippetDTO[]>([]);
+  const [snippetsLoading, setSnippetsLoading] = useState(false);
+  const [isCreateSnippetDialogOpen, setIsCreateSnippetDialogOpen] = useState(false);
+  const [editingSnippet, setEditingSnippet] = useState<InstallationSnippetDTO | null>(null);
+  const [newSnippetDomains, setNewSnippetDomains] = useState<string[]>([]);
+  const [newDomainInput, setNewDomainInput] = useState('');
+  const [allowAllDomains, setAllowAllDomains] = useState(true);
+
   // Fetch bot data from API
   useEffect(() => {
     const fetchBot = async () => {
@@ -253,6 +267,34 @@ const BotDetail = () => {
     fetchBot();
   }, [botId, navigate]);
 
+  // Fetch snippets when bot is loaded
+  useEffect(() => {
+    const fetchSnippets = async () => {
+      if (!botId || !bot) return;
+
+      try {
+        setSnippetsLoading(true);
+        const response = await getSnippetsForBot(botId);
+        
+        if (response.error) {
+          toast.error(response.error || 'Failed to load snippets');
+          return;
+        }
+
+        setSnippets(response.data || []);
+      } catch (error) {
+        console.error('Error fetching snippets:', error);
+        toast.error('Failed to load snippets');
+      } finally {
+        setSnippetsLoading(false);
+      }
+    };
+
+    if (bot) {
+      fetchSnippets();
+    }
+  }, [botId, bot]);
+
   // Update style prompt when communication style changes
   useEffect(() => {
     const selectedOption = styleOptions.find(opt => opt.value === communicationStyle);
@@ -317,6 +359,134 @@ const BotDetail = () => {
       console.error('Failed to copy embed code:', error);
       toast.error('Failed to copy embed code');
     }
+  };
+
+  // Snippet Management Handlers
+  const handleCreateSnippet = async () => {
+    if (!botId) return;
+
+    try {
+      const response = await createSnippet(botId, {
+        bot_id: botId,
+        environment: 'production',
+        status: 'active',
+        allowed_domains: allowAllDomains ? undefined : (newSnippetDomains.length > 0 ? newSnippetDomains : undefined),
+      });
+
+      if (response.error) {
+        toast.error(response.error || 'Failed to create snippet');
+        return;
+      }
+
+      toast.success('Snippet created successfully');
+      setIsCreateSnippetDialogOpen(false);
+      setNewSnippetDomains([]);
+      setNewDomainInput('');
+      setAllowAllDomains(true);
+      
+      // Refresh snippets list
+      const snippetsResponse = await getSnippetsForBot(botId);
+      if (!snippetsResponse.error) {
+        setSnippets(snippetsResponse.data || []);
+      }
+    } catch (error) {
+      console.error('Error creating snippet:', error);
+      toast.error('Failed to create snippet');
+    }
+  };
+
+  const handleUpdateSnippet = async (snippet: InstallationSnippetDTO) => {
+    try {
+      const response = await updateSnippet(snippet.id, {
+        name: snippet.name || undefined,
+        allowed_domains: snippet.allowed_domains || undefined,
+        status: snippet.status,
+      });
+
+      if (response.error) {
+        toast.error(response.error || 'Failed to update snippet');
+        return;
+      }
+
+      toast.success('Snippet updated successfully');
+      setEditingSnippet(null);
+      
+      // Refresh snippets list
+      if (botId) {
+        const snippetsResponse = await getSnippetsForBot(botId);
+        if (!snippetsResponse.error) {
+          setSnippets(snippetsResponse.data || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating snippet:', error);
+      toast.error('Failed to update snippet');
+    }
+  };
+
+  const handleToggleSnippetStatus = async (snippet: InstallationSnippetDTO) => {
+    try {
+      const newStatus = snippet.status === 'active' ? 'revoked' : 'active';
+      const response = await updateSnippet(snippet.id, { status: newStatus });
+
+      if (response.error) {
+        toast.error(response.error || 'Failed to update snippet status');
+        return;
+      }
+
+      toast.success(`Snippet ${newStatus === 'active' ? 'activated' : 'revoked'} successfully`);
+      
+      // Refresh snippets list
+      if (botId) {
+        const snippetsResponse = await getSnippetsForBot(botId);
+        if (!snippetsResponse.error) {
+          setSnippets(snippetsResponse.data || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating snippet status:', error);
+      toast.error('Failed to update snippet status');
+    }
+  };
+
+  const handleDeleteSnippet = async (snippetId: string) => {
+    if (!confirm('Are you sure you want to delete this snippet? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await deleteSnippet(snippetId);
+
+      if (response.error) {
+        toast.error(response.error || 'Failed to delete snippet');
+        return;
+      }
+
+      toast.success('Snippet deleted successfully');
+      
+      // Refresh snippets list
+      if (botId) {
+        const snippetsResponse = await getSnippetsForBot(botId);
+        if (!snippetsResponse.error) {
+          setSnippets(snippetsResponse.data || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting snippet:', error);
+      toast.error('Failed to delete snippet');
+    }
+  };
+
+  const handleAddDomain = () => {
+    const domain = newDomainInput.trim().toLowerCase();
+    if (domain && !newSnippetDomains.includes(domain)) {
+      setNewSnippetDomains([...newSnippetDomains, domain]);
+      setNewDomainInput('');
+    }
+  };
+
+  const handleRemoveDomain = (domain: string) => {
+    setNewSnippetDomains(newSnippetDomains.filter(d => d !== domain));
   };
 
   // Update style prompt when communication style changes
@@ -1234,9 +1404,329 @@ const BotDetail = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Installation Snippets Section */}
+            <Card className="glass-card">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Code2 className="h-5 w-5" />
+                      Installation Snippets
+                    </CardTitle>
+                    <CardDescription>
+                      Manage embed code snippets with domain allow-lists and analytics
+                    </CardDescription>
+                  </div>
+                  <Button onClick={() => setIsCreateSnippetDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Snippet
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {snippetsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : snippets.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Code2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-sm">No snippets created yet</p>
+                    <p className="text-xs mt-1">Create your first snippet to get started</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {snippets.map((snippet) => (
+                      <Card key={snippet.id} className="border border-border/50">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 space-y-3">
+                              <div className="flex items-center gap-3">
+                                <h4 className="font-semibold">{snippet.name || 'Unnamed Snippet'}</h4>
+                                <Badge variant={snippet.status === 'active' ? 'default' : 'secondary'}>
+                                  {snippet.status}
+                                </Badge>
+                                {snippet.environment && (
+                                  <Badge variant="outline">{snippet.environment}</Badge>
+                                )}
+                              </div>
+                              
+                              {/* Analytics */}
+                              <div className="grid grid-cols-3 gap-4 text-sm">
+                                <div>
+                                  <p className="text-muted-foreground text-xs">Usage Count</p>
+                                  <p className="font-semibold flex items-center gap-1">
+                                    <Activity className="h-4 w-4" />
+                                    {snippet.usage_count || 0}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground text-xs">Last Used</p>
+                                  <p className="font-semibold">
+                                    {snippet.last_used_at 
+                                      ? formatTimeAgo(snippet.last_used_at)
+                                      : 'Never'}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground text-xs">Allowed Domains</p>
+                                  <p className="font-semibold">
+                                    {snippet.allowed_domains && snippet.allowed_domains.length > 0
+                                      ? `${snippet.allowed_domains.length} domain(s)`
+                                      : 'All domains'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Domain List */}
+                              {snippet.allowed_domains && snippet.allowed_domains.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                  {snippet.allowed_domains.map((domain, idx) => (
+                                    <Badge key={idx} variant="outline" className="text-xs">
+                                      <Globe className="h-3 w-3 mr-1" />
+                                      {domain}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Embed Code Preview */}
+                              <div className="mt-3 p-3 bg-muted rounded-lg">
+                                <p className="text-xs text-muted-foreground mb-2">Embed Code:</p>
+                                <code className="text-xs block break-all">
+                                  data-snippet-id="{snippet.id}"
+                                </code>
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex flex-col gap-2 ml-4">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+                                  const embedCode = `<!-- Add this before closing </body> tag -->
+<script 
+  src="${apiBase}/static/widget.js"
+  data-snippet-id="${snippet.id}"
+  async>
+</script>`;
+                                  navigator.clipboard.writeText(embedCode);
+                                  toast.success('Embed code copied!');
+                                }}
+                              >
+                                <Copy className="h-4 w-4 mr-2" />
+                                Copy Code
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setEditingSnippet(snippet)}
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleToggleSnippetStatus(snippet)}
+                              >
+                                {snippet.status === 'active' ? (
+                                  <>
+                                    <X className="h-4 w-4 mr-2" />
+                                    Revoke
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check className="h-4 w-4 mr-2" />
+                                    Activate
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDeleteSnippet(snippet.id)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </motion.div>
+      
+      {/* Create Snippet Dialog */}
+      <Dialog open={isCreateSnippetDialogOpen} onOpenChange={setIsCreateSnippetDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create Installation Snippet</DialogTitle>
+            <DialogDescription>
+              Create a new embed code snippet with optional domain restrictions
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Allow All Domains</Label>
+                <p className="text-sm text-muted-foreground">
+                  Allow the snippet to be used on any domain (recommended for testing)
+                </p>
+              </div>
+              <Switch 
+                checked={allowAllDomains} 
+                onCheckedChange={(checked) => {
+                  setAllowAllDomains(checked);
+                  if (checked) {
+                    setNewSnippetDomains([]);
+                    setNewDomainInput('');
+                  }
+                }}
+              />
+            </div>
+            
+            {!allowAllDomains && (
+              <div>
+                <Label>Allowed Domains</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Add domains to restrict where the snippet can be used.
+                </p>
+                <div className="flex gap-2 mb-2">
+                  <Input
+                    value={newDomainInput}
+                    onChange={(e) => setNewDomainInput(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddDomain();
+                      }
+                    }}
+                    placeholder="example.com"
+                  />
+                  <Button type="button" onClick={handleAddDomain} variant="outline">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {newSnippetDomains.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {newSnippetDomains.map((domain, idx) => (
+                      <Badge key={idx} variant="secondary" className="flex items-center gap-1">
+                        <Globe className="h-3 w-3" />
+                        {domain}
+                        <button
+                          onClick={() => handleRemoveDomain(domain)}
+                          className="ml-1 hover:text-destructive"
+                          aria-label={`Remove domain ${domain}`}
+                          title={`Remove domain ${domain}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => {
+                setIsCreateSnippetDialogOpen(false);
+                setAllowAllDomains(true);
+                setNewSnippetDomains([]);
+                setNewDomainInput('');
+              }}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateSnippet}>
+                Create Snippet
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Snippet Dialog */}
+      <Dialog open={editingSnippet !== null} onOpenChange={(open) => !open && setEditingSnippet(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Snippet</DialogTitle>
+            <DialogDescription>
+              Update snippet name, domain allow-list, and status
+            </DialogDescription>
+          </DialogHeader>
+          {editingSnippet && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="edit-snippet-name">Snippet Name</Label>
+                <Input
+                  id="edit-snippet-name"
+                  value={editingSnippet.name || ''}
+                  onChange={(e) => setEditingSnippet({ ...editingSnippet, name: e.target.value })}
+                />
+              </div>
+              
+              <div>
+                <Label>Status</Label>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant={editingSnippet.status === 'active' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setEditingSnippet({ ...editingSnippet, status: 'active' })}
+                  >
+                    Active
+                  </Button>
+                  <Button
+                    variant={editingSnippet.status === 'revoked' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setEditingSnippet({ ...editingSnippet, status: 'revoked' })}
+                  >
+                    Revoked
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <Label>Allowed Domains</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Current domains: {editingSnippet.allowed_domains?.length || 0}
+                </p>
+                {editingSnippet.allowed_domains && editingSnippet.allowed_domains.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {editingSnippet.allowed_domains.map((domain, idx) => (
+                      <Badge key={idx} variant="secondary">
+                        {domain}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Domain editing coming soon. For now, delete and recreate the snippet to change domains.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEditingSnippet(null)}>
+                  Cancel
+                </Button>
+                <Button onClick={() => handleUpdateSnippet(editingSnippet)}>
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isEmbedDialogOpen} onOpenChange={setIsEmbedDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>

@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Upload, Globe, Trash2, RefreshCw, ArrowRight, ArrowLeft, CheckCircle2, Bot, Circle } from 'lucide-react';
-import { mockUploadFile, mockStartCrawl, mockGetGuardrails, mockSaveGuardrails, createBot, updateBot, createUiConfig } from '@/lib/api';
+import { mockUploadFile, mockStartCrawl, mockGetGuardrails, mockSaveGuardrails, createBot, updateBot, createUiConfig, createSnippet } from '@/lib/api';
 import { toast } from 'sonner';
 
 const steps = [
@@ -50,6 +50,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
   const [isCrawling, setIsCrawling] = useState(false);
   const [createdBotId, setCreatedBotId] = useState<string | null>(null);
   const [createdBotSlug, setCreatedBotSlug] = useState<string | null>(null);
+  const [createdSnippetId, setCreatedSnippetId] = useState<string | null>(null);
   const [indexingStatus, setIndexingStatus] = useState<'idle' | 'indexing' | 'completed'>('idle');
   const [indexingProgress, setIndexingProgress] = useState(0);
   const [testMessage, setTestMessage] = useState('');
@@ -288,6 +289,26 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
             toast.warning('Bot created but activation failed. Please activate it manually.');
           } else {
             toast.success('Bot created and activated successfully! 🎉');
+            
+            // Create installation snippet for the bot
+            try {
+              const snippetResponse = await createSnippet(response.data.id, {
+                bot_id: response.data.id,
+                environment: 'production',
+                status: 'active',
+                // allowed_domains: undefined means allow all domains (good for testing)
+              });
+              
+              if (snippetResponse.error) {
+                toast.warning('Bot created but snippet creation failed. You can create a snippet manually from the bot detail page.');
+              } else if (snippetResponse.data) {
+                setCreatedSnippetId(snippetResponse.data.id);
+                toast.success('Installation snippet created!');
+              }
+            } catch (snippetError) {
+              console.error('Error creating snippet:', snippetError);
+              toast.warning('Bot created but snippet creation failed. You can create a snippet manually from the bot detail page.');
+            }
           }
         } catch (activateError) {
           console.error('Error activating bot:', activateError);
@@ -706,32 +727,35 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                     <div className="relative">
                       <div className="p-4 bg-muted rounded-lg font-mono text-xs overflow-x-auto border border-border/50">
                         <code className="text-xs whitespace-pre">
-{`<!-- Add this before closing </body> tag -->
+{createdSnippetId ? `<!-- Add this before closing </body> tag -->
 <script 
   src="${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/static/widget.js"
-  data-bot-id="${createdBotSlug || createdBotId}"
+  data-snippet-id="${createdSnippetId}"
   async>
-</script>`}
+</script>` : `<!-- Snippet is being created... -->
+<!-- Once created, you'll see the embed code here -->`}
                         </code>
                       </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="absolute top-2 right-2 h-7 px-3 text-xs"
-                        onClick={() => {
-                          const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-                          const embedCode = `<!-- Add this before closing </body> tag -->
+                      {createdSnippetId && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="absolute top-2 right-2 h-7 px-3 text-xs"
+                          onClick={() => {
+                            const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+                            const embedCode = `<!-- Add this before closing </body> tag -->
 <script 
   src="${apiBase}/static/widget.js"
-  data-bot-id="${createdBotSlug || createdBotId}"
+  data-snippet-id="${createdSnippetId}"
   async>
 </script>`;
-                          navigator.clipboard.writeText(embedCode);
-                          toast.success('Code copied to clipboard!');
-                        }}
-                      >
-                        Copy
-                      </Button>
+                            navigator.clipboard.writeText(embedCode);
+                            toast.success('Code copied to clipboard!');
+                          }}
+                        >
+                          Copy
+                        </Button>
+                      )}
                     </div>
                     <div className="space-y-2 text-xs text-muted-foreground">
                       <p>
@@ -772,6 +796,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                     resetWizard();
                     setCreatedBotId(null);
                     setCreatedBotSlug(null);
+                    setCreatedSnippetId(null);
                     window.location.reload();
                   }} 
                   size="default" 

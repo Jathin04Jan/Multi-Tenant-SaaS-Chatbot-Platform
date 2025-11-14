@@ -494,3 +494,80 @@ export const deleteBot = async (botId: string): Promise<ApiResponse<{ success: b
     method: 'DELETE',
   });
 };
+
+// Installation Snippet DTOs and API functions
+export interface InstallationSnippetDTO {
+  id: string;
+  user_id: string;
+  bot_id: string;
+  name: string | null;
+  environment: string | null;
+  allowed_domains: string[] | null;
+  status: string;
+  embed_code: string | null;
+  script_url: string | null;
+  is_active: boolean;
+  usage_count: number;
+  last_used_at: string | null;
+  created_at: string;
+  updated_at: string;
+  expires_at: string | null;
+}
+
+export interface InstallationSnippetCreate {
+  bot_id: string;
+  name?: string;
+  environment?: string;
+  allowed_domains?: string[];
+  status?: string;
+}
+
+export interface InstallationSnippetUpdate {
+  name?: string;
+  environment?: string;
+  allowed_domains?: string[];
+  status?: string;
+}
+
+// Create a snippet for a bot
+export const createSnippet = async (
+  botId: string,
+  snippetData: InstallationSnippetCreate
+): Promise<ApiResponse<InstallationSnippetDTO>> => {
+  return apiRequest<InstallationSnippetDTO>(`/api/v1/snippets/bots/${botId}/snippets`, {
+    method: 'POST',
+    body: JSON.stringify(snippetData),
+  });
+};
+
+// Get all snippets for a bot
+export const getSnippetsForBot = async (botId: string): Promise<ApiResponse<InstallationSnippetDTO[]>> => {
+  return apiRequest<InstallationSnippetDTO[]>(`/api/v1/snippets/bots/${botId}/snippets`, {
+    method: 'GET',
+  });
+};
+
+// Get a specific snippet
+export const getSnippet = async (snippetId: string): Promise<ApiResponse<InstallationSnippetDTO>> => {
+  return apiRequest<InstallationSnippetDTO>(`/api/v1/snippets/${snippetId}`, {
+    method: 'GET',
+  });
+};
+
+// Update a snippet
+export const updateSnippet = async (
+  snippetId: string,
+  updateData: InstallationSnippetUpdate
+): Promise<ApiResponse<InstallationSnippetDTO>> => {
+  return apiRequest<InstallationSnippetDTO>(`/api/v1/snippets/${snippetId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(updateData),
+  });
+};
+
+// Delete a snippet
+export const deleteSnippet = async (snippetId: string): Promise<ApiResponse<{ success: boolean }>> => {
+  return apiRequest<{ success: boolean }>(`/api/v1/snippets/${snippetId}`, {
+    method: 'DELETE',
+  });
+};

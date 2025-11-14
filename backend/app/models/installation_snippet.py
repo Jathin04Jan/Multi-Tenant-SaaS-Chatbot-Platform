@@ -56,15 +56,33 @@ class InstallationSnippet(Base):
         Boolean,
         default=True,
         nullable=False,
-        comment="Whether this snippet is currently active/enabled"
+        comment="Whether this snippet is currently active/enabled (deprecated: use status)"
+    )
+    
+    # Status field for production-ready snippet management
+    status = Column(
+        String(20),
+        default="active",
+        nullable=False,
+        comment="Snippet status: 'active' | 'revoked'"
     )
     
     # Security & Access Control
     domain_whitelist = Column(
         JSONB,
         nullable=True,
-        comment="List of allowed domains where this snippet can be used (null = no restrictions)"
+        comment="List of allowed domains where this snippet can be used (null = no restrictions). Stored as JSON array of strings."
     )
+    
+    # Alias for domain_whitelist (for compatibility with GPT's naming)
+    @property
+    def allowed_domains(self):
+        """Get allowed domains as a list."""
+        if self.domain_whitelist is None:
+            return None
+        if isinstance(self.domain_whitelist, list):
+            return self.domain_whitelist
+        return []
     
     # Usage Tracking
     usage_count = Column(

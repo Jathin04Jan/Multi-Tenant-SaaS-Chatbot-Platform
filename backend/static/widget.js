@@ -1,27 +1,45 @@
 /**
- * YourBot Widget - Embeddable Chatbot Widget
+ * YourBot Widget - Embeddable Chatbot Widget (Production-Ready)
  *
  * This script creates a chatbot widget that can be embedded on any website.
- * Usage:
- *   <script src="https://yourbot.com/static/widget.js" data-bot-id="your-bot-id" async></script>
+ * 
+ * Production Usage (preferred):
+ *   <script src="https://yourbot.com/static/widget.js" data-snippet-id="uuid-here" async></script>
+ * 
+ * Legacy Usage (deprecated):
+ *   <script src="https://yourbot.com/static/widget.js" data-bot-id="bot-id-or-slug" async></script>
  */
 
 (function () {
   'use strict';
 
-  // Configuration from script tag
-  const scriptTag = document.currentScript || document.querySelector('script[data-bot-id]');
-  const botId = scriptTag ? scriptTag.getAttribute('data-bot-id') : null;
+  // Get script tag and extract configuration
+  const scriptTag = document.currentScript || 
+    Array.from(document.querySelectorAll('script')).find(s => 
+      (s.src || '').includes('widget') && (s.dataset.snippetId || s.dataset.botId)
+    );
 
-  if (!botId) {
-    console.error('YourBot Widget: data-bot-id attribute is required');
+  if (!scriptTag) {
+    console.error('YourBot Widget: Script tag not found');
     return;
   }
 
+  // Extract snippet_id (preferred) or bot_id (legacy)
+  const snippetId = scriptTag.dataset.snippetId;
+  const botId = scriptTag.dataset.botId; // Legacy support
+
+  if (!snippetId && !botId) {
+    console.error('YourBot Widget: data-snippet-id (preferred) or data-bot-id (deprecated) attribute is required');
+    return;
+  }
+
+  if (!snippetId && botId) {
+    console.warn('YourBot Widget: Using deprecated data-bot-id. Please migrate to data-snippet-id for production-ready features.');
+  }
+
   // Get API base URL from script source
-  // This will be overridden by the config from the API
   let apiBaseUrl = 'http://localhost:8000';
-  if (scriptTag && scriptTag.src) {
+  if (scriptTag.src) {
     try {
       const scriptUrl = new URL(scriptTag.src);
       apiBaseUrl = `${scriptUrl.protocol}//${scriptUrl.host}`;
@@ -35,6 +53,11 @@
   let isOpen = false;
   let messages = [];
   let initialIntroMessage = null;
+  let embedToken = null; // JWT token for chat API authentication
+
+  // Store config globally for chat calls
+  window.YourBot = window.YourBot || {};
+  window.YourBot._config = null;
 
   const getTheme = () => {
     if (!config || !config.theme) {
@@ -46,7 +69,7 @@
 
   const getIntroMessage = () => {
     if (!config || typeof config.intro_message !== 'string') {
-      console.error('YourBot Widget: Intro message missing or invalid in configuration. intro_message:', config?.intro_message, 'full config:', config);
+      console.error('YourBot Widget: Intro message missing or invalid in configuration.');
       return null;
     }
     return config.intro_message;
@@ -99,34 +122,52 @@
       ${theme.position === 'bottom-left' ? 'left' : 'right'}: 20px;
       width: ${theme.width}px;
       height: ${theme.height}px;
-      background: ${theme.background_color};
+      background: #ffffff;
       border-radius: 12px;
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-      z-index: 9999;
       display: none;
       flex-direction: column;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      z-index: 9999;
+      overflow: hidden;
     `;
 
-    // Chat header
+    // Header
     const header = document.createElement('div');
     header.style.cssText = `
-      padding: 16px;
       background: ${theme.primary_color};
       color: white;
-      border-radius: 12px 12px 0 0;
+      padding: 16px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
     `;
-    header.innerHTML = `
-      <div>
-        <div style="font-weight: 600; font-size: 16px;">${theme.chat_title}</div>
-        <div style="font-size: 12px; opacity: 0.9;">Online</div>
-      </div>
-      <button id="yourbot-close-button" style="background: none; border: none; color: white; cursor: pointer; font-size: 24px; padding: 0; width: 32px; height: 32px;">&times;</button>
-    `;
-    header.querySelector('#yourbot-close-button').onclick = toggleWidget;
+    // Create header content
+    const headerLeft = document.createElement('div');
+    headerLeft.style.cssText = 'display: flex; align-items: center; gap: 12px;';
+    
+    if (theme.avatar_url) {
+      const avatar = document.createElement('img');
+      avatar.src = theme.avatar_url;
+      avatar.style.cssText = 'width: 32px; height: 32px; border-radius: 50%;';
+      headerLeft.appendChild(avatar);
+    }
+    
+    const headerText = document.createElement('div');
+    const title = document.createElement('div');
+    title.style.cssText = 'font-weight: 600; font-size: 16px;';
+    title.textContent = theme.chat_title || 'Chat';
+    headerText.appendChild(title);
+    headerLeft.appendChild(headerText);
+    
+    header.appendChild(headerLeft);
+    
+    // Create close button
+    const closeButton = document.createElement('button');
+    closeButton.id = 'yourbot-close';
+    closeButton.style.cssText = 'background: none; border: none; color: white; cursor: pointer; font-size: 20px;';
+    closeButton.textContent = '×';
+    closeButton.onclick = toggleWidget;
+    header.appendChild(closeButton);
 
     // Messages container
     const messagesContainer = document.createElement('div');
@@ -135,46 +176,57 @@
       flex: 1;
       overflow-y: auto;
       padding: 16px;
-      background: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: #ffffff;
     `;
 
     // Input area
     const inputArea = document.createElement('div');
     inputArea.style.cssText = `
-      padding: 16px;
-      border-top: 1px solid #e0e0e0;
+      padding: 12px;
+      border-top: 1px solid #e5e7eb;
       display: flex;
       gap: 8px;
+      background: #ffffff;
     `;
     const input = document.createElement('input');
     input.id = 'yourbot-input';
     input.type = 'text';
-    input.placeholder = 'Type a message...';
+    input.placeholder = 'Type your message...';
     input.style.cssText = `
       flex: 1;
       padding: 10px 16px;
-      border: 1px solid #e0e0e0;
+      border: 1px solid #e5e7eb;
       border-radius: 24px;
       outline: none;
       font-size: 14px;
     `;
+    input.onkeypress = (e) => {
+      if (e.key === 'Enter') sendMessage();
+    };
+
     const sendButton = document.createElement('button');
-    sendButton.textContent = 'Send';
+    sendButton.innerHTML = `
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+        <line x1="22" y1="2" x2="11" y2="13"></line>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+      </svg>
+    `;
     sendButton.style.cssText = `
-      padding: 10px 20px;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
       background: ${theme.primary_color};
-      color: white;
       border: none;
-      border-radius: 24px;
       cursor: pointer;
-      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
     `;
     sendButton.onclick = sendMessage;
-    input.onkeypress = (e) => {
-      if (e.key === 'Enter') {
-        sendMessage();
-      }
-    };
 
     inputArea.appendChild(input);
     inputArea.appendChild(sendButton);
@@ -186,17 +238,15 @@
     document.body.appendChild(button);
     document.body.appendChild(chatWindow);
 
-    // Apply theme when config loads
-    applyTheme();
-
-    initialIntroMessage = getIntroMessage();
+    // Apply theme after DOM elements are created
+    setTimeout(() => applyTheme(), 100);
   }
 
-  // Apply theme from config
+  // Apply theme to existing elements
   function applyTheme() {
-    if (!config || !config.theme) return;
+    const theme = getTheme();
+    if (!theme) return;
 
-    const theme = config.theme;
     const button = document.getElementById('yourbot-widget-button');
     const header = document.querySelector('#yourbot-widget-window > div:first-child');
     const inputElement = document.querySelector('#yourbot-input');
@@ -235,8 +285,6 @@
           button.style.left = '20px';
         }
       }
-    } else {
-      console.warn('YourBot Widget: applyTheme called before inputs rendered.');
     }
   }
 
@@ -272,12 +320,30 @@
       justify-content: ${sender === 'user' ? 'flex-end' : 'flex-start'};
     `;
 
+    // Get theme for colors
+    const theme = getTheme();
+    const primaryColor = theme?.primary_color || '#6366f1';
+    
+    // Convert hex to RGB for light color (bot messages) - works with any theme color
+    const hexToRgb = (hex) => {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+      } : { r: 99, g: 102, b: 241 }; // Default indigo
+    };
+    
+    const rgb = hexToRgb(primaryColor);
+    // Create light version of theme color (20% opacity for better visibility)
+    const lightColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`;
+
     const bubble = document.createElement('div');
     bubble.style.cssText = `
       max-width: 70%;
       padding: 10px 16px;
       border-radius: 18px;
-      background: ${sender === 'user' ? '#6366f1' : 'white'};
+      background: ${sender === 'user' ? primaryColor : lightColor};
       color: ${sender === 'user' ? 'white' : '#333'};
       font-size: 14px;
       line-height: 1.5;
@@ -290,7 +356,7 @@
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
 
-  // Send message
+  // Send message to chat API
   async function sendMessage() {
     const input = document.getElementById('yourbot-input');
     const message = input.value.trim();
@@ -299,27 +365,99 @@
     input.value = '';
     addMessage(message, 'user');
 
-    // TODO: Replace with actual API call
-    // For now, show a placeholder response
-    setTimeout(() => {
-      addMessage('Thank you for your message! This is a demo response. The actual chatbot API integration is coming soon.', 'bot');
-    }, 500);
+    // Get config and token
+    const cfg = window.YourBot._config;
+    if (!cfg || !cfg.token) {
+      addMessage('Error: Widget not properly configured. Please refresh the page.', 'bot');
+      console.error('YourBot Widget: Missing token in configuration');
+      return;
+    }
+
+    const { api_base, token } = cfg;
+
+    try {
+      const response = await fetch(`${api_base}/api/v1/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ message }),
+        credentials: 'omit'
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          addMessage('Session expired. Please refresh the page.', 'bot');
+          console.error('YourBot Widget: Token expired or invalid');
+          return;
+        }
+        throw new Error(`Chat API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      addMessage(data.response || 'No response received', 'bot');
+    } catch (error) {
+      console.error('YourBot Widget: Failed to send message', error);
+      addMessage('Sorry, I encountered an error. Please try again.', 'bot');
+    }
   }
 
   // Fetch config from API
   async function fetchConfig() {
     try {
-      const response = await fetch(`${apiBaseUrl}/public/embed-config?bot_id=${encodeURIComponent(botId)}`);
+      let url;
+      if (snippetId) {
+        // Production flow: use snippet_id
+        url = `${apiBaseUrl}/public/embed-config?snippet_id=${encodeURIComponent(snippetId)}`;
+      } else if (botId) {
+        // Legacy flow: use bot_id (deprecated)
+        console.warn('YourBot Widget: Using deprecated bot_id flow. Migrate to snippet_id.');
+        url = `${apiBaseUrl}/public/embed-config?bot_id=${encodeURIComponent(botId)}`;
+      } else {
+        throw new Error('Neither snippet_id nor bot_id provided');
+      }
+
+      const response = await fetch(url, {
+        credentials: 'omit'
+      });
+
       if (!response.ok) {
         throw new Error(`Failed to fetch config: ${response.status}`);
       }
+
       config = await response.json();
       console.info('YourBot Widget: Config loaded', config);
+
       // Use API base URL from config if provided
-      if (config.api_base_url) {
+      if (config.api_base) {
+        apiBaseUrl = config.api_base;
+      } else if (config.api_base_url) {
+        // Legacy support
         apiBaseUrl = config.api_base_url;
       }
-      applyTheme();
+
+      // Store token if available (production flow)
+      if (config.token) {
+        embedToken = config.token;
+        window.YourBot._config = {
+          api_base: apiBaseUrl,
+          theme: config.theme,
+          token: embedToken,
+          snippetId: snippetId
+        };
+      } else {
+        // Legacy flow - no token
+        window.YourBot._config = {
+          api_base: apiBaseUrl,
+          theme: config.theme,
+          token: null,
+          snippetId: snippetId
+        };
+      }
+
+      // Don't call applyTheme() here - widget elements don't exist yet
+      // applyTheme() will be called after createWidget() completes
     } catch (error) {
       console.error('YourBot Widget: Failed to load config', error);
       config = null;
@@ -350,4 +488,3 @@
     });
   }
 })();
-

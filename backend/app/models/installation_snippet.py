@@ -91,7 +91,11 @@ class InstallationSnippet(Base):
     
     # Relationships
     user = relationship("User", backref="installation_snippets")
-    bot = relationship("Bot", backref="installation_snippets")
+    bot = relationship(
+        "Bot",
+        backref="installation_snippets",
+        passive_deletes=True  # Let database CASCADE handle deletion, don't update FK to None
+    )
     
     @property
     def is_active(self) -> bool:

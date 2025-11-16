@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from uuid import UUID
 from typing import Dict, Any, Optional
 from app.models.bot import Bot, BotStatus
@@ -117,6 +118,9 @@ class BotService:
         Delete a bot.
         Only the bot owner can delete it.
         
+        Note: This will automatically delete all associated installation_snippets
+        due to the CASCADE delete constraint in the database.
+        
         Args:
             db: Database session
             bot_id: Bot ID to delete
@@ -133,8 +137,16 @@ class BotService:
         if not bot:
             return False
         
-        db.delete(bot)
+        # Use raw SQL to delete the bot, bypassing SQLAlchemy's relationship management
+        # This ensures database CASCADE handles snippet deletion without SQLAlchemy
+        # trying to nullify the foreign key first
+        # Pass UUID directly - psycopg2 will handle type conversion
+        result = db.execute(
+            text("DELETE FROM bots WHERE id = :bot_id"),
+            {"bot_id": bot_id}
+        )
         db.commit()
         
-        return True
+        # Check if any rows were deleted
+        return result.rowcount > 0
 

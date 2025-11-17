@@ -8,7 +8,8 @@ This document provides the complete database schema for the Multi-Tenant SaaS Ch
 
 1. **`users`** - User/Tenant accounts (users = tenants)
 2. **`bots`** - Bot/Agent configurations
-3. **`installation_snippets`** - Embed codes and installation scripts
+3. **`documents`** - Uploaded knowledge sources stored in MinIO
+4. **`installation_snippets`** - Embed codes and installation scripts
 
 ---
 
@@ -232,6 +233,27 @@ Stores all chatbot/bot configurations and settings for each user/tenant.
 ---
 
 ## 📊 `installation_snippets` Table
+## 📊 `documents` Table
+
+Tracks files uploaded by tenants during bot setup or knowledge-base management. Files live in MinIO; this table stores metadata plus the generated object key.
+
+### Complete Table Structure
+
+| Column Name | Type | Constraints | Description |
+|------------|------|-------------|-------------|
+| `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique document identifier |
+| `tenant_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Owner/tenant reference |
+| `bot_id` | UUID | FOREIGN KEY → bots.id, NOT NULL, INDEXED, CASCADE DELETE | Associated bot |
+| `object_key` | VARCHAR(512) | NULLABLE | Backend-generated MinIO object path |
+| `filename` | VARCHAR(255) | NOT NULL | Original filename |
+| `content_type` | VARCHAR(128) | NULLABLE | MIME type |
+| `size` | INTEGER | NULLABLE | File size (bytes) |
+| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Upload timestamp |
+
+### Notes
+- Object keys are built as `{tenant_id}/{bot_id}/{document_id}/{filename}` and never exposed to clients.
+- Every query must include `tenant_id = current_user.id` to maintain isolation.
+
 
 Stores embed codes and script URLs for installing bots on customer websites. Each snippet is tied to a specific bot and user/tenant.
 
@@ -350,6 +372,29 @@ CREATE INDEX idx_installation_snippets_created_at ON installation_snippets(creat
 CREATE INDEX idx_installation_snippets_user_bot ON installation_snippets(user_id, bot_id);
 ```
 
+### Documents Table
+```sql
+CREATE TABLE documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    bot_id UUID NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+    source_type document_source_type NOT NULL DEFAULT 'file',
+    source_url VARCHAR(512),
+    filename VARCHAR(255),
+    content_type VARCHAR(128),
+    size INTEGER,
+    status document_status NOT NULL DEFAULT 'pending',
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_documents_tenant_id ON documents(tenant_id);
+CREATE INDEX idx_documents_bot_id ON documents(bot_id);
+CREATE INDEX idx_documents_status ON documents(status);
+CREATE INDEX idx_documents_source_type ON documents(source_type);
+```
+
 ---
 
 ## 🔗 Relationships
@@ -365,7 +410,7 @@ CREATE INDEX idx_installation_snippets_user_bot ON installation_snippets(user_id
 
 ## 🎯 Summary
 
-- **3 Tables**: `users`, `bots`, `installation_snippets`
+- **4 Tables**: `users`, `bots`, `documents`, `installation_snippets`
 - **2 Enums**: `user_status`, `bot_status`
 - **All relationships** properly configured with foreign keys and CASCADE DELETE
 - **All indexes** optimized for common query patterns

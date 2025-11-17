@@ -142,6 +142,7 @@ Multi-Tenant-SaaS-Chatbot-Platform/
 - **RAG Integration**: Vectorization and embedding generation pipeline visualization
 - **Navigation**: Collapsible sidebar with persistent state
 - **Widget Delivery**: Static `widget.js` served by FastAPI with runtime theming via `/public/embed-config`
+- **Document Storage**: Secure, tenant-scoped uploads to MinIO via backend-only APIs
 
 ## 🔌 API Integration
 
@@ -153,6 +154,9 @@ Key endpoints:
 - `POST /api/v1/bots/{bot_id}/snippets` for installation snippet creation (auto-created, one per bot)
 - `GET /api/v1/bots/{bot_id}/snippets` for listing snippets for a bot
 - `GET/PATCH/DELETE /api/v1/snippets/{snippet_id}` for installation snippet management
+- `POST /api/v1/bots/{bot_id}/documents` to upload files
+- `GET /api/v1/bots/{bot_id}/documents` to list docs for a bot
+- `GET/DELETE /api/v1/documents/{document_id}` to download or delete files securely
 - `GET /public/embed-config?snippet_id=...` to serve runtime embed configuration with JWT tokens (ACTIVE bots only)
 - `POST /api/v1/chat` for widget chat messages (JWT-authenticated)
 

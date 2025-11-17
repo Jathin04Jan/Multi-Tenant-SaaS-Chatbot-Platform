@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Upload, Globe, Trash2, RefreshCw, ArrowRight, ArrowLeft, CheckCircle2, Bot, Circle } from 'lucide-react';
-import { mockUploadFile, mockStartCrawl, mockGetGuardrails, mockSaveGuardrails, createBot, updateBot, createSnippet } from '@/lib/api';
+import { mockStartCrawl, mockGetGuardrails, mockSaveGuardrails, createBot, updateBot, createSnippet, uploadBotDocument } from '@/lib/api';
 import { toast } from 'sonner';
 
 const steps = [
@@ -39,6 +39,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     dataSources, 
     addDataSource, 
     removeDataSource, 
+    updateDataSource,
     resetWizard,
     branding,
     persona,
@@ -48,6 +49,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
   const [crawlUrl, setCrawlUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isCrawling, setIsCrawling] = useState(false);
+  const [pendingUploads, setPendingUploads] = useState<Record<string, File>>({});
   const [createdBotId, setCreatedBotId] = useState<string | null>(null);
   const [createdSnippetId, setCreatedSnippetId] = useState<string | null>(null);
   const [indexingStatus, setIndexingStatus] = useState<'idle' | 'indexing' | 'completed'>('idle');
@@ -62,6 +64,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     if (open) {
       resetWizard();
       setCurrentStep(1);
+      setPendingUploads({});
     }
   }, [open, resetWizard, setCurrentStep]);
 
@@ -102,20 +105,80 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
 
     setIsUploading(true);
     try {
-      const result = await mockUploadFile(file);
+      const uploadId =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      setPendingUploads((prev) => ({ ...prev, [uploadId]: file }));
       addDataSource({
-        id: Date.now().toString(),
+        id: uploadId,
         type: 'upload',
         name: file.name,
-        status: 'indexed',
+        status: 'queued',
+        size: file.size,
         updatedAt: new Date().toISOString(),
       });
-      toast.success('File uploaded successfully!');
+      toast.success('Document added. It will upload when you finish setup.');
     } catch (error) {
-      toast.error('Failed to upload file');
+      toast.error('Failed to queue file for upload');
     } finally {
       setIsUploading(false);
+      if (e.target) {
+        e.target.value = '';
+      }
     }
+  };
+
+  const handleRemoveSource = (id: string) => {
+    removeDataSource(id);
+    setPendingUploads((prev) => {
+      if (!(id in prev)) return prev;
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+  };
+
+  const uploadQueuedDocuments = async (botId: string) => {
+    const entries = Object.entries(pendingUploads);
+    if (entries.length === 0) {
+      return;
+    }
+
+    let successCount = 0;
+    for (const [sourceId, file] of entries) {
+      try {
+        const response = await uploadBotDocument(botId, file);
+        if (response.error) {
+          updateDataSource(sourceId, {
+            status: 'failed',
+            updatedAt: new Date().toISOString(),
+          });
+          toast.error(response.error || `Failed to upload ${file.name}`);
+        } else {
+          updateDataSource(sourceId, {
+            status: 'indexed',
+            updatedAt: new Date().toISOString(),
+          });
+          successCount += 1;
+        }
+      } catch (error) {
+        console.error('Error uploading document:', error);
+        updateDataSource(sourceId, {
+          status: 'failed',
+          updatedAt: new Date().toISOString(),
+        });
+        toast.error(`Failed to upload ${file.name}`);
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(
+        `Uploaded ${successCount} document${successCount > 1 ? 's' : ''} to MinIO`
+      );
+    }
+    setPendingUploads({});
   };
 
   const handleCrawl = async () => {
@@ -272,6 +335,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
             toast.warning('Bot created but activation failed. Please activate it manually.');
           } else {
             toast.success('Bot created and activated successfully! 🎉');
+            await uploadQueuedDocuments(response.data.id);
             
             // Create installation snippet for the bot
             try {
@@ -452,7 +516,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => removeDataSource(source.id)}
+                        onClick={() => handleRemoveSource(source.id)}
                         className="h-8 w-8"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -511,11 +575,11 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                   <span className="text-sm font-medium">Overall Progress</span>
                   <span className="text-sm text-muted-foreground">{indexingProgress}%</span>
                 </div>
-                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                  <div
-                    className="bg-primary h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${indexingProgress}%` }}
-                  />
+                <div
+                  className="w-full bg-muted rounded-full h-2 overflow-hidden"
+                  data-indexing-progress={indexingProgress}
+                >
+                  <div className="bg-primary h-2 rounded-full transition-all duration-300" />
                 </div>
               </div>
 

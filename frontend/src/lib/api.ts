@@ -34,6 +34,20 @@ export interface DocumentDTO {
   createdAt: string;
 }
 
+export interface BotDocumentDTO {
+  id: string;
+  bot_id: string;
+  filename?: string | null;
+  content_type?: string | null;
+  size?: number | null;
+  source_type: 'file' | 'url' | 'integration';
+  source_url?: string | null;
+  status: 'pending' | 'processing' | 'indexed' | 'error';
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface JobDTO {
   id: string;
   type: 'ingest' | 'embed' | 'sync';
@@ -74,32 +88,59 @@ export async function apiRequest<T>(
 ): Promise<ApiResponse<T>> {
   const url = `${API_BASE_URL}${endpoint}`;
   const token = localStorage.getItem('access_token');
-  
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  };
-  
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  const isFormData =
+    typeof FormData !== 'undefined' && options.body instanceof FormData;
+
+  const headers = new Headers(options.headers || {});
+
+  if (!isFormData && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
   }
-  
+
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
   try {
     const response = await fetch(url, {
       ...options,
       headers,
     });
-    
-    const data = await response.json();
-    
+
+    const contentType = response.headers.get('content-type') || '';
+    let parsedBody: any = null;
+
+    if (response.status !== 204) {
+      const text = await response.text();
+      if (text) {
+        if (contentType.includes('application/json')) {
+          parsedBody = JSON.parse(text);
+        } else {
+          parsedBody = text as unknown as T;
+        }
+      }
+    }
+
     if (!response.ok) {
+      const errorMessage =
+        (parsedBody &&
+          typeof parsedBody === 'object' &&
+          (parsedBody.detail || parsedBody.message)) ||
+        (typeof parsedBody === 'string'
+          ? parsedBody
+          : response.statusText || 'An error occurred');
+
       return {
-        data: data as T,
-        error: data.detail || data.message || 'An error occurred',
+        data: (parsedBody ?? ({} as T)) as T,
+        error: errorMessage,
       };
     }
-    
-    return { data: data as T };
+
+    if (parsedBody === null) {
+      return { data: {} as T };
+    }
+
+    return { data: parsedBody as T };
   } catch (error) {
     return {
       data: {} as T,
@@ -289,6 +330,90 @@ export const mockSaveDocument = async (doc: Omit<DocumentDTO, 'id' | 'createdAt'
     _documents = [saved, ..._documents];
   }
   return { data: saved };
+};
+
+// ----- Real document upload endpoints -----
+
+export const uploadBotDocument = async (
+  botId: string,
+  file: File
+): Promise<ApiResponse<BotDocumentDTO>> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  return apiRequest<BotDocumentDTO>(`/api/v1/bots/${botId}/documents`, {
+    method: 'POST',
+    body: formData,
+  });
+};
+
+export const listBotDocuments = async (
+  botId: string
+): Promise<ApiResponse<BotDocumentDTO[]>> => {
+  return apiRequest<BotDocumentDTO[]>(`/api/v1/bots/${botId}/documents`);
+};
+
+export const deleteBotDocument = async (
+  documentId: string
+): Promise<ApiResponse<Record<string, never>>> => {
+  return apiRequest(`/api/v1/documents/${documentId}`, {
+    method: 'DELETE',
+  });
+};
+
+export const downloadBotDocument = async (
+  documentId: string
+): Promise<
+  ApiResponse<{ blob: Blob; filename: string; contentType: string }>
+> => {
+  const token = localStorage.getItem('access_token');
+
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/v1/documents/${documentId}`,
+      {
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : undefined,
+      }
+    );
+
+    if (!response.ok) {
+      let errorMessage = 'Failed to download document';
+      try {
+        const data = await response.json();
+        errorMessage = data.detail || data.message || errorMessage;
+      } catch {
+        /* ignore */
+      }
+      return { data: {} as any, error: errorMessage };
+    }
+
+    const blob = await response.blob();
+    const contentType =
+      response.headers.get('content-type') || 'application/octet-stream';
+    const disposition = response.headers.get('content-disposition') || '';
+    let filename = `document-${documentId}`;
+    const match = disposition.match(/filename="?([^"]+)"?/i);
+    if (match?.[1]) {
+      filename = match[1];
+    }
+
+    return {
+      data: {
+        blob,
+        filename,
+        contentType,
+      },
+    };
+  } catch (error) {
+    return {
+      data: {} as any,
+      error: error instanceof Error ? error.message : 'Network error',
+    };
+  }
 };
 
 // Jobs

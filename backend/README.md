@@ -68,6 +68,13 @@ Once the server is running:
 - **PATCH** `/api/v1/snippets/{snippet_id}` - Update snippet (domain allow-list, status)
 - **DELETE** `/api/v1/snippets/{snippet_id}` - Delete a snippet
 
+## 📂 Document Endpoints
+
+- **POST** `/api/v1/bots/{bot_id}/documents` - Upload a document to MinIO (backend-owned object keys)
+- **GET** `/api/v1/bots/{bot_id}/documents` - List documents for a bot
+- **GET** `/api/v1/documents/{document_id}` - Download a document (auth-required)
+- **DELETE** `/api/v1/documents/{document_id}` - Delete document + MinIO object
+
 ## 🌐 Public & Chat Endpoints
 
 - **GET** `/public/embed-config?snippet_id=...` - Public endpoint for widget configuration (returns JWT token, validates domain allow-list, ACTIVE bots only)

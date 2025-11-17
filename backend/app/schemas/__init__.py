@@ -6,11 +6,13 @@ from app.schemas.installation_snippet import (
     InstallationSnippetResponse,
     InstallationSnippetListItem
 )
+from app.schemas.document import DocumentResponse
 
 __all__ = [
     "Token", "TokenData", "UserSignIn", "UserSignUp", "UserResponse", "UserUpdate",
     "BotResponse", "BotListItem", "BotCreate", "BotUpdate",
     "InstallationSnippetCreate", "InstallationSnippetUpdate",
-    "InstallationSnippetResponse", "InstallationSnippetListItem"
+    "InstallationSnippetResponse", "InstallationSnippetListItem",
+    "DocumentResponse",
 ]
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getBot, type BotDTO, updateBot, getSnippetsForBot, createSnippet, updateSnippet, deleteSnippet, type InstallationSnippetDTO } from '@/lib/api';
+import { getBot, type BotDTO, updateBot, getSnippetsForBot, createSnippet, updateSnippet, deleteSnippet, type InstallationSnippetDTO, uploadBotDocument, listBotDocuments, deleteBotDocument, downloadBotDocument, type BotDocumentDTO } from '@/lib/api';
 import { colorCombinations } from '@/lib/constants';
 import {
   Bot,
@@ -22,6 +22,7 @@ import {
   Share2,
   Code,
   Download,
+  Eye,
   Upload,
   Globe,
   Shield,
@@ -83,15 +84,13 @@ const formatDate = (dateString: string): string => {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
-// Helper to get date or generate random date for existing docs
-const getDocumentDate = (source: any): string => {
-  const date = source.createdAt || source.updatedAt || source.created_at || source.updated_at;
-  if (date) return formatDate(date);
-  // Generate random date within last 90 days for existing docs
-  const daysAgo = Math.floor(Math.random() * 90);
-  const randomDate = new Date();
-  randomDate.setDate(randomDate.getDate() - daysAgo);
-  return formatDate(randomDate.toISOString());
+const formatFileSize = (bytes?: number | null): string => {
+  if (bytes === undefined || bytes === null) return 'Unknown size';
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const index = Math.floor(Math.log(bytes) / Math.log(1024));
+  const value = bytes / Math.pow(1024, index);
+  return `${value.toFixed(1)} ${units[index]}`;
 };
 
 // Communication style options
@@ -181,6 +180,11 @@ const BotDetail = () => {
   const [editSnippetDomains, setEditSnippetDomains] = useState<string[]>([]);
   const [editDomainInput, setEditDomainInput] = useState('');
   const [editAllowAllDomains, setEditAllowAllDomains] = useState(true);
+
+  // Document Management State
+  const [documents, setDocuments] = useState<BotDocumentDTO[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [isUploadingDocument, setIsUploadingDocument] = useState(false);
 
   // Fetch bot data from API
   useEffect(() => {
@@ -281,6 +285,37 @@ const BotDetail = () => {
     }
   }, [bot, fetchSnippets]);
 
+  const fetchDocuments = useCallback(
+    async (showToast = false) => {
+      if (!botId) return;
+      try {
+        setDocumentsLoading(true);
+        const response = await listBotDocuments(botId);
+        if (response.error) {
+          if (showToast) {
+            toast.error(response.error || 'Failed to load documents');
+          }
+          return;
+        }
+        setDocuments(response.data || []);
+      } catch (error) {
+        console.error('Error fetching documents:', error);
+        if (showToast) {
+          toast.error('Failed to load documents');
+        }
+      } finally {
+        setDocumentsLoading(false);
+      }
+    },
+    [botId]
+  );
+
+  useEffect(() => {
+    if (botId) {
+      fetchDocuments();
+    }
+  }, [botId, fetchDocuments]);
+
   // Auto-refresh snippets every 30 seconds
   useEffect(() => {
     if (!botId || !bot) return;
@@ -353,6 +388,53 @@ const BotDetail = () => {
 
   const handleDuplicate = () => {
     toast.success('Bot duplicated successfully');
+  };
+
+  const handleDeleteDocument = async (documentId: string) => {
+    if (!botId) return;
+    try {
+      const response = await deleteBotDocument(documentId);
+      if (response.error) {
+        toast.error(response.error || 'Failed to delete document');
+        return;
+      }
+      setDocuments((docs) => docs.filter((doc) => doc.id !== documentId));
+      toast.success('Document deleted successfully');
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      toast.error('Failed to delete document');
+    }
+  };
+
+  const handleDownloadDocument = async (
+    documentId: string,
+    filename: string,
+    mode: 'download' | 'view' = 'download'
+  ) => {
+    try {
+      const response = await downloadBotDocument(documentId);
+      if (response.error || !response.data) {
+        toast.error(response.error || 'Failed to fetch document');
+        return;
+      }
+      const { blob, contentType } = response.data;
+      const url = URL.createObjectURL(blob);
+      if (mode === 'view') {
+        window.open(url, '_blank');
+      } else {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+      URL.revokeObjectURL(url);
+      toast.success(mode === 'view' ? 'Document opened' : 'Document downloaded');
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      toast.error('Failed to download document');
+    }
   };
 
   const handleShowEmbedCode = (event?: React.MouseEvent) => {
@@ -739,33 +821,25 @@ const BotDetail = () => {
     const file = e.target.files?.[0];
     if (!file || !bot) return;
 
-    const retrievalConfig = bot.retrieval_config as any || {};
-    const dataSources = retrievalConfig.data_sources || [];
-    
-    const newSource = {
-      id: Date.now().toString(),
-      name: file.name,
-      type: 'upload' as const,
-      status: 'processing' as const,
-      updatedAt: new Date().toISOString(),
-    };
-
-    const updatedConfig = {
-      ...retrievalConfig,
-      data_sources: [...dataSources, newSource],
-    };
-
     try {
-      const response = await updateBot(bot.id, { retrieval_config: updatedConfig });
+      setIsUploadingDocument(true);
+      const response = await uploadBotDocument(bot.id, file);
       if (response.error) {
         toast.error(response.error || 'Failed to upload document');
         return;
       }
-      setBot(response.data);
       toast.success('Document uploaded successfully!');
-      e.target.value = ''; // Reset input
+      e.target.value = '';
+      if (response.data) {
+        setDocuments((prev) => [response.data, ...prev]);
+      } else {
+        fetchDocuments();
+      }
     } catch (error) {
+      console.error('Error uploading document:', error);
       toast.error('Failed to upload document');
+    } finally {
+      setIsUploadingDocument(false);
     }
   };
 
@@ -1434,45 +1508,64 @@ const BotDetail = () => {
                 <CardDescription>Manage documents and data sources for your bot's knowledge base</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {(() => {
-                  const retrievalConfig = bot.retrieval_config as any || {};
-                  const dataSources = retrievalConfig.data_sources || [];
-                  
-                  if (dataSources.length === 0) {
-                    return (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                        <p>No data sources yet</p>
-                        <p className="text-sm mt-2">Add documents or websites to build your knowledge base</p>
-                      </div>
-                    );
-                  }
-                  
-                  return (
-                    <>
-                      {dataSources.map((source: any) => (
-                        <div key={source.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex items-center gap-3 flex-1">
-                            {source.type === 'upload' ? (
-                              <FileText className="w-5 h-5 text-muted-foreground" />
-                            ) : (
-                              <Globe className="w-5 h-5 text-muted-foreground" />
-                            )}
-                            <div className="flex-1">
-                              <p className="font-medium">{source.name}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {source.type === 'upload' ? 'Uploaded' : 'Crawled'} · {source.status} · {getDocumentDate(source)}
-                              </p>
-                            </div>
+                {documentsLoading ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <RefreshCw className="w-5 h-5 mx-auto mb-4 animate-spin" />
+                    <p>Loading documents…</p>
+                  </div>
+                ) : documents.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No documents yet</p>
+                    <p className="text-sm mt-2">Upload PDFs, DOCs, or text files to build your knowledge base.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {documents.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="flex flex-wrap items-center gap-3 p-4 border rounded-lg"
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-[200px]">
+                          <FileText className="w-5 h-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">{doc.filename}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatFileSize(doc.size)} · Uploaded {formatDate(doc.created_at)}
+                            </p>
                           </div>
-                          <Button variant="ghost" size="sm">
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                            onClick={() => handleDownloadDocument(doc.id, doc.filename, 'view')}
+                          >
+                            <Eye className="w-4 h-4" />
+                            View
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                            onClick={() => handleDownloadDocument(doc.id, doc.filename, 'download')}
+                          >
+                            <Download className="w-4 h-4" />
+                            Download
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteDocument(doc.id)}
+                          >
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
-                      ))}
-                    </>
-                  );
-                })()}
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <label className="block cursor-pointer">
                   <input
                     type="file"
@@ -1480,9 +1573,14 @@ const BotDetail = () => {
                     onChange={handleFileUpload}
                     accept=".pdf,.doc,.docx,.txt,.md"
                   />
-                  <Button variant="outline" className="w-full gap-2" type="button">
-                    <Upload className="w-4 h-4" />
-                    Add Document or Website
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2"
+                    type="button"
+                    disabled={isUploadingDocument}
+                  >
+                    <Upload className={`w-4 h-4 ${isUploadingDocument ? 'animate-bounce' : ''}`} />
+                    {isUploadingDocument ? 'Uploading…' : 'Add Document'}
                   </Button>
                 </label>
               </CardContent>

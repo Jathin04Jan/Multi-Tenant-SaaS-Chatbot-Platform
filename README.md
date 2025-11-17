@@ -161,6 +161,17 @@ Supporting services:
 - MinIO for document storage
 - Alembic migrations for schema evolution (optional during local dev)
 
+### 🧪 Load/Stress Testing
+Need thousands of records to test pagination, embeds, or analytics? Use the backend seeding script:
+
+```bash
+cd backend
+python generate_test_data.py            # defaults: 1000 users, 5–6 bots each
+python generate_test_data.py --users 200 --min-bots 4 --max-bots 8
+```
+
+The script creates active “Test User N” accounts with realistic bot configurations (branding, guardrails, RAG settings) so every downstream feature has data. Never run this against production—it's only for local/staging environments.
+
 > Need additional routes? Extend the FastAPI routers under `backend/app/api/v1/` and add matching functions in `frontend/src/lib/api.ts`.
 
 ## 🤖 Bot Management Features

@@ -27,6 +27,14 @@ python reset_db.py
 
 Type `RESET` when prompted to confirm.
 
+### 4. Seed Large Test Data (Optional, but great for stress testing)
+```bash
+python generate_test_data.py            # 1000 users, 5–6 bots each
+python generate_test_data.py --users 200 --min-bots 4 --max-bots 8
+```
+
+This script lives in the backend root and creates realistic “Test User N” accounts with multiple bots so you can hammer list endpoints, embeds, or analytics with real data. Never run it against production.
+
 ---
 
 ## Development Workflow

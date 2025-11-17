@@ -92,6 +92,18 @@ To change the API URL, set the environment variable in `frontend/.env`:
 VITE_API_URL=http://localhost:8000
 ```
 
+## Seed Data for Testing
+
+Need thousands of users/bots to exercise pagination or embeds? Use the seeding script:
+
+```bash
+cd backend
+python generate_test_data.py            # 1000 users, 5–6 bots each
+python generate_test_data.py --users 200 --min-bots 4 --max-bots 8
+```
+
+Each “Test User N” receives multiple bots with full branding/guardrails so every feature has data. Only run this in local/staging environments—never against production.
+
 ## Troubleshooting
 
 ### Database Connection Issues

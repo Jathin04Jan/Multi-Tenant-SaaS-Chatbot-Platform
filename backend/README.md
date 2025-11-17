@@ -125,6 +125,18 @@ alembic upgrade head
 alembic downgrade -1
 ```
 
+### Generate Large Test Datasets
+
+Use the bundled seeding script to stress-test paging, embeds, and analytics with thousands of rows:
+
+```bash
+cd backend
+python generate_test_data.py            # 1000 users, 5–6 bots each
+python generate_test_data.py --users 200 --min-bots 4 --max-bots 8
+```
+
+Each user is created as “Test User N” with hashed credentials and 5–6 bots containing realistic branding, guardrails, and retrieval config. Only run this in local/staging environments—never against production.
+
 ## 🔒 Security Features
 
 ### Authentication & Authorization
@@ -154,7 +166,7 @@ See [SECURITY.md](docs/SECURITY.md) and [EMBED_SECURITY_AND_SNIPPETS.md](docs/EM
 
 ### PostgreSQL (Database)
 - Container: `yourbot_postgres`
-- Port: `5432`
+- Host Port: `5433` (for local connections); container listens on `5432`
 - Connected via Docker container only
 
 ### MinIO (Object Storage)

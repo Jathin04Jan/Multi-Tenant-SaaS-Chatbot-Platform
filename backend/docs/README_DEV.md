@@ -56,6 +56,17 @@ python reset_db.py
 python reset_db.py
 ```
 
+### When You Need Lots of Data Fast:
+```bash
+# Generate 1000 users with 5–6 bots each (defaults)
+python generate_test_data.py
+
+# Custom run
+python generate_test_data.py --users 200 --min-bots 4 --max-bots 8
+```
+
+This seeds “Test User N” accounts with realistic bots so you can stress test dashboards, embeds, or pagination. Only run it against local/staging environments.
+
 ---
 
 ## 🚀 Quick Commands

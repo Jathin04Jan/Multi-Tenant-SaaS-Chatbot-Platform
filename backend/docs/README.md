@@ -12,6 +12,7 @@ This directory contains detailed documentation for the backend API.
 - **[SETUP_ENV.md](./SETUP_ENV.md)** - Environment variable setup guide
 - **[DEV_WORKFLOW.md](./DEV_WORKFLOW.md)** - Development workflow and best practices
 - **[README_DEV.md](./README_DEV.md)** - Additional development documentation
+- **`../generate_test_data.py`** - Command-line seeding script for generating thousands of users/bots for stress tests
 
 ### Database
 - **[DATABASE_SETUP.md](./DATABASE_SETUP.md)** - PostgreSQL container management guide

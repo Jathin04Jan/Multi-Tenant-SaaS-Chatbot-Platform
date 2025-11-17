@@ -210,7 +210,7 @@ Stores tenant-uploaded knowledge sources that live in MinIO. The backend control
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last modification |
 
 #### Notes
-- Tenants never provide `object_key`; it is built server-side as `{tenant_id}/{bot_id}/{document_id}/{filename}`.
+- Tenants never provide storage paths. The backend builds the MinIO key as `{tenant_id}/{bot_id}/{document_id}/{filename}` and persists it in `source_url`.
 - Queries always filter by `tenant_id` to enforce isolation.
 
 ### Documents Table

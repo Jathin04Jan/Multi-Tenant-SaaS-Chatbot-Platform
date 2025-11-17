@@ -142,7 +142,7 @@ Multi-Tenant-SaaS-Chatbot-Platform/
 - **RAG Integration**: Vectorization and embedding generation pipeline visualization
 - **Navigation**: Collapsible sidebar with persistent state
 - **Widget Delivery**: Static `widget.js` served by FastAPI with runtime theming via `/public/embed-config`
-- **Document Storage**: Secure, tenant-scoped uploads to MinIO via backend-only APIs
+- **Document Storage**: Secure, tenant-scoped uploads to MinIO via backend-only APIs with tracked `source_type`, ingestion `status`, and backend-owned storage paths (`source_url`)
 
 ## 🔌 API Integration
 
@@ -154,8 +154,8 @@ Key endpoints:
 - `POST /api/v1/bots/{bot_id}/snippets` for installation snippet creation (auto-created, one per bot)
 - `GET /api/v1/bots/{bot_id}/snippets` for listing snippets for a bot
 - `GET/PATCH/DELETE /api/v1/snippets/{snippet_id}` for installation snippet management
-- `POST /api/v1/bots/{bot_id}/documents` to upload files
-- `GET /api/v1/bots/{bot_id}/documents` to list docs for a bot
+- `POST /api/v1/bots/{bot_id}/documents` to upload files (backend creates records with `source_type`, `status`, `metadata`, and a secure `source_url`)
+- `GET /api/v1/bots/{bot_id}/documents` to list docs for a bot (shows ingestion status + source info)
 - `GET/DELETE /api/v1/documents/{document_id}` to download or delete files securely
 - `GET /public/embed-config?snippet_id=...` to serve runtime embed configuration with JWT tokens (ACTIVE bots only)
 - `POST /api/v1/chat` for widget chat messages (JWT-authenticated)
@@ -164,6 +164,15 @@ Supporting services:
 - PostgreSQL for relational data (users, bots, installation snippets)
 - MinIO for document storage
 - Alembic migrations for schema evolution (optional during local dev)
+
+## 📄 Knowledge Base & Document Pipeline
+
+- **Source-aware uploads**: Every document captures `source_type` (`file`, `url`, `integration`) so you can differentiate uploads from crawls or connectors.
+- **Backend-owned storage paths**: The server generates the MinIO key and stores it in the `source_url` column—never exposed to the browser.
+- **Lifecycle tracking**: Documents record ingestion `status` (`pending`, `processing`, `indexed`, `error`) to reflect RAG pipeline progress.
+- **Rich metadata**: `metadata` (JSONB) stores extra details (checksums, crawl summaries, etc.) so the UI can surface context about each knowledge source.
+- **Tenant isolation**: All document queries are scoped to `tenant_id`; downloads stream through FastAPI and validate bot ownership before fetching from MinIO.
+- **UI support**: The Bot Detail → “Manage Knowledge Base” tab shows source type, status, size, timestamps, and allows viewing/downloading/deleting without ever revealing storage credentials.
 
 ### 🧪 Load/Stress Testing
 Need thousands of records to test pagination, embeds, or analytics? Use the backend seeding script:
@@ -204,9 +213,10 @@ Access by clicking any bot card from the Bots page. Features include:
   - **Guardrails**: Response length, blocked phrases, content filters (explicit, political, personal info), custom instructions
 
 - **Manage Knowledge Base Tab**:
-  - View and manage uploaded documents
+  - View and manage uploaded documents with live status (`pending`, `processing`, `indexed`, `error`)
+  - Inspect source type (file, URL, integration) and metadata captured during ingestion
   - Manage crawled websites
-  - Add new documents or websites
+  - Add new documents or websites (uploads remain backend-only; storage paths are never exposed)
 
 - **Analytics Tab**: Detailed analytics and performance metrics (placeholder)
 

@@ -70,10 +70,10 @@ Once the server is running:
 
 ## 📂 Document Endpoints
 
-- **POST** `/api/v1/bots/{bot_id}/documents` - Upload a document to MinIO (backend-owned object keys)
-- **GET** `/api/v1/bots/{bot_id}/documents` - List documents for a bot
-- **GET** `/api/v1/documents/{document_id}` - Download a document (auth-required)
-- **DELETE** `/api/v1/documents/{document_id}` - Delete document + MinIO object
+- **POST** `/api/v1/bots/{bot_id}/documents` - Upload a document; backend records `source_type`, `status`, `metadata`, and a secure `source_url`
+- **GET** `/api/v1/bots/{bot_id}/documents` - List documents for a bot with ingestion status and source info
+- **GET** `/api/v1/documents/{document_id}` - Download a document (auth-required, streams via backend using `source_url`)
+- **DELETE** `/api/v1/documents/{document_id}` - Delete document entry + underlying MinIO object
 
 ## 🌐 Public & Chat Endpoints
 

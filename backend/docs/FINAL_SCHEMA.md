@@ -232,10 +232,9 @@ Stores all chatbot/bot configurations and settings for each user/tenant.
 
 ---
 
-## 📊 `installation_snippets` Table
 ## 📊 `documents` Table
 
-Tracks files uploaded by tenants during bot setup or knowledge-base management. Files live in MinIO; this table stores metadata plus the generated object key.
+Tracks knowledge sources uploaded or linked by tenants. Files live in MinIO (or remote systems); the database stores metadata, ingest status, and the generated storage key.
 
 ### Complete Table Structure
 
@@ -244,16 +243,21 @@ Tracks files uploaded by tenants during bot setup or knowledge-base management. 
 | `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique document identifier |
 | `tenant_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Owner/tenant reference |
 | `bot_id` | UUID | FOREIGN KEY → bots.id, NOT NULL, INDEXED, CASCADE DELETE | Associated bot |
-| `object_key` | VARCHAR(512) | NULLABLE | Backend-generated MinIO object path |
-| `filename` | VARCHAR(255) | NOT NULL | Original filename |
+| `source_type` | ENUM('file','url','integration') | NOT NULL, DEFAULT 'file' | Where the knowledge came from |
+| `source_url` | VARCHAR(512) | NULLABLE | Generated MinIO key for uploads or remote URL for crawls/integrations |
+| `filename` | VARCHAR(255) | NULLABLE | Original filename (null for URL/integration sources) |
 | `content_type` | VARCHAR(128) | NULLABLE | MIME type |
 | `size` | INTEGER | NULLABLE | File size (bytes) |
+| `status` | ENUM('pending','processing','indexed','error') | NOT NULL, DEFAULT 'pending' | Ingestion/indexing pipeline state |
+| `metadata` | JSONB | NULLABLE | Extra payload (checksums, crawl info, etc.) |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Upload timestamp |
+| `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last mutation timestamp |
 
 ### Notes
-- Object keys are built as `{tenant_id}/{bot_id}/{document_id}/{filename}` and never exposed to clients.
+- The backend generates a storage path `{tenant_id}/{bot_id}/{document_id}/{filename}` and saves it in `source_url`. Clients never provide this value.
 - Every query must include `tenant_id = current_user.id` to maintain isolation.
 
+## 📊 `installation_snippets` Table
 
 Stores embed codes and script URLs for installing bots on customer websites. Each snippet is tied to a specific bot and user/tenant.
 

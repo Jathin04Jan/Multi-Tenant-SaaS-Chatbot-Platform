@@ -33,6 +33,7 @@ This table stores metadata for tenant knowledge sources persisted in MinIO or re
 
 ### Future Enhancements
 
-- Add `status` + `metadata` fields to track indexing lifecycle (`pending`, `processing`, `indexed`, `error`) and store ingestion details (file type, crawl date, etc.)
 - Implement pre-signed URLs for large uploads (recorded as TODO in `app/services/presign.py`).
+- Extend ingestion pipeline to populate `status` transitions (`pending → processing → indexed/error`) automatically.
+- Surface metadata such as page counts, vectorization stats, and crawl summaries in the UI.
 

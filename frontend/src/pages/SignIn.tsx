@@ -9,9 +9,12 @@ import { signInSchema, type SignInInput } from '@/lib/zod-schemas';
 import { mockSignIn } from '@/lib/api';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { useUserStore } from '@/store/user';
 
 const SignIn = () => {
   const navigate = useNavigate();
+  const setUserName = useUserStore((state) => state.setUserName);
+  const setUserEmail = useUserStore((state) => state.setUserEmail);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -31,6 +34,10 @@ const SignIn = () => {
       if (response.error) {
         toast.error(response.error || 'Invalid credentials. Please try again.');
       } else {
+        const fullName = response.data.user?.full_name || 'User';
+        const email = response.data.user?.email || data.email;
+        setUserName(fullName);
+        setUserEmail(email);
         toast.success('Welcome back!');
         navigate('/dashboard');
       }

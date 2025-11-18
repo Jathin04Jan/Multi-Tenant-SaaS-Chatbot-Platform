@@ -34,6 +34,9 @@ const getInitials = (name: string | null | undefined): string => {
 export const TopNav = () => {
   const navigate = useNavigate();
   const userName = useUserStore((state) => state.userName);
+  const userEmailFromStore = useUserStore((state) => state.userEmail);
+  const setUserName = useUserStore((state) => state.setUserName);
+  const setUserEmail = useUserStore((state) => state.setUserEmail);
   const [userData, setUserData] = useState<UserData | null>(null);
 
   // Fetch user data on mount
@@ -46,6 +49,8 @@ export const TopNav = () => {
         
         if (response.data) {
           setUserData(response.data);
+          setUserName(response.data.full_name);
+          setUserEmail(response.data.email);
         }
       } catch (error) {
         // Silently fail - use fallback
@@ -53,10 +58,10 @@ export const TopNav = () => {
     };
 
     fetchUserData();
-  }, []);
+  }, [setUserName, setUserEmail]);
 
   const displayName = userData?.full_name || userName || null;
-  const userEmail = userData?.email || null;
+  const userEmail = userData?.email || userEmailFromStore || null;
   const initials = getInitials(displayName);
 
   const handleLogout = () => {
@@ -64,6 +69,7 @@ export const TopNav = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('wizard-storage');
     useUserStore.getState().setUserName(null);
+    useUserStore.getState().setUserEmail(null);
     toast.success('Signed out successfully');
     navigate('/');
   };

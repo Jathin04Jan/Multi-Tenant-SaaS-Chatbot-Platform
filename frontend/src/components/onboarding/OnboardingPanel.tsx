@@ -57,13 +57,21 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     { type: 'bot', message: 'Hello! How can I help you today?' }
   ]);
 
-  // Reset wizard when panel opens
-  useEffect(() => {
-    if (open) {
-      resetWizard();
-      setCurrentStep(1);
-    }
-  }, [open, resetWizard, setCurrentStep]);
+  const handleResetWizard = () => {
+    resetWizard();
+    setCurrentStep(1);
+    setCrawlUrl('');
+    setIsUploading(false);
+    setIsCrawling(false);
+    setIndexingStatus('idle');
+    setIndexingProgress(0);
+    setTestMessage('');
+    setChatMessages([
+      { type: 'bot', message: 'Hello! How can I help you today?' }
+    ]);
+    setCreatedBotId(null);
+    setCreatedBotSlug(null);
+  };
 
   // Map steps with completion status
   // Only show steps as completed if they are completed AND current step is at or beyond that step
@@ -796,8 +804,17 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-6">
-        <DialogHeader className="pb-4">
+        <DialogHeader className="pb-4 flex items-center justify-between">
           <DialogTitle className="text-2xl font-semibold">Create New Bot</DialogTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleResetWizard}
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Reset
+          </Button>
         </DialogHeader>
 
         <div className="mt-4 space-y-6">

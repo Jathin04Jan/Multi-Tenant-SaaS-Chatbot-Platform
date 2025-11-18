@@ -17,7 +17,7 @@ const DashboardLayout = () => {
           style={{ width: sidebarWidth }}
         />
         <Sidebar />
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto pt-16">
           <ErrorBoundary>
             <Outlet />
           </ErrorBoundary>

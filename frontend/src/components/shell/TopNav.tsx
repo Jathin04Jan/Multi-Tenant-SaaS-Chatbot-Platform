@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, LogOut, User, Palette } from 'lucide-react';
+import { Bell, LogOut, User, Palette, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ThemeToggle } from './ThemeToggle';
@@ -69,8 +69,18 @@ export const TopNav = () => {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/50 glass">
-      <div className="flex h-16 items-center justify-end w-full pr-4">
+    <header className="fixed top-0 left-0 right-0 z-40 border-b border-border/50 glass">
+      <div className="flex h-16 items-center justify-between w-full px-4">
+        {/* Left side: App logo / title */}
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+            <Bot className="w-5 h-5 text-primary" />
+          </div>
+          <span className="text-lg md:text-xl font-bold tracking-tight">
+            YourBot
+          </span>
+        </div>
+
         {/* Right side icons */}
         <div className="flex items-center gap-3">
           {/* Theme Toggle */}

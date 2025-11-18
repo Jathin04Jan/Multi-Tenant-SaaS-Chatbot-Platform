@@ -32,11 +32,11 @@ export const Sidebar = () => {
   const { isCollapsed, toggleSidebar } = useSidebarStore();
 
   return (
-    <div className="fixed left-0 top-16 bottom-0 flex z-30">
+    <div className="fixed left-0 top-16 bottom-0 flex z-30 will-change-transform">
       {/* Sidebar */}
       <aside
         className={cn(
-          'relative flex flex-col h-full border-r border-border/50 glass transition-all duration-300 ease-in-out overflow-visible',
+          'relative flex flex-col h-full border-r border-border/50 glass overflow-visible transition-[width,transform] duration-500 ease-[cubic-bezier(0.25,0.1,0.25,1)]',
           isCollapsed ? 'w-16' : 'w-64'
         )}
       >

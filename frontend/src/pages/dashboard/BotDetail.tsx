@@ -108,6 +108,32 @@ const getDocumentTime = (source: any): string => {
   return formatTime(randomDate.toISOString());
 };
 
+// Helper to derive a human-friendly document type from source
+const getDocumentType = (source: any): string => {
+  if (source.type === 'crawl') {
+    return 'Website';
+  }
+
+  const name: string = source.name || '';
+  const ext = name.split('.').pop()?.toLowerCase();
+
+  switch (ext) {
+    case 'pdf':
+      return 'PDF';
+    case 'doc':
+    case 'docx':
+      return 'Word Document';
+    case 'txt':
+      return 'Text File';
+    case 'md':
+      return 'Markdown';
+    case 'csv':
+      return 'CSV';
+    default:
+      return 'File';
+  }
+};
+
 // Helper to normalize status
 const normalizeStatus = (status: string): 'Processing' | 'Processed' | 'Active' | 'Inactive' => {
   const statusLower = status.toLowerCase();
@@ -975,11 +1001,10 @@ const BotDetail = () => {
                         <thead>
                           <tr className="border-b border-border">
                             <th className="text-left py-3 px-4 font-medium">Name</th>
-                            <th className="text-left py-3 px-4 font-medium">Type</th>
-                            <th className="text-left py-3 px-4 font-medium">Date</th>
-                            <th className="text-left py-3 px-4 font-medium">Time</th>
-                            <th className="text-left py-3 px-4 font-medium">Status</th>
-                            <th className="text-left py-3 px-4 font-medium">Actions</th>
+                            <th className="text-center py-3 px-4 font-medium">Type</th>
+                            <th className="text-center py-3 px-4 font-medium">Date &amp; Time</th>
+                            <th className="text-center py-3 px-4 font-medium">Status</th>
+                            <th className="text-center py-3 px-4 font-medium">Actions</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -997,16 +1022,13 @@ const BotDetail = () => {
                                     <span className="font-medium">{source.name}</span>
                                   </div>
                                 </td>
-                                <td className="py-3 px-4 text-sm text-muted-foreground">
-                                  {source.type === 'upload' ? 'Uploaded' : 'Crawled'}
+                                <td className="py-3 px-4 text-sm text-muted-foreground text-center">
+                                  {getDocumentType(source)}
                                 </td>
-                                <td className="py-3 px-4 text-sm text-muted-foreground">
-                                  {getDocumentDate(source)}
+                                <td className="py-3 px-4 text-sm text-muted-foreground whitespace-nowrap text-center">
+                                  {getDocumentDate(source)} · {getDocumentTime(source)}
                                 </td>
-                                <td className="py-3 px-4 text-sm text-muted-foreground">
-                                  {getDocumentTime(source)}
-                                </td>
-                                <td className="py-3 px-4">
+                                <td className="py-3 px-4 text-center">
                                   <Badge
                                     variant={
                                       normalizedStatus === 'Processed' || normalizedStatus === 'Active'
@@ -1020,7 +1042,7 @@ const BotDetail = () => {
                                     {normalizedStatus}
                                   </Badge>
                                 </td>
-                                <td className="py-3 px-4">
+                                <td className="py-3 px-4 text-center">
                                   <Button 
                                     variant="ghost" 
                                     size="sm"

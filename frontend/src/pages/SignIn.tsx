@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Bot, ArrowLeft, Shield, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { signInSchema, type SignInInput } from '@/lib/zod-schemas';
 import { mockSignIn } from '@/lib/api';
 import { motion } from 'framer-motion';
@@ -17,15 +18,22 @@ const SignIn = () => {
   const setUserEmail = useUserStore((state) => state.setUserEmail);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isResetOpen, setIsResetOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSent, setResetSent] = useState(false);
+  const [resetError, setResetError] = useState('');
 
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isValid },
   } = useForm<SignInInput>({
     resolver: zodResolver(signInSchema),
     mode: 'onChange',
   });
+
+  const emailValue = watch('email');
 
   const onSubmit = async (data: SignInInput) => {
     setIsLoading(true);
@@ -99,12 +107,18 @@ const SignIn = () => {
                 <label htmlFor="password" className="text-sm font-medium">
                   Password
                 </label>
-                <Link
-                  to="#"
+                <button
+                  type="button"
                   className="text-sm text-primary hover:underline"
+                  onClick={() => {
+                    setResetEmail(emailValue || '');
+                    setResetError('');
+                    setResetSent(false);
+                    setIsResetOpen(true);
+                  }}
                 >
                   Forgot password?
-                </Link>
+                </button>
               </div>
               <div className="relative">
                 <Input
@@ -155,6 +169,60 @@ const SignIn = () => {
           </div>
         </div>
       </motion.div>
+
+      <Dialog open={isResetOpen} onOpenChange={setIsResetOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Reset your password</DialogTitle>
+            <DialogDescription>
+              Enter the email associated with your account and we'll send you a secure reset link.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!resetSent ? (
+            <>
+              <div className="space-y-2">
+                <label htmlFor="reset_email" className="text-sm font-medium">
+                  Email address
+                </label>
+                <Input
+                  id="reset_email"
+                  type="email"
+                  placeholder="you@company.com"
+                  value={resetEmail}
+                  onChange={(event) => {
+                    setResetEmail(event.target.value);
+                    if (resetError) setResetError('');
+                  }}
+                />
+                {resetError && <p className="text-sm text-destructive">{resetError}</p>}
+              </div>
+              <Button
+                className="w-full rounded-xl mt-6"
+                onClick={() => {
+                  if (!resetEmail) {
+                    setResetError('Please enter the email you use to sign in.');
+                    return;
+                  }
+                  setResetSent(true);
+                  toast.success(`Password reset email sent to ${resetEmail}`);
+                }}
+              >
+                Send reset link
+              </Button>
+            </>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary-foreground/90">
+                We've sent instructions to <span className="font-semibold">{resetEmail}</span>. It usually arrives within a minute.
+              </div>
+              <Button className="w-full rounded-xl" onClick={() => setIsResetOpen(false)}>
+                Back to sign in
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

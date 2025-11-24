@@ -22,10 +22,8 @@ import Progress from "./pages/dashboard/onboarding/Progress";
 import Test from "./pages/dashboard/onboarding/Test";
 import Install from "./pages/dashboard/onboarding/Install";
 import Profile from "./pages/dashboard/settings/Profile";
-import Team from "./pages/dashboard/settings/Team";
 import Billing from "./pages/dashboard/settings/Billing";
-import ApiKeys from "./pages/dashboard/settings/ApiKeys";
-import Tenant from "./pages/dashboard/settings/Tenant";
+import Checkout from "./pages/dashboard/settings/Checkout";
 import Appearance from "./pages/dashboard/settings/Appearance";
 import Guardrails from "./pages/dashboard/Guardrails";
 import Agents from "./pages/dashboard/Agents";
@@ -93,10 +91,8 @@ const App = () => (
             <Route path="settings" element={<Navigate to="/dashboard/settings/appearance" replace />} />
             <Route path="settings/appearance" element={<Appearance />} />
             <Route path="settings/profile" element={<Profile />} />
-            <Route path="settings/team" element={<Team />} />
             <Route path="settings/billing" element={<Billing />} />
-            <Route path="settings/api-keys" element={<ApiKeys />} />
-            <Route path="settings/tenant" element={<Tenant />} />
+            <Route path="settings/payment" element={<Checkout />} />
 
             {/* [schema-demo:additive] Demo routes also available under dashboard shell */}
             <Route path="demo" element={<DemoLayout />}>

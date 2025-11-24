@@ -1,32 +1,38 @@
 import { z } from 'zod';
 import { type Agent, type Source, type Tenant } from './schema-types';
 
-export const signUpSchema = z.object({
-  email: z.string().trim().email({ message: 'Invalid email address' }),
-  password: z
-    .string()
-    .min(8, { message: 'Password must be at least 8 characters' })
-    .regex(/[A-Z]/, { message: 'Password must contain uppercase letter' })
-    .regex(/[0-9]/, { message: 'Password must contain a number' }),
-  full_name: z
-    .string()
-    .trim()
-    .min(1, { message: 'Full name is required' })
-    .max(255, { message: 'Full name must be less than 255 characters' }),
-  company_name: z
-    .string()
-    .trim()
-    .min(1, { message: 'Company/Organization name is required' })
-    .max(255, { message: 'Company name must be less than 255 characters' }),
-  domain: z
-    .string()
-    .trim()
-    .max(255, { message: 'Domain must be less than 255 characters' })
-    .optional(),
-  terms: z.boolean().refine((val) => val === true, {
-    message: 'You must accept the terms and conditions to continue',
-  }),
-});
+export const signUpSchema = z
+  .object({
+    email: z.string().trim().email({ message: 'Invalid email address' }),
+    password: z
+      .string()
+      .min(8, { message: 'Password must be at least 8 characters' })
+      .regex(/[A-Z]/, { message: 'Password must contain uppercase letter' })
+      .regex(/[0-9]/, { message: 'Password must contain a number' }),
+    confirm_password: z.string().min(1, { message: 'Please confirm your password' }),
+    full_name: z
+      .string()
+      .trim()
+      .min(1, { message: 'Full name is required' })
+      .max(255, { message: 'Full name must be less than 255 characters' }),
+    company_name: z
+      .string()
+      .trim()
+      .min(1, { message: 'Company/Organization name is required' })
+      .max(255, { message: 'Company name must be less than 255 characters' }),
+    domain: z
+      .string()
+      .trim()
+      .max(255, { message: 'Domain must be less than 255 characters' })
+      .optional(),
+    terms: z.boolean().refine((val) => val === true, {
+      message: 'You must accept the terms and conditions to continue',
+    }),
+  })
+  .refine((data) => data.password === data.confirm_password, {
+    message: 'Passwords do not match',
+    path: ['confirm_password'],
+  });
 
 export const signInSchema = z.object({
   email: z.string().trim().email({ message: 'Invalid email address' }),

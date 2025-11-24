@@ -423,28 +423,49 @@ export const mockListJobs = async (): Promise<ApiResponse<JobDTO[]>> => {
 };
 
 // Billing
+const planLimits: Record<SubscriptionDTO['plan'], { messagesLimit: number; storageLimitMb: number; botsLimit: number }> = {
+  free: { messagesLimit: 100, storageLimitMb: 50, botsLimit: 1 },
+  pro: { messagesLimit: 10000, storageLimitMb: 1024, botsLimit: 10 },
+  business: { messagesLimit: 100000, storageLimitMb: 10240, botsLimit: 999 },
+  enterprise: { messagesLimit: 999999, storageLimitMb: 999999, botsLimit: 999 },
+};
+
+let _subscription: SubscriptionDTO = {
+  plan: 'free',
+  status: 'trialing',
+  renewsAt: null,
+  usage: {
+    messages: 47,
+    messagesLimit: planLimits.free.messagesLimit,
+    storageMb: 12,
+    storageLimitMb: planLimits.free.storageLimitMb,
+    bots: 1,
+    botsLimit: planLimits.free.botsLimit,
+  },
+};
+
 export const mockGetSubscription = async (): Promise<ApiResponse<SubscriptionDTO>> => {
   await new Promise((r) => setTimeout(r, 250));
-  return { data: { plan: 'free', status: 'trialing', renewsAt: null, usage: { messages: 47, messagesLimit: 100, storageMb: 12, storageLimitMb: 50, bots: 1, botsLimit: 1 } } };
+  return { data: _subscription };
 };
 
 export const mockUpdatePlan = async (plan: SubscriptionDTO['plan']): Promise<ApiResponse<SubscriptionDTO>> => {
   await new Promise((r) => setTimeout(r, 400));
-  const limits: Record<SubscriptionDTO['plan'], { messagesLimit: number; storageLimitMb: number; botsLimit: number }> = {
-    free: { messagesLimit: 100, storageLimitMb: 50, botsLimit: 1 },
-    pro: { messagesLimit: 10000, storageLimitMb: 1024, botsLimit: 10 },
-    business: { messagesLimit: 100000, storageLimitMb: 10240, botsLimit: 999 },
-    enterprise: { messagesLimit: 999999, storageLimitMb: 999999, botsLimit: 999 },
-  };
-  const l = limits[plan];
-  return {
-    data: {
-      plan,
-      status: plan === 'free' ? 'trialing' : 'active',
-      renewsAt: plan === 'free' ? null : new Date(Date.now() + 30 * 24 * 3600e3).toISOString(),
-      usage: { messages: 0, messagesLimit: l.messagesLimit, storageMb: 0, storageLimitMb: l.storageLimitMb, bots: 1, botsLimit: l.botsLimit },
+  const limits = planLimits[plan];
+  _subscription = {
+    plan,
+    status: plan === 'free' ? 'trialing' : 'active',
+    renewsAt: plan === 'free' ? null : new Date(Date.now() + 30 * 24 * 3600e3).toISOString(),
+    usage: {
+      messages: Math.min(_subscription.usage.messages, limits.messagesLimit),
+      messagesLimit: limits.messagesLimit,
+      storageMb: Math.min(_subscription.usage.storageMb, limits.storageLimitMb),
+      storageLimitMb: limits.storageLimitMb,
+      bots: Math.min(_subscription.usage.bots, limits.botsLimit),
+      botsLimit: limits.botsLimit,
     },
   };
+  return { data: _subscription };
 };
 
 // API Keys

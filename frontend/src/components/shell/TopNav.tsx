@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, LogOut, User, Palette, Key, Building2, Users } from 'lucide-react';
+import { Bell, LogOut, User, Palette, Bot } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ThemeToggle } from './ThemeToggle';
@@ -34,6 +34,9 @@ const getInitials = (name: string | null | undefined): string => {
 export const TopNav = () => {
   const navigate = useNavigate();
   const userName = useUserStore((state) => state.userName);
+  const userEmailFromStore = useUserStore((state) => state.userEmail);
+  const setUserName = useUserStore((state) => state.setUserName);
+  const setUserEmail = useUserStore((state) => state.setUserEmail);
   const [userData, setUserData] = useState<UserData | null>(null);
 
   // Fetch user data on mount
@@ -46,6 +49,8 @@ export const TopNav = () => {
         
         if (response.data) {
           setUserData(response.data);
+          setUserName(response.data.full_name);
+          setUserEmail(response.data.email);
         }
       } catch (error) {
         // Silently fail - use fallback
@@ -53,10 +58,10 @@ export const TopNav = () => {
     };
 
     fetchUserData();
-  }, []);
+  }, [setUserName, setUserEmail]);
 
   const displayName = userData?.full_name || userName || null;
-  const userEmail = userData?.email || null;
+  const userEmail = userData?.email || userEmailFromStore || null;
   const initials = getInitials(displayName);
 
   const handleLogout = () => {
@@ -64,13 +69,24 @@ export const TopNav = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('wizard-storage');
     useUserStore.getState().setUserName(null);
+    useUserStore.getState().setUserEmail(null);
     toast.success('Signed out successfully');
     navigate('/');
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/50 glass">
-      <div className="flex h-16 items-center justify-end w-full pr-4">
+    <header className="fixed top-0 left-0 right-0 z-40 border-b border-border/50 glass">
+      <div className="flex h-16 items-center justify-between w-full px-4">
+        {/* Left side: App logo / title */}
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+            <Bot className="w-5 h-5 text-primary" />
+          </div>
+          <span className="text-lg md:text-xl font-bold tracking-tight">
+            YourBot
+          </span>
+        </div>
+
         {/* Right side icons */}
         <div className="flex items-center gap-3">
           {/* Theme Toggle */}
@@ -143,27 +159,6 @@ export const TopNav = () => {
                 >
                   <Palette className="w-5 h-5" />
                   <span>Appearance</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer"
-                  onClick={() => navigate('/dashboard/settings/api-keys')}
-                >
-                  <Key className="w-5 h-5" />
-                  <span>API Keys</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer"
-                  onClick={() => navigate('/dashboard/settings/tenant')}
-                >
-                  <Building2 className="w-5 h-5" />
-                  <span>Tenant Settings</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer"
-                  onClick={() => navigate('/dashboard/settings/team')}
-                >
-                  <Users className="w-5 h-5" />
-                  <span>Team</span>
                 </DropdownMenuItem>
               </div>
             </DropdownMenuContent>

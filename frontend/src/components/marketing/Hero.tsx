@@ -62,7 +62,7 @@ export const Hero = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6, duration: 0.4 }}
-            className="text-sm text-muted-foreground"
+            className="inline-flex items-center justify-center px-5 py-2 text-base font-medium rounded-full bg-primary/10 text-primary/90 border border-primary/20 shadow-sm"
           >
             No credit card required · 14-day free trial · Cancel anytime
           </motion.p>

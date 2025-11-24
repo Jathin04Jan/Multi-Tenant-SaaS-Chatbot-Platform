@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Bot, ArrowLeft } from 'lucide-react';
+import { Bot, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { signUpSchema, type SignUpInput } from '@/lib/zod-schemas';
+import { cn } from '@/lib/utils';
 import { mockSignUp, mockCreateTenant } from '@/lib/api';
 import { useWizardStore } from '@/store/wizard';
 import { motion } from 'framer-motion';
@@ -16,6 +18,13 @@ const SignUp = () => {
   const navigate = useNavigate();
   const setTenantId = useWizardStore((state) => state.setTenantId);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isVerificationOpen, setIsVerificationOpen] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [otpValues, setOtpValues] = useState<string[]>(Array(6).fill(''));
+  const [otpError, setOtpError] = useState('');
+  const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   const {
     register,
@@ -31,6 +40,8 @@ const SignUp = () => {
   });
 
   const password = watch('password');
+  const confirmPassword = watch('confirm_password');
+  const passwordsMatch = !confirmPassword || password === confirmPassword;
   const getPasswordStrength = () => {
     if (!password) return 0;
     let strength = 0;
@@ -39,6 +50,55 @@ const SignUp = () => {
     if (/[0-9]/.test(password)) strength += 25;
     if (/[^A-Za-z0-9]/.test(password)) strength += 25;
     return strength;
+  };
+
+  const maskEmail = (email: string) => {
+    if (!email) return '';
+    const [local, domain] = email.split('@');
+    if (!domain) return email;
+    if (local.length <= 2) {
+      return `${local[0] ?? ''}***@${domain}`;
+    }
+    return `${local[0]}${'*'.repeat(Math.max(1, local.length - 2))}${local[local.length - 1]}@${domain}`;
+  };
+
+  const handleOtpChange = (index: number, value: string) => {
+    if (!/^\d?$/.test(value)) return;
+    const next = [...otpValues];
+    next[index] = value;
+    setOtpValues(next);
+    setOtpError('');
+
+    if (value && index < otpValues.length - 1) {
+      otpRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index: number, event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Backspace' && !otpValues[index] && index > 0) {
+      otpRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleResendCode = () => {
+    setOtpValues(Array(6).fill(''));
+    setOtpError('');
+    otpRefs.current[0]?.focus();
+    toast.message('Verification email resent');
+  };
+
+  const handleTryDifferentMethod = () => {
+    toast.message('We will reach out with alternate verification options soon.');
+  };
+
+  const handleVerifyEmail = () => {
+    if (otpValues.some((digit) => !digit)) {
+      setOtpError('Enter the 6-digit code we sent to your email.');
+      return;
+    }
+    toast.success('Email verified!');
+    setIsVerificationOpen(false);
+    navigate('/dashboard');
   };
 
   const onSubmit = async (data: SignUpInput) => {
@@ -59,7 +119,10 @@ const SignUp = () => {
       const tenantResponse = await mockCreateTenant();
       setTenantId(tenantResponse.data.tenantId);
       toast.success('Account created! Check your email to verify.');
-      navigate('/verify');
+      setVerificationEmail(data.email);
+      setOtpValues(Array(6).fill(''));
+      setOtpError('');
+      setIsVerificationOpen(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to create account. Please try again.');
     } finally {
@@ -172,13 +235,23 @@ const SignUp = () => {
               <label htmlFor="password" className="text-sm font-medium block mb-2">
                 Password
               </label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                className="rounded-xl"
-                {...register('password')}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  className="rounded-xl pr-12"
+                  {...register('password')}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 px-3 flex items-center text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
               {password && (
                 <div className="mt-2">
                   <div className="h-1 bg-muted rounded-full overflow-hidden">
@@ -191,6 +264,42 @@ const SignUp = () => {
               )}
               {errors.password && (
                 <p className="text-sm text-destructive mt-1">{errors.password.message}</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="confirm_password" className="text-sm font-medium block mb-2">
+                Confirm Password
+              </label>
+              <div className="relative">
+                <Input
+                  id="confirm_password"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  placeholder="Re-enter your password"
+                  className="rounded-xl pr-12"
+                  {...register('confirm_password')}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 px-3 flex items-center text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {errors.confirm_password && (
+                <p className="text-sm text-destructive mt-1">{errors.confirm_password.message}</p>
+              )}
+              {!errors.confirm_password && confirmPassword && (
+                <p
+                  className={cn(
+                    'text-sm mt-1',
+                    passwordsMatch ? 'text-success' : 'text-destructive'
+                  )}
+                >
+                  {passwordsMatch ? 'Passwords match' : 'Passwords do not match'}
+                </p>
               )}
             </div>
 
@@ -239,6 +348,57 @@ const SignUp = () => {
           </p>
         </div>
       </motion.div>
+
+      <Dialog
+        open={isVerificationOpen}
+        onOpenChange={(open) => {
+          setIsVerificationOpen(open);
+          if (!open) {
+            setOtpValues(Array(6).fill(''));
+            setOtpError('');
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Verify your email</DialogTitle>
+            <DialogDescription>
+              We've sent a 6-digit verification code to {maskEmail(verificationEmail)}. Enter the code below to continue.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex gap-3 justify-center my-6">
+            {otpValues.map((digit, index) => (
+              <Input
+                key={index}
+                ref={(el) => {
+                  otpRefs.current[index] = el;
+                }}
+                inputMode="numeric"
+                maxLength={1}
+                className="w-12 h-14 text-center text-xl font-semibold rounded-xl"
+                value={digit}
+                onChange={(event) => handleOtpChange(index, event.target.value)}
+                onKeyDown={(event) => handleOtpKeyDown(index, event)}
+              />
+            ))}
+          </div>
+          {otpError && <p className="text-sm text-destructive text-center -mt-4 mb-4">{otpError}</p>}
+
+          <div className="flex items-center justify-between text-sm">
+            <button type="button" className="text-primary hover:underline font-medium" onClick={handleResendCode}>
+              Resend code
+            </button>
+            <button type="button" className="text-muted-foreground hover:text-foreground" onClick={handleTryDifferentMethod}>
+              Try different method
+            </button>
+          </div>
+
+          <Button className="w-full rounded-xl mt-6" onClick={handleVerifyEmail}>
+            Continue
+          </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

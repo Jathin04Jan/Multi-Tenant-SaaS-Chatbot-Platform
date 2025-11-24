@@ -3,69 +3,44 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { motion } from 'framer-motion';
 import { Badge } from '@/components/ui/badge';
-import { useEffect, useState } from 'react';
-import { mockGetSubscription, mockUpdatePlan, type SubscriptionDTO } from '@/lib/api';
-import { toast } from 'sonner';
-
-const plans = [
-  {
-    id: 'free' as const,
-    name: 'Free',
-    price: '$0',
-    period: 'forever',
-    features: ['100 messages/month', '50 MB storage', '1 chatbot', 'Basic support'],
-    limits: { messages: 100, storage: 50, bots: 1 },
-  },
-  {
-    id: 'pro' as const,
-    name: 'Pro',
-    price: '$29',
-    period: 'per month',
-    features: ['10,000 messages/month', '1 GB storage', '10 chatbots', 'Priority support', 'API access'],
-    limits: { messages: 10000, storage: 1024, bots: 10 },
-  },
-  {
-    id: 'business' as const,
-    name: 'Business',
-    price: '$99',
-    period: 'per month',
-    features: ['100,000 messages/month', '10 GB storage', 'Unlimited chatbots', '24/7 support', 'Advanced analytics', 'Custom integrations'],
-    limits: { messages: 100000, storage: 10240, bots: 999 },
-  },
-  {
-    id: 'enterprise' as const,
-    name: 'Enterprise',
-    price: 'Custom',
-    period: '',
-    features: ['Unlimited messages', 'Unlimited storage', 'Unlimited chatbots', 'Dedicated support', 'SLA guarantee', 'Custom contracts'],
-    limits: { messages: 999999, storage: 999999, bots: 999 },
-  },
-];
+import { useCallback, useEffect, useState } from 'react';
+import { mockGetSubscription, type SubscriptionDTO } from '@/lib/api';
+import { pricingPlans, getPlanPrice, type BillingFrequency } from '@/constants/pricingPlans';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const Billing = () => {
   const [sub, setSub] = useState<SubscriptionDTO | null>(null);
-  const [updating, setUpdating] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [billingCycle, setBillingCycle] = useState<BillingFrequency>('monthly');
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  useEffect(() => {
+  const fetchSubscription = useCallback(() => {
+    setLoading(true);
     mockGetSubscription().then((r) => {
       setSub(r.data);
       setLoading(false);
     });
   }, []);
 
-  const changePlan = async (plan: SubscriptionDTO['plan']) => {
-    if (plan === sub?.plan) return;
-    setUpdating(true);
-    try {
-      const res = await mockUpdatePlan(plan);
-      setSub(res.data);
-      toast.success(`Plan changed to ${plan}`);
-    } catch (error) {
-      toast.error('Failed to change plan');
-    } finally {
-      setUpdating(false);
+  useEffect(() => {
+    fetchSubscription();
+  }, [fetchSubscription]);
+
+  useEffect(() => {
+    const state = location.state as { planChangedAt?: number } | null;
+    if (state?.planChangedAt) {
+      fetchSubscription();
+      navigate(location.pathname, { replace: true });
     }
+  }, [fetchSubscription, location.pathname, location.state, navigate]);
+
+  const handlePlanSelect = (planId: SubscriptionDTO['plan']) => {
+    const params = new URLSearchParams({
+      plan: planId,
+      billing: billingCycle,
+    });
+    navigate(`/dashboard/settings/payment?${params.toString()}`);
   };
 
   return (
@@ -143,51 +118,73 @@ const Billing = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.2 }}
+        className="space-y-6"
       >
-        <h2 className="text-2xl font-bold mb-6">Choose Your Plan</h2>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {plans.map((plan, index) => {
-            const isCurrent = plan.id === sub?.plan;
-            const isUpgrade = plans.findIndex((p) => p.id === sub?.plan) < index;
-            const isDowngrade = plans.findIndex((p) => p.id === sub?.plan) > index;
+        <div className="text-center space-y-3">
+          <p className="text-sm uppercase tracking-[0.3em] text-muted-foreground">Individual Plans</p>
+          <h2 className="text-4xl font-bold">Pricing</h2>
+          <div className="inline-flex items-center gap-2 bg-secondary/70 border border-border rounded-full p-1">
+            {(['monthly', 'yearly'] as BillingFrequency[]).map((cycle) => (
+              <button
+                key={cycle}
+                onClick={() => setBillingCycle(cycle)}
+                className={`relative px-6 py-2 text-sm font-semibold rounded-full transition ${
+                  billingCycle === cycle ? 'bg-background text-foreground shadow' : 'text-muted-foreground'
+                }`}
+              >
+                {cycle === 'monthly' ? 'Monthly' : 'Yearly'}
+                {cycle === 'yearly' && (
+                  <span className="ml-2 text-[11px] font-normal text-success">Save 20%</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
 
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {pricingPlans.map((plan, index) => {
+            const isCurrent = plan.id === sub?.plan;
+            const price = getPlanPrice(plan, billingCycle);
             return (
               <motion.div
                 key={plan.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.1 * index }}
-                className={`glass-card p-6 relative flex flex-col ${isCurrent ? 'ring-2 ring-primary' : ''}`}
+                className={`relative flex flex-col rounded-3xl border border-white/10 bg-card/60 p-6 text-left shadow-lg ${
+                  plan.recommended ? 'ring-2 ring-primary/50' : ''
+                }`}
               >
-                {isCurrent && (
-                  <Badge className="absolute top-4 right-4" variant="default">
-                    Current
-                  </Badge>
+                {plan.badge && (
+                  <span className="absolute -top-3 right-4 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
+                    {plan.badge}
+                  </span>
                 )}
-                <div className="mb-4">
-                  <h3 className="text-xl font-bold mb-1">{plan.name}</h3>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-bold">{plan.price}</span>
-                    {plan.period && <span className="text-sm text-muted-foreground">/{plan.period}</span>}
+                <div className="space-y-2 mb-4">
+                  <h3 className="text-xl font-semibold">{plan.title}</h3>
+                  <p className="text-sm text-muted-foreground">{plan.description}</p>
+                  <div className="text-3xl font-bold">
+                    {price === 0 ? 'Free' : `$${price}`}
+                    {price !== 0 && <span className="text-base font-normal text-muted-foreground">/{billingCycle === 'monthly' ? 'mo' : 'mo (annual)'}</span>}
                   </div>
                 </div>
 
-                <ul className="space-y-2 mb-6 flex-1">
-                  {plan.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-sm">
+                <div className="space-y-3 flex-1">
+                  {plan.features.map((feature) => (
+                    <div key={feature} className="flex items-start gap-2 text-sm">
                       <Check className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                       <span>{feature}</span>
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
 
                 <Button
-                  className="w-full rounded-xl mt-auto"
-                  variant={isCurrent ? 'outline' : isUpgrade ? 'default' : 'secondary'}
-                  disabled={isCurrent || updating}
-                  onClick={() => changePlan(plan.id)}
+                  className="w-full rounded-xl mt-6"
+                  variant={isCurrent ? 'outline' : plan.recommended ? 'default' : 'secondary'}
+                  disabled={isCurrent}
+                  onClick={() => handlePlanSelect(plan.id)}
                 >
-                  {isCurrent ? 'Current Plan' : isUpgrade ? 'Upgrade' : 'Downgrade'}
+                  {isCurrent ? 'Current Plan' : plan.ctaLabel}
                 </Button>
               </motion.div>
             );

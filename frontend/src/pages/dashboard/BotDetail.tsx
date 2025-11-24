@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getBot, type BotDTO, updateBot, getSnippetsForBot, createSnippet, updateSnippet, deleteSnippet, type InstallationSnippetDTO, uploadBotDocument, listBotDocuments, deleteBotDocument, downloadBotDocument, type BotDocumentDTO } from '@/lib/api';
+import { getBot, type BotDTO, updateBot, getSnippetsForBot, createSnippet, updateSnippet, deleteSnippet, type InstallationSnippetDTO, uploadBotDocument, listBotDocuments, deleteBotDocument, downloadBotDocument, type BotDocumentDTO, createCrawlDocument } from '@/lib/api';
 import { colorCombinations } from '@/lib/constants';
 import { styleOptions } from '@/components/bot-config';
 import {
@@ -203,7 +203,18 @@ const BotDetail = () => {
   const [documents, setDocuments] = useState<BotDocumentDTO[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
+  const [newDocumentUrl, setNewDocumentUrl] = useState('');
+  const [isAddingDocumentUrl, setIsAddingDocumentUrl] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const normalizeUrl = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (/^https?:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
+    return `https://${trimmed}`;
+  };
+
 
   // Fetch bot data from API
   useEffect(() => {
@@ -462,6 +473,42 @@ const BotDetail = () => {
       return;
     }
     window.open(document.source_url, '_blank', 'noopener');
+  };
+
+  const handleAddWebsiteDocument = async () => {
+    if (!botId) return;
+    if (!newDocumentUrl.trim()) {
+      toast.error('Please enter a website URL');
+      return;
+    }
+
+    const normalizedUrl = normalizeUrl(newDocumentUrl);
+    if (!normalizedUrl) {
+      toast.error('Please enter a valid URL');
+      return;
+    }
+
+    try {
+      setIsAddingDocumentUrl(true);
+      const response = await createCrawlDocument(botId, {
+        url: normalizedUrl,
+        name: normalizedUrl,
+      });
+
+      if (response.error || !response.data) {
+        toast.error(response.error || 'Failed to add website');
+        return;
+      }
+
+      toast.success('Website added to knowledge base!');
+      setDocuments((prev) => [response.data, ...prev]);
+      setNewDocumentUrl('');
+    } catch (error) {
+      console.error('Error adding website document:', error);
+      toast.error('Failed to add website');
+    } finally {
+      setIsAddingDocumentUrl(false);
+    }
   };
 
   const handleShowEmbedCode = (event?: React.MouseEvent) => {
@@ -1444,6 +1491,38 @@ const BotDetail = () => {
                   <Upload className={`w-4 h-4 ${isUploadingDocument ? 'animate-bounce' : ''}`} />
                   {isUploadingDocument ? 'Uploading…' : 'Add Document'}
                 </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Globe className="w-5 h-5" />
+                  Add Website
+                </CardTitle>
+                <CardDescription>Add a URL to your knowledge base (e.g., documentation, blog, support site).</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex flex-col gap-2 md:flex-row">
+                  <Input
+                    placeholder="https://example.com/docs"
+                    value={newDocumentUrl}
+                    onChange={(e) => setNewDocumentUrl(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleAddWebsiteDocument}
+                    disabled={isAddingDocumentUrl}
+                    className="gap-2"
+                  >
+                    <Globe className="w-4 h-4" />
+                    {isAddingDocumentUrl ? 'Adding...' : 'Add URL'}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  We’ll queue this site for crawling and show it here as a “Website” document.
+                </p>
               </CardContent>
             </Card>
           </TabsContent>

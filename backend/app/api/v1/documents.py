@@ -3,6 +3,7 @@ from __future__ import annotations
 from io import BytesIO
 from typing import List, Optional, cast
 from uuid import UUID
+from pathlib import Path
 
 from fastapi import (
     APIRouter,
@@ -45,6 +46,24 @@ async def upload_document(
     db: Session = Depends(get_db),
 ):
     """Upload a document for a bot owned by the current tenant."""
+
+    allowed_mimetypes = {
+        "application/pdf",
+        "text/plain",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }
+    allowed_extensions = {".pdf", ".txt", ".doc", ".docx"}
+
+    filename = file.filename or "file"
+    ext = Path(filename).suffix.lower()
+    content_type = file.content_type or ""
+    if ext not in allowed_extensions and content_type not in allowed_mimetypes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported file type. Allowed types: PDF, DOC, DOCX, TXT.",
+        )
+
     content = await file.read()
     if not content:
         raise HTTPException(

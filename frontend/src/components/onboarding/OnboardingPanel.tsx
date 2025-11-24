@@ -560,8 +560,17 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
               <h3 className="font-semibold text-base">Upload Files</h3>
               <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-primary/30 rounded-xl cursor-pointer hover:border-primary/50 transition-colors">
                 <Upload className="w-8 h-8 text-primary mb-2" />
-                <span className="text-sm text-muted-foreground">Click to upload or drag and drop</span>
-                <input type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
+                <div className="text-center text-sm text-muted-foreground space-y-1">
+                  <p>Click to upload or drag and drop</p>
+                  <p className="text-xs">Allowed file types: PDF, DOC, DOCX, TXT</p>
+                </div>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.doc,.docx,.txt"
+                  onChange={handleFileUpload}
+                  disabled={isUploading}
+                />
               </label>
             </div>
 

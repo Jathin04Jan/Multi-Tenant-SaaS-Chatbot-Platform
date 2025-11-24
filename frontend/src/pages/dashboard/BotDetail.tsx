@@ -1370,6 +1370,9 @@ const BotDetail = () => {
                 <CardDescription>Manage documents and data sources for your bot's knowledge base</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-primary">
+                  Uploads accept PDF, DOC, DOCX, or TXT files only. Add new websites via the form below to queue crawl sources.
+                </div>
                 {documentsLoading ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <RefreshCw className="w-5 h-5 mx-auto mb-4 animate-spin" />
@@ -1478,7 +1481,7 @@ const BotDetail = () => {
                   type="file"
                   className="hidden"
                   onChange={handleFileUpload}
-                  accept=".pdf,.doc,.docx,.txt,.md"
+                  accept=".pdf,.doc,.docx,.txt"
                   aria-label="Upload document"
                 />
                 <Button
@@ -1521,7 +1524,7 @@ const BotDetail = () => {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  We’ll queue this site for crawling and show it here as a “Website” document.
+                  Uploads accept PDF, DOC, DOCX, or TXT files only. Websites can be added via the form above.
                 </p>
               </CardContent>
             </Card>

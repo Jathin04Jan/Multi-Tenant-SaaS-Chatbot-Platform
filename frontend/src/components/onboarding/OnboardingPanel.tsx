@@ -198,13 +198,16 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           });
           successCount += 1;
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error uploading document:', error);
         updateDataSource(sourceId, {
           status: 'failed',
           updatedAt: new Date().toISOString(),
         });
-        toast.error(`Failed to upload ${file.name}`);
+        const message =
+          error?.response?.data?.detail ||
+          (error instanceof Error ? error.message : 'Failed to upload document');
+        toast.error(message);
       }
     }
 
@@ -562,7 +565,9 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                 <Upload className="w-8 h-8 text-primary mb-2" />
                 <div className="text-center text-sm text-muted-foreground space-y-1">
                   <p>Click to upload or drag and drop</p>
-                  <p className="text-xs">Allowed file types: PDF, DOC, DOCX, TXT</p>
+                  <p className="text-xs">
+                    Allowed file types: PDF, DOC, DOCX, TXT · Max size 1 GB per file
+                  </p>
                 </div>
                 <input
                   type="file"

@@ -65,6 +65,11 @@ async def upload_document(
         )
 
     content = await file.read()
+    if len(content) > 1 * 1024 * 1024 * 1024:  # 1 GB
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File too large. Maximum supported size is 1 GB.",
+        )
     if not content:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

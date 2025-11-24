@@ -461,9 +461,12 @@ const BotDetail = () => {
       }
       URL.revokeObjectURL(url);
       toast.success(mode === 'view' ? 'Document opened' : 'Document downloaded');
-    } catch (error) {
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.detail ||
+        (error instanceof Error ? error.message : 'Failed to download document');
       console.error('Error downloading document:', error);
-      toast.error('Failed to download document');
+      toast.error(message);
     }
   };
 
@@ -1371,7 +1374,7 @@ const BotDetail = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-primary">
-                  Uploads accept PDF, DOC, DOCX, or TXT files only. Add new websites via the form below to queue crawl sources.
+                  Uploads accept PDF, DOC, DOCX, or TXT files only (max 1&nbsp;GB per file). Add new websites via the form below to queue crawl sources.
                 </div>
                 {documentsLoading ? (
                   <div className="text-center py-8 text-muted-foreground">

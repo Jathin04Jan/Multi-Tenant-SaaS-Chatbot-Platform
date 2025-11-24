@@ -135,8 +135,8 @@ All colors MUST be HSL.
       radial-gradient(ellipse 180% 130% at 10% 90%, hsl(var(--gradient-to)), transparent 55%);
     opacity: 0.4;
     transition: background 1.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 1.2s cubic-bezier(0.4, 0, 0.2, 1);
-    filter: blur(100px);
     -webkit-filter: blur(100px);
+    filter: blur(100px);
   }
   
   /* Additional overlay for smoother blending - creates ambient glow */
@@ -152,8 +152,8 @@ All colors MUST be HSL.
         hsl(var(--gradient-via) / 0.06) 100%);
     opacity: 1;
     pointer-events: none;
-    filter: blur(120px);
     -webkit-filter: blur(120px);
+    filter: blur(120px);
   }
 
   /* Smooth transitions for theme variables */
@@ -201,9 +201,53 @@ All colors MUST be HSL.
   :root:not(.dark) .glass-card {
     background: hsl(84 25% 97% / 0.7);
     border-color: hsl(84 20% 78% / 0.7);
-    backdrop-filter: blur(20px) saturate(150%);
     -webkit-backdrop-filter: blur(20px) saturate(150%);
+    backdrop-filter: blur(20px) saturate(150%);
   }
+
+[data-indexing-progress] > div {
+  width: 0;
+}
+
+[data-indexing-progress="10"] > div {
+  width: 10%;
+}
+
+[data-indexing-progress="20"] > div {
+  width: 20%;
+}
+
+[data-indexing-progress="30"] > div {
+  width: 30%;
+}
+
+[data-indexing-progress="40"] > div {
+  width: 40%;
+}
+
+[data-indexing-progress="50"] > div {
+  width: 50%;
+}
+
+[data-indexing-progress="60"] > div {
+  width: 60%;
+}
+
+[data-indexing-progress="70"] > div {
+  width: 70%;
+}
+
+[data-indexing-progress="80"] > div {
+  width: 80%;
+}
+
+[data-indexing-progress="90"] > div {
+  width: 90%;
+}
+
+[data-indexing-progress="100"] > div {
+  width: 100%;
+}
 
   /* Better border visibility in light mode - override Tailwind border utilities */
   :root:not(.dark) [class*="border-border"] {

@@ -82,8 +82,8 @@
             <ol>
                 <li>Create a bot in the dashboard and complete the onboarding</li>
                 <li>Ensure the bot status is <strong>active</strong> (it should auto-activate after creation)</li>
-                <li>Copy your bot ID or slug from the embed code in the Install step</li>
-                <li>Replace <code>YOUR_BOT_ID_OR_SLUG</code> in the script tag below with your actual bot ID/slug</li>
+                <li>Copy your snippet ID from the embed code in the Install step</li>
+                <li>Replace <code>YOUR_SNIPPET_ID</code> in the script tag below with your actual snippet ID</li>
                 <li>Save this file and open it in your browser</li>
                 <li>The widget should appear as a floating button in the bottom-right corner</li>
             </ol>
@@ -109,11 +109,11 @@
     </div>
 
     <!-- YourBot Widget Embed Code -->
-    <!-- Replace YOUR_BOT_ID_OR_SLUG with your actual bot ID or slug -->
+    <!-- Replace YOUR_SNIPPET_ID with your actual snippet ID (UUID) -->
     <!-- The bot must be ACTIVE for the widget to work -->
     <script 
         src="http://localhost:8000/static/widget.js"
-        data-bot-id="YOUR_BOT_ID_OR_SLUG"
+        data-snippet-id="YOUR_SNIPPET_ID"
         async>
     </script>
 </body>

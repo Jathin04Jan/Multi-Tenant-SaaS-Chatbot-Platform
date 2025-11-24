@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     
     # Database - Load from environment
     DATABASE_URL: str = Field(
-        default="postgresql://yourbot_user:yourbot_password@localhost:5432/yourbot_db",
-        description="PostgreSQL database connection URL"
+        default="postgresql://yourbot_user:yourbot_password@localhost:5433/yourbot_db",
+        description="PostgreSQL database connection URL (port 5433 matches docker-compose.yml)"
     )
     
     # CORS - Accept comma-separated string
@@ -44,6 +44,22 @@ class Settings(BaseSettings):
     MINIO_SECRET_KEY: str = Field(default="yourbot_minio_password", description="MinIO secret key")
     MINIO_SECURE: bool = Field(default=False, description="Use HTTPS for MinIO")
     MINIO_BUCKET_NAME: str = Field(default="yourbot-documents", description="MinIO bucket name")
+    
+    # Embed Token Configuration (for widget authentication)
+    EMBED_TOKEN_SECRET: str = Field(
+        default="your-embed-token-secret-change-in-production",
+        description="Secret key for embed JWT tokens (should be different from SECRET_KEY in production)"
+    )
+    EMBED_TOKEN_TTL_MINUTES: int = Field(
+        default=10,
+        description="Embed token TTL in minutes (short-lived for security)"
+    )
+    
+    # API Base URL (for embed code generation)
+    API_BASE_URL: str = Field(
+        default="http://localhost:8000",
+        description="Base URL for the API (used in embed code generation). In production, set this to your domain."
+    )
     
     class Config:
         env_file = ".env"

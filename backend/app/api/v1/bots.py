@@ -24,9 +24,7 @@ async def create_bot(
     Expected bot_data structure:
     - name: Bot name (required)
     - description: Bot description (optional)
-    - slug: URL-friendly identifier (optional)
-    - ui_config_id: UI configuration ID (optional, FK to ui_configs.id)
-    - branding: Branding configuration (JSONB)
+    - branding: Branding and UI configuration (JSONB: colors, messages, positioning, widget sizing)
     - llm_config: LLM configuration (JSONB)
     - guardrails: Guardrails configuration (JSONB)
     - retrieval_config: Retrieval/RAG configuration (JSONB)
@@ -123,7 +121,6 @@ async def update_bot(
     - name: Bot name
     - description: Bot description
     - status: Bot status (draft, active, paused, archived)
-    - ui_config_id: UI configuration ID (FK to ui_configs.id, must belong to user)
     - branding: Branding configuration (JSONB)
     - llm_config: LLM configuration (JSONB)
     - guardrails: Guardrails configuration (JSONB)

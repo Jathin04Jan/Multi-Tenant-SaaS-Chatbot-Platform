@@ -40,15 +40,19 @@ class UserResponse(BaseModel):
     @classmethod
     def from_orm(cls, obj):
         """Convert ORM object to response, converting UUID to string."""
+        # is_verified is computed from status: ACTIVE = verified, PENDING_VERIFICATION = not verified
+        status_value = obj.status.value if hasattr(obj.status, 'value') else str(obj.status)
+        is_verified = status_value == UserStatus.ACTIVE.value
+        
         data = {
             "id": str(obj.id),
             "email": obj.email,
             "full_name": obj.full_name,
             "company_name": obj.company_name,
             "domain": obj.domain,
-            "status": obj.status.value if hasattr(obj.status, 'value') else str(obj.status),
+            "status": status_value,
             "plan": obj.plan,
-            "is_verified": obj.is_verified,
+            "is_verified": is_verified,  # Computed from status
             "created_at": obj.created_at,
         }
         return cls(**data)

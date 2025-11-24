@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Upload, Globe, Trash2, RefreshCw, ArrowRight, ArrowLeft, CheckCircle2, Bot, Circle } from 'lucide-react';
-import { mockUploadFile, mockStartCrawl, mockGetGuardrails, mockSaveGuardrails, createBot, updateBot, createUiConfig } from '@/lib/api';
+import { mockStartCrawl, mockGetGuardrails, mockSaveGuardrails, createBot, updateBot, createSnippet, uploadBotDocument } from '@/lib/api';
 import { toast } from 'sonner';
 
 const steps = [
@@ -39,6 +39,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     dataSources, 
     addDataSource, 
     removeDataSource, 
+    updateDataSource,
     resetWizard,
     branding,
     persona,
@@ -48,8 +49,9 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
   const [crawlUrl, setCrawlUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isCrawling, setIsCrawling] = useState(false);
+  const [pendingUploads, setPendingUploads] = useState<Record<string, File>>({});
   const [createdBotId, setCreatedBotId] = useState<string | null>(null);
-  const [createdBotSlug, setCreatedBotSlug] = useState<string | null>(null);
+  const [createdSnippetId, setCreatedSnippetId] = useState<string | null>(null);
   const [indexingStatus, setIndexingStatus] = useState<'idle' | 'indexing' | 'completed'>('idle');
   const [indexingProgress, setIndexingProgress] = useState(0);
   const [testMessage, setTestMessage] = useState('');
@@ -57,21 +59,14 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     { type: 'bot', message: 'Hello! How can I help you today?' }
   ]);
 
-  const handleResetWizard = () => {
-    resetWizard();
-    setCurrentStep(1);
-    setCrawlUrl('');
-    setIsUploading(false);
-    setIsCrawling(false);
-    setIndexingStatus('idle');
-    setIndexingProgress(0);
-    setTestMessage('');
-    setChatMessages([
-      { type: 'bot', message: 'Hello! How can I help you today?' }
-    ]);
-    setCreatedBotId(null);
-    setCreatedBotSlug(null);
-  };
+  // Reset wizard when panel opens
+  useEffect(() => {
+    if (open) {
+      resetWizard();
+      setCurrentStep(1);
+      setPendingUploads({});
+    }
+  }, [open, resetWizard, setCurrentStep]);
 
   // Map steps with completion status
   // Only show steps as completed if they are completed AND current step is at or beyond that step
@@ -110,20 +105,80 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
 
     setIsUploading(true);
     try {
-      const result = await mockUploadFile(file);
+      const uploadId =
+        typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+      setPendingUploads((prev) => ({ ...prev, [uploadId]: file }));
       addDataSource({
-        id: Date.now().toString(),
+        id: uploadId,
         type: 'upload',
         name: file.name,
-        status: 'indexed',
+        status: 'queued',
+        size: file.size,
         updatedAt: new Date().toISOString(),
       });
-      toast.success('File uploaded successfully!');
+      toast.success('Document added. It will upload when you finish setup.');
     } catch (error) {
-      toast.error('Failed to upload file');
+      toast.error('Failed to queue file for upload');
     } finally {
       setIsUploading(false);
+      if (e.target) {
+        e.target.value = '';
+      }
     }
+  };
+
+  const handleRemoveSource = (id: string) => {
+    removeDataSource(id);
+    setPendingUploads((prev) => {
+      if (!(id in prev)) return prev;
+      const copy = { ...prev };
+      delete copy[id];
+      return copy;
+    });
+  };
+
+  const uploadQueuedDocuments = async (botId: string) => {
+    const entries = Object.entries(pendingUploads);
+    if (entries.length === 0) {
+      return;
+    }
+
+    let successCount = 0;
+    for (const [sourceId, file] of entries) {
+      try {
+        const response = await uploadBotDocument(botId, file);
+        if (response.error) {
+          updateDataSource(sourceId, {
+            status: 'failed',
+            updatedAt: new Date().toISOString(),
+          });
+          toast.error(response.error || `Failed to upload ${file.name}`);
+        } else {
+          updateDataSource(sourceId, {
+            status: 'indexed',
+            updatedAt: new Date().toISOString(),
+          });
+          successCount += 1;
+        }
+      } catch (error) {
+        console.error('Error uploading document:', error);
+        updateDataSource(sourceId, {
+          status: 'failed',
+          updatedAt: new Date().toISOString(),
+        });
+        toast.error(`Failed to upload ${file.name}`);
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(
+        `Uploaded ${successCount} document${successCount > 1 ? 's' : ''} to MinIO`
+      );
+    }
+    setPendingUploads({});
   };
 
   const handleCrawl = async () => {
@@ -207,42 +262,28 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     try {
       // Get bot name from persona (BrandingForm updates persona.botName)
       const botName = persona.botName || 'My Bot';
-      
-      // Create UI config for the bot (reusable theme)
-      let uiConfigId: string | null = null;
-      const uiConfigPayload = {
-        name: `${botName} Theme`,
-        primary_color: branding.primaryColor || '#6366f1',
-        background_color: '#0f172a',
-        chat_title: botName,
-        intro_message: branding.welcomeMessage || 'Hello! How can I help you today?',
-        avatar_url: branding.logo || null,
-        position: 'bottom-right',
-        height: 600,
-        width: 400,
-      };
-
-      try {
-        const uiConfigResponse = await createUiConfig(uiConfigPayload);
-        if (uiConfigResponse.error) {
-          toast.warning(uiConfigResponse.error || 'Created bot without UI theme (using defaults).');
-        } else {
-          uiConfigId = uiConfigResponse.data.id;
-        }
-      } catch (uiError) {
-        console.error('Error creating UI config:', uiError);
-        toast.warning('Created bot without UI theme (using defaults).');
-      }
 
       // Prepare bot data from wizard store
+      // All UI configuration is stored in branding JSONB
       const botData = {
         name: botName,
         description: `A ${tone.communicationStyle} chatbot`,
         branding: {
+          // Logo and avatar
           logo_url: branding.logo || null,
-          primary_color: branding.primaryColor,
-          welcome_message: branding.welcomeMessage,
+          avatar_url: branding.logo || null,
+          // Colors
+          primary_color: branding.primaryColor || '#6366f1',
+          background_color: '#ffffff',
+          // Messages
+          welcome_message: branding.welcomeMessage || 'Hello! How can I help you today?',
+          intro_message: branding.welcomeMessage || 'Hello! How can I help you today?',
           assistant_name: botName,
+          chat_title: botName,
+          // Widget positioning and sizing
+          position: 'bottom-right',
+          height: 600,
+          width: 400,
         },
         llm_config: {
           model: 'gpt-4',
@@ -272,7 +313,6 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           chunk_overlap: 200,
           embedding_model: 'text-embedding-ada-002',
         },
-        ui_config_id: uiConfigId,
       };
       
       // Create bot via API
@@ -283,10 +323,9 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
         return;
       }
       
-      // Store bot ID and slug for embed code
+      // Store bot ID for embed code
       if (response.data) {
         setCreatedBotId(response.data.id);
-        setCreatedBotSlug(response.data.slug || response.data.id);
         
         // PRODUCTION: Automatically activate the bot after creation
         // This makes the bot immediately embeddable
@@ -296,6 +335,26 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
             toast.warning('Bot created but activation failed. Please activate it manually.');
           } else {
             toast.success('Bot created and activated successfully! 🎉');
+            await uploadQueuedDocuments(response.data.id);
+            
+            // Create installation snippet for the bot
+            try {
+              const snippetResponse = await createSnippet(response.data.id, {
+                bot_id: response.data.id,
+                status: 'active',
+                // allowed_domains: undefined means allow all domains (good for testing)
+              });
+              
+              if (snippetResponse.error) {
+                toast.warning('Bot created but snippet creation failed. You can create a snippet manually from the bot detail page.');
+              } else if (snippetResponse.data) {
+                setCreatedSnippetId(snippetResponse.data.id);
+                toast.success('Installation snippet created!');
+              }
+            } catch (snippetError) {
+              console.error('Error creating snippet:', snippetError);
+              toast.warning('Bot created but snippet creation failed. You can create a snippet manually from the bot detail page.');
+            }
           }
         } catch (activateError) {
           console.error('Error activating bot:', activateError);
@@ -457,7 +516,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => removeDataSource(source.id)}
+                        onClick={() => handleRemoveSource(source.id)}
                         className="h-8 w-8"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -516,11 +575,11 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                   <span className="text-sm font-medium">Overall Progress</span>
                   <span className="text-sm text-muted-foreground">{indexingProgress}%</span>
                 </div>
-                <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                  <div
-                    className="bg-primary h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${indexingProgress}%` }}
-                  />
+                <div
+                  className="w-full bg-muted rounded-full h-2 overflow-hidden"
+                  data-indexing-progress={indexingProgress}
+                >
+                  <div className="bg-primary h-2 rounded-full transition-all duration-300" />
                 </div>
               </div>
 
@@ -714,32 +773,35 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                     <div className="relative">
                       <div className="p-4 bg-muted rounded-lg font-mono text-xs overflow-x-auto border border-border/50">
                         <code className="text-xs whitespace-pre">
-{`<!-- Add this before closing </body> tag -->
+{createdSnippetId ? `<!-- Add this before closing </body> tag -->
 <script 
   src="${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/static/widget.js"
-  data-bot-id="${createdBotSlug || createdBotId}"
+  data-snippet-id="${createdSnippetId}"
   async>
-</script>`}
+</script>` : `<!-- Snippet is being created... -->
+<!-- Once created, you'll see the embed code here -->`}
                         </code>
                       </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="absolute top-2 right-2 h-7 px-3 text-xs"
-                        onClick={() => {
-                          const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-                          const embedCode = `<!-- Add this before closing </body> tag -->
+                      {createdSnippetId && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="absolute top-2 right-2 h-7 px-3 text-xs"
+                          onClick={() => {
+                            const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+                            const embedCode = `<!-- Add this before closing </body> tag -->
 <script 
   src="${apiBase}/static/widget.js"
-  data-bot-id="${createdBotSlug || createdBotId}"
+  data-snippet-id="${createdSnippetId}"
   async>
 </script>`;
-                          navigator.clipboard.writeText(embedCode);
-                          toast.success('Code copied to clipboard!');
-                        }}
-                      >
-                        Copy
-                      </Button>
+                            navigator.clipboard.writeText(embedCode);
+                            toast.success('Code copied to clipboard!');
+                          }}
+                        >
+                          Copy
+                        </Button>
+                      )}
                     </div>
                     <div className="space-y-2 text-xs text-muted-foreground">
                       <p>
@@ -779,7 +841,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                     onOpenChange(false);
                     resetWizard();
                     setCreatedBotId(null);
-                    setCreatedBotSlug(null);
+                    setCreatedSnippetId(null);
                     window.location.reload();
                   }} 
                   size="default" 

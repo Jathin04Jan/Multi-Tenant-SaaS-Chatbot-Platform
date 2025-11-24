@@ -38,8 +38,9 @@ npm run dev                # http://localhost:8080
 - [Backend Quick Start (`backend/README.md`)](backend/README.md)
 - [Backend Docs Index (`backend/docs/README.md`)](backend/docs/README.md)
 - [Setup Guides](backend/docs/README.md#setup--configuration) – virtualenv, database, MinIO
-- [Database Schema References](backend/docs/README.md#database) – users, bots, ui configs, installation snippets
+- [Database Schema References](backend/docs/README.md#database) – users, bots, installation snippets
 - [Security & Troubleshooting](backend/docs/README.md#security) – JWT, CORS, diagnostics
+- **[Embed Security & Code Snippets](backend/docs/EMBED_SECURITY_AND_SNIPPETS.md)** – Complete guide to embed system, security, domain allow-list, and usage tracking
 
 ## 📁 Project Structure
 
@@ -141,6 +142,7 @@ Multi-Tenant-SaaS-Chatbot-Platform/
 - **RAG Integration**: Vectorization and embedding generation pipeline visualization
 - **Navigation**: Collapsible sidebar with persistent state
 - **Widget Delivery**: Static `widget.js` served by FastAPI with runtime theming via `/public/embed-config`
+- **Document Storage**: Secure, tenant-scoped uploads to MinIO via backend-only APIs with tracked `source_type`, ingestion `status`, and backend-owned storage paths (`source_url`)
 
 ## 🔌 API Integration
 
@@ -149,13 +151,39 @@ The frontend talks directly to the FastAPI backend via the typed helpers in `src
 Key endpoints:
 - `POST /api/v1/auth/signup` / `signin` / `PATCH /auth/me` for onboarding and account updates
 - `GET/POST/PATCH/DELETE /api/v1/bots` for complete bot lifecycle management
-- `POST /api/v1/ui-configs` plus related CRUD endpoints to persist reusable widget themes
-- `GET /public/embed-config` to serve runtime embed configuration (ACTIVE bots only)
+- `POST /api/v1/bots/{bot_id}/snippets` for installation snippet creation (auto-created, one per bot)
+- `GET /api/v1/bots/{bot_id}/snippets` for listing snippets for a bot
+- `GET/PATCH/DELETE /api/v1/snippets/{snippet_id}` for installation snippet management
+- `POST /api/v1/bots/{bot_id}/documents` to upload files (backend creates records with `source_type`, `status`, `metadata`, and a secure `source_url`)
+- `GET /api/v1/bots/{bot_id}/documents` to list docs for a bot (shows ingestion status + source info)
+- `GET/DELETE /api/v1/documents/{document_id}` to download or delete files securely
+- `GET /public/embed-config?snippet_id=...` to serve runtime embed configuration with JWT tokens (ACTIVE bots only)
+- `POST /api/v1/chat` for widget chat messages (JWT-authenticated)
 
 Supporting services:
-- PostgreSQL for relational data (users, bots, configs, installation snippets)
+- PostgreSQL for relational data (users, bots, installation snippets)
 - MinIO for document storage
 - Alembic migrations for schema evolution (optional during local dev)
+
+## 📄 Knowledge Base & Document Pipeline
+
+- **Source-aware uploads**: Every document captures `source_type` (`file`, `url`, `integration`) so you can differentiate uploads from crawls or connectors.
+- **Backend-owned storage paths**: The server generates the MinIO key and stores it in the `source_url` column—never exposed to the browser.
+- **Lifecycle tracking**: Documents record ingestion `status` (`pending`, `processing`, `indexed`, `error`) to reflect RAG pipeline progress.
+- **Rich metadata**: `metadata` (JSONB) stores extra details (checksums, crawl summaries, etc.) so the UI can surface context about each knowledge source.
+- **Tenant isolation**: All document queries are scoped to `tenant_id`; downloads stream through FastAPI and validate bot ownership before fetching from MinIO.
+- **UI support**: The Bot Detail → “Manage Knowledge Base” tab shows source type, status, size, timestamps, and allows viewing/downloading/deleting without ever revealing storage credentials.
+
+### 🧪 Load/Stress Testing
+Need thousands of records to test pagination, embeds, or analytics? Use the backend seeding script:
+
+```bash
+cd backend
+python generate_test_data.py            # defaults: 1000 users, 5–6 bots each
+python generate_test_data.py --users 200 --min-bots 4 --max-bots 8
+```
+
+The script creates active “Test User N” accounts with realistic bot configurations (branding, guardrails, RAG settings) so every downstream feature has data. Never run this against production—it's only for local/staging environments.
 
 > Need additional routes? Extend the FastAPI routers under `backend/app/api/v1/` and add matching functions in `frontend/src/lib/api.ts`.
 
@@ -185,13 +213,22 @@ Access by clicking any bot card from the Bots page. Features include:
   - **Guardrails**: Response length, blocked phrases, content filters (explicit, political, personal info), custom instructions
 
 - **Manage Knowledge Base Tab**:
-  - View and manage uploaded documents
+  - View and manage uploaded documents with live status (`pending`, `processing`, `indexed`, `error`)
+  - Inspect source type (file, URL, integration) and metadata captured during ingestion
   - Manage crawled websites
-  - Add new documents or websites
+  - Add new documents or websites (uploads remain backend-only; storage paths are never exposed)
 
 - **Analytics Tab**: Detailed analytics and performance metrics (placeholder)
 
-- **Settings Tab**: Bot status controls, access settings, auto-respond configuration
+- **Settings Tab**: 
+  - Bot status controls (Enable Bot, Public Access, Auto-respond)
+  - **Installation Snippet Management**:
+    - View snippet details (usage count, last used, allowed domains)
+    - Edit snippet (domain allow-list, status)
+    - Copy embed code
+    - Revoke or delete snippet
+    - Auto-refresh every 30 seconds
+    - Manual refresh button
 
 - **Quick Actions**: Start/Pause/Stop bot, Edit, Share, Embed Code, Export Data, Delete (wired to backend actions)
 
@@ -209,11 +246,15 @@ Edit `src/index.css`:
 ```
 
 ### Per-Tenant Branding
-Branding data captured in the wizard is persisted to PostgreSQL. Bots may either:
-- Link to a reusable UI theme via `ui_config_id` (preferred);
-- Or fall back to their `branding` JSONB payload for legacy compatibility.
+Branding data captured in the wizard is persisted to PostgreSQL in the `branding` JSONB field. This includes:
+- Logo and avatar URLs
+- Primary and background colors
+- Welcome and intro messages
+- Assistant name and chat title
+- Widget positioning (bottom-right, bottom-left, etc.)
+- Widget sizing (height, width)
 
-The public embed endpoint (`/public/embed-config`) automatically resolves the best source and delivers runtime theming to `widget.js`.
+The public embed endpoint (`/public/embed-config`) reads from the `branding` JSONB field and delivers runtime theming to `widget.js`.
 
 ## 🧪 Widget Testing (Local)
 
@@ -221,27 +262,62 @@ To validate the production-style embed locally:
 
 1. **Start services**: `docker-compose up -d`, run `python backend/run.py`, and `npm run dev` from `frontend/`.
 2. **Create & activate a bot**: Finish the 7-step wizard (bots are auto-activated) or toggle status to `active` on the Bot Detail page.
-3. **Copy the embed snippet** from the Install step or Bot Detail → Embed Code:
+3. **Get the embed snippet**: 
+   - After bot creation, snippet is auto-created
+   - Or go to Bot Detail → Settings → Installation Snippet
+   - Copy the embed code (uses `data-snippet-id`, not `data-bot-id`)
+4. **Copy the embed snippet**:
    ```html
+   <!-- Add this before closing </body> tag -->
    <script 
      src="http://localhost:8000/static/widget.js"
-     data-bot-id="your-bot-slug-or-id"
+     data-snippet-id="0af28c2a-764a-425e-9043-2710aa1b1011"
      async>
    </script>
    ```
-4. **Drop it into HTML**: 
-   - Quick check: edit `backend/static/test.html` and swap in your bot ID or slug.  
+5. **Drop it into HTML**: 
+   - Quick check: edit `backend/static/test.html` and swap in your snippet ID.  
    - Or create your own page and paste the snippet before `</body>`.
-5. **Verify**: Only `ACTIVE` bots render. Theme, intro message, and positioning should match your bot. Use DevTools ↦ Network to inspect `/public/embed-config?bot_id=...` if debugging.
+6. **Verify**: 
+   - Only `ACTIVE` bots render
+   - Only `active` snippets work
+   - Domain allow-list is validated (if configured)
+   - Theme, intro message, and positioning match your bot
+   - Use DevTools ↦ Network to inspect `/public/embed-config?snippet_id=...` if debugging
 
-> Hard-refresh after updating branding or UI settings—the widget caches aggressively.
+> **Note**: The widget uses `data-snippet-id` (UUID) for security. Legacy `data-bot-id` is supported but deprecated.
+
+### Installation Snippet Features
+
+- **One Snippet Per Bot**: System automatically creates/updates one snippet per bot
+- **Domain Allow-List**: Restrict where snippet can be embedded
+- **Usage Tracking**: Tracks widget loads and chat messages
+- **Auto-Refresh**: Usage stats update every 30 seconds
+- **Manual Refresh**: Click "Refresh" button for immediate update
+- **Status Management**: Activate/revoke snippets without deleting
 
 ## 🔐 Security Features
 
+### Authentication & Authorization
+- **JWT Authentication**: Secure token-based authentication for all API endpoints
+- **Password Hashing**: bcrypt with automatic salt generation
+- **Token Expiration**: Configurable token expiration (default 7 days)
+- **User Status Management**: Active, pending verification, suspended states
+
+### Embed Security
+- **Short-Lived JWT Tokens**: Widgets receive 10-minute tokens (no API keys in frontend)
+- **Domain Allow-List**: Restrict where snippets can be embedded
+- **Snippet Status Management**: Active/revoked status control
+- **Bot Status Verification**: Only ACTIVE bots can be embedded
+- **One Snippet Per Bot**: Enforced to prevent confusion
+- **Origin Tracking**: Token includes request origin for audit
+
+### Data Security
 - **Input Validation**: All forms use Zod schemas
-- **Domain Allowlist**: Restrict embed origins
-- **Mock Auth**: Replace with JWT/session auth
-- **No Hardcoded Secrets**: Use environment variables in production
+- **SQL Injection Protection**: SQLAlchemy ORM prevents injection attacks
+- **Environment Variables**: All sensitive data in `.env` (gitignored)
+- **CORS Configuration**: Restricted to frontend domains
+- **No Hardcoded Secrets**: All secrets loaded from environment
 
 ## 🌙 Theme Toggle
 
@@ -322,6 +398,12 @@ VITE_ENVIRONMENT=production
 - [x] Collapsible sidebar navigation
 - [x] Connect real backend APIs
 - [x] Serve production-ready embed widget
+- [x] Production-grade embed security with JWT tokens
+- [x] Domain allow-list management
+- [x] Usage tracking (widget loads + chat messages)
+- [x] One snippet per bot enforcement
+- [x] Auto-refresh and manual refresh for snippet analytics
+- [x] Comprehensive documentation for embed security and code snippets
 - [ ] Add WebSocket-powered live analytics
 - [ ] Implement deep-chat conversation engine
 - [ ] Implement advanced auth flows (OAuth/SSO/SAML)

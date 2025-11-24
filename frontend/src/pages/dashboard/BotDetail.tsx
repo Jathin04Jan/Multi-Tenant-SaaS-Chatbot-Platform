@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getBot, type BotDTO, updateBot, getUiConfig, type UiConfigDTO, createUiConfig, updateUiConfig, mockUploadFile, mockStartCrawl } from '@/lib/api';
+import { getBot, type BotDTO, updateBot, getSnippetsForBot, createSnippet, updateSnippet, deleteSnippet, type InstallationSnippetDTO, uploadBotDocument, listBotDocuments, deleteBotDocument, downloadBotDocument, type BotDocumentDTO } from '@/lib/api';
 import { colorCombinations } from '@/lib/constants';
 import { styleOptions } from '@/components/bot-config';
 import {
@@ -23,6 +23,7 @@ import {
   Share2,
   Code,
   Download,
+  Eye,
   Upload,
   Globe,
   Shield,
@@ -31,6 +32,11 @@ import {
   ArrowLeft,
   Check,
   Save,
+  Code2,
+  Plus,
+  X,
+  ExternalLink,
+  Activity,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -80,21 +86,13 @@ const formatDate = (dateString: string): string => {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
-// Helper function to format time
-const formatTime = (dateString: string): string => {
-  const date = new Date(dateString);
-  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-};
-
-// Helper to get date or generate random date for existing docs
-const getDocumentDate = (source: any): string => {
-  const date = source.createdAt || source.updatedAt || source.created_at || source.updated_at;
-  if (date) return formatDate(date);
-  // Generate random date within last 90 days for existing docs
-  const daysAgo = Math.floor(Math.random() * 90);
-  const randomDate = new Date();
-  randomDate.setDate(randomDate.getDate() - daysAgo);
-  return formatDate(randomDate.toISOString());
+const formatFileSize = (bytes?: number | null): string => {
+  if (bytes === undefined || bytes === null) return 'Unknown size';
+  if (bytes === 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const index = Math.floor(Math.log(bytes) / Math.log(1024));
+  const value = bytes / Math.pow(1024, index);
+  return `${value.toFixed(1)} ${units[index]}`;
 };
 
 // Helper to get time or generate random time for existing docs
@@ -155,8 +153,6 @@ const BotDetail = () => {
   const [botName, setBotName] = useState('');
   const [welcomeMessage, setWelcomeMessage] = useState('');
   const [selectedColor, setSelectedColor] = useState('#6366f1');
-  const [uiConfigId, setUiConfigId] = useState<string | null>(null);
-  const [uiConfig, setUiConfig] = useState<UiConfigDTO | null>(null);
   
   // Document Upload/Crawl State
   const [crawlUrl, setCrawlUrl] = useState('');
@@ -177,6 +173,26 @@ const BotDetail = () => {
   const [strictlyStickToTopic, setStrictlyStickToTopic] = useState(true);
   const [blockPersonalInfo, setBlockPersonalInfo] = useState(true);
   const [customInstructions, setCustomInstructions] = useState('');
+
+  // Snippet Management State
+  const [snippets, setSnippets] = useState<InstallationSnippetDTO[]>([]);
+  const [snippetsLoading, setSnippetsLoading] = useState(false);
+  const [isRefreshingSnippets, setIsRefreshingSnippets] = useState(false);
+  const [isCreateSnippetDialogOpen, setIsCreateSnippetDialogOpen] = useState(false);
+  const [editingSnippet, setEditingSnippet] = useState<InstallationSnippetDTO | null>(null);
+  const [newSnippetDomains, setNewSnippetDomains] = useState<string[]>([]);
+  const [newDomainInput, setNewDomainInput] = useState('');
+  const [allowAllDomains, setAllowAllDomains] = useState(true);
+  
+  // Edit snippet domain state
+  const [editSnippetDomains, setEditSnippetDomains] = useState<string[]>([]);
+  const [editDomainInput, setEditDomainInput] = useState('');
+  const [editAllowAllDomains, setEditAllowAllDomains] = useState(true);
+
+  // Document Management State
+  const [documents, setDocuments] = useState<BotDocumentDTO[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [isUploadingDocument, setIsUploadingDocument] = useState(false);
 
   // Fetch bot data from API
   useEffect(() => {
@@ -202,41 +218,13 @@ const BotDetail = () => {
         // Initialize state from bot data
         setBotName(botData.name);
         
-        // Extract branding data
+        // Extract branding/UI configuration data from JSONB
         const branding = botData.branding as any || {};
-        setWelcomeMessage(branding.welcome_message || 'Hello! How can I help you today?');
+        setWelcomeMessage(branding.intro_message || branding.welcome_message || 'Hello! How can I help you today?');
         setSelectedColor(branding.primary_color || '#6366f1');
-        
-        // Load UI configuration if linked
-        if (botData.ui_config_id) {
-          try {
-            const uiConfigResponse = await getUiConfig(botData.ui_config_id);
-            if (uiConfigResponse.error) {
-              toast.warning(uiConfigResponse.error || 'Unable to load UI configuration. Using branding defaults.');
-              setUiConfigId(botData.ui_config_id);
-              setUiConfig(null);
-            } else {
-              const uiConfigData = uiConfigResponse.data;
-              setUiConfigId(uiConfigData.id);
-              setUiConfig(uiConfigData);
-              if (uiConfigData.chat_title) {
-                setBotName(uiConfigData.chat_title);
-              }
-              if (uiConfigData.intro_message) {
-                setWelcomeMessage(uiConfigData.intro_message);
-              }
-              if (uiConfigData.primary_color) {
-                setSelectedColor(uiConfigData.primary_color);
-              }
-            }
-          } catch (uiError) {
-            console.error('Error fetching UI config:', uiError);
-            setUiConfigId(botData.ui_config_id);
-            setUiConfig(null);
-          }
-        } else {
-          setUiConfigId(null);
-          setUiConfig(null);
+        // Use chat_title or assistant_name from branding if available
+        if (branding.chat_title || branding.assistant_name) {
+          setBotName(branding.chat_title || branding.assistant_name || botData.name);
         }
 
         // Extract LLM config
@@ -266,6 +254,116 @@ const BotDetail = () => {
 
     fetchBot();
   }, [botId, navigate]);
+
+  // Fetch snippets function (can be called manually or automatically)
+  const fetchSnippets = useCallback(async (showLoading = true) => {
+    if (!botId || !bot) return;
+
+    try {
+      if (showLoading) {
+        setSnippetsLoading(true);
+      } else {
+        setIsRefreshingSnippets(true);
+      }
+      const response = await getSnippetsForBot(botId);
+      
+      if (response.error) {
+        if (showLoading) {
+          toast.error(response.error || 'Failed to load snippets');
+        }
+        return;
+      }
+
+      setSnippets(response.data || []);
+    } catch (error) {
+      console.error('Error fetching snippets:', error);
+      if (showLoading) {
+        toast.error('Failed to load snippets');
+      }
+    } finally {
+      setSnippetsLoading(false);
+      setIsRefreshingSnippets(false);
+    }
+  }, [botId, bot]);
+
+  // Fetch snippets when bot is loaded
+  useEffect(() => {
+    if (bot) {
+      fetchSnippets(true);
+    }
+  }, [bot, fetchSnippets]);
+
+  const fetchDocuments = useCallback(
+    async (showToast = false) => {
+      if (!botId) return;
+      try {
+        setDocumentsLoading(true);
+        const response = await listBotDocuments(botId);
+        if (response.error) {
+          if (showToast) {
+            toast.error(response.error || 'Failed to load documents');
+          }
+          return;
+        }
+        setDocuments(response.data || []);
+      } catch (error) {
+        console.error('Error fetching documents:', error);
+        if (showToast) {
+          toast.error('Failed to load documents');
+        }
+      } finally {
+        setDocumentsLoading(false);
+      }
+    },
+    [botId]
+  );
+
+  useEffect(() => {
+    if (botId) {
+      fetchDocuments();
+    }
+  }, [botId, fetchDocuments]);
+
+  // Auto-refresh snippets every 30 seconds
+  useEffect(() => {
+    if (!botId || !bot) return;
+
+    const interval = setInterval(() => {
+      fetchSnippets(false); // Silent refresh (no loading spinner)
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [botId, bot, fetchSnippets]);
+
+  // Initialize edit snippet state when dialog opens
+  useEffect(() => {
+    if (editingSnippet) {
+      // Handle null, undefined, or empty array as "allow all domains"
+      const domains = editingSnippet.allowed_domains || [];
+      const hasDomains = domains.length > 0;
+      setEditSnippetDomains(hasDomains ? domains : []);
+      setEditAllowAllDomains(!hasDomains); // true if no domains (allow all), false if domains exist
+      setEditDomainInput('');
+      console.log('Initializing edit snippet:', { 
+        allowed_domains: editingSnippet.allowed_domains, 
+        domains, 
+        hasDomains,
+        editAllowAllDomains: !hasDomains 
+      }); // Debug log
+    } else {
+      setEditSnippetDomains([]);
+      setEditAllowAllDomains(true);
+      setEditDomainInput('');
+    }
+  }, [editingSnippet]);
+
+  // Update style prompt when communication style changes
+  useEffect(() => {
+    const selectedOption = styleOptions.find(opt => opt.value === communicationStyle);
+    if (selectedOption && (!stylePrompt || stylePrompt === selectedOption.defaultPrompt)) {
+      setStylePrompt(selectedOption.defaultPrompt);
+    }
+  }, [communicationStyle]);
 
   const handleStatusChange = async (newStatus: 'active' | 'paused' | 'stopped') => {
     if (!bot) return;
@@ -300,6 +398,53 @@ const BotDetail = () => {
     toast.success('Bot duplicated successfully');
   };
 
+  const handleDeleteDocument = async (documentId: string) => {
+    if (!botId) return;
+    try {
+      const response = await deleteBotDocument(documentId);
+      if (response.error) {
+        toast.error(response.error || 'Failed to delete document');
+        return;
+      }
+      setDocuments((docs) => docs.filter((doc) => doc.id !== documentId));
+      toast.success('Document deleted successfully');
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      toast.error('Failed to delete document');
+    }
+  };
+
+  const handleDownloadDocument = async (
+    documentId: string,
+    filename: string,
+    mode: 'download' | 'view' = 'download'
+  ) => {
+    try {
+      const response = await downloadBotDocument(documentId);
+      if (response.error || !response.data) {
+        toast.error(response.error || 'Failed to fetch document');
+        return;
+      }
+      const { blob, contentType } = response.data;
+      const url = URL.createObjectURL(blob);
+      if (mode === 'view') {
+        window.open(url, '_blank');
+      } else {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+      URL.revokeObjectURL(url);
+      toast.success(mode === 'view' ? 'Document opened' : 'Document downloaded');
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      toast.error('Failed to download document');
+    }
+  };
+
   const handleShowEmbedCode = (event?: React.MouseEvent) => {
     if (event) {
       event.stopPropagation();
@@ -313,8 +458,14 @@ const BotDetail = () => {
 
   const handleCopyEmbedCode = async () => {
     if (!bot) return;
+    // Get the first snippet (there should only be one per bot)
+    const snippet = snippets.length > 0 ? snippets[0] : null;
+    if (!snippet) {
+      toast.error('No snippet found. Please create a snippet first.');
+      return;
+    }
     const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    const embedCode = `<!-- Add this before closing </body> tag -->\n<script \n  src="${apiBase}/static/widget.js"\n  data-bot-id="${bot.slug || bot.id}"\n  async>\n</script>`;
+    const embedCode = `<!-- Add this before closing </body> tag -->\n<script \n  src="${apiBase}/static/widget.js"\n  data-snippet-id="${snippet.id}"\n  async>\n</script>`;
 
     try {
       await navigator.clipboard.writeText(embedCode);
@@ -325,61 +476,312 @@ const BotDetail = () => {
     }
   };
 
-  const handleSaveBotConfiguration = async (data: BrandingData) => {
+  // Snippet Management Handlers
+  const handleCreateSnippet = async () => {
+    if (!botId) return;
+
+    try {
+      const response = await createSnippet(botId, {
+        bot_id: botId,
+        status: 'active',
+        allowed_domains: allowAllDomains ? undefined : (newSnippetDomains.length > 0 ? newSnippetDomains : undefined),
+      });
+
+      if (response.error) {
+        toast.error(response.error || 'Failed to create snippet');
+        return;
+      }
+
+      toast.success('Snippet created successfully');
+      setIsCreateSnippetDialogOpen(false);
+      setNewSnippetDomains([]);
+      setNewDomainInput('');
+      setAllowAllDomains(true);
+      
+      // Refresh snippets list
+      const snippetsResponse = await getSnippetsForBot(botId);
+      if (!snippetsResponse.error) {
+        setSnippets(snippetsResponse.data || []);
+      }
+    } catch (error) {
+      console.error('Error creating snippet:', error);
+      toast.error('Failed to create snippet');
+    }
+  };
+
+  const handleUpdateSnippet = async (snippet: InstallationSnippetDTO) => {
+    try {
+      // Prepare the update payload
+      const updatePayload: any = {
+        status: snippet.status,
+      };
+
+      // Handle allowed_domains based on toggle
+      console.log('DEBUG Frontend: editAllowAllDomains:', editAllowAllDomains); // Debug log
+      console.log('DEBUG Frontend: editSnippetDomains:', editSnippetDomains); // Debug log
+      console.log('DEBUG Frontend: editSnippetDomains.length:', editSnippetDomains.length); // Debug log
+      
+      if (editAllowAllDomains) {
+        // If "Allow All Domains" is ON, send null explicitly to clear restrictions
+        updatePayload.allowed_domains = null;
+        console.log('DEBUG Frontend: Setting allowed_domains to null (allow all toggle is ON)'); // Debug log
+      } else {
+        // If "Allow All Domains" is OFF, send the domain list
+        // If no domains are specified, send null (which means allow all)
+        // This is a bit counterintuitive, but empty array gets converted to null anyway
+        if (editSnippetDomains.length > 0) {
+          updatePayload.allowed_domains = editSnippetDomains;
+          console.log('DEBUG Frontend: Setting allowed_domains to list:', editSnippetDomains); // Debug log
+        } else {
+          updatePayload.allowed_domains = null;
+          console.log('DEBUG Frontend: Setting allowed_domains to null (no domains in list)'); // Debug log
+        }
+      }
+
+      console.log('Updating snippet with payload:', updatePayload); // Debug log
+      const response = await updateSnippet(snippet.id, updatePayload);
+
+      if (response.error) {
+        toast.error(response.error || 'Failed to update snippet');
+        return;
+      }
+
+      console.log('Update response:', response.data); // Debug log
+
+      // Update the snippets list with the updated snippet from the response
+      if (response.data) {
+        setSnippets(prevSnippets => {
+          const updated = prevSnippets.map(s => 
+            s.id === response.data!.id ? response.data! : s
+          );
+          // If snippet not found in list, add it
+          if (!updated.find(s => s.id === response.data!.id)) {
+            updated.push(response.data!);
+          }
+          console.log('Updated snippets state:', updated); // Debug log
+          return updated;
+        });
+      } else {
+        // Fallback: refresh from server if response doesn't have data
+        if (botId) {
+          const snippetsResponse = await getSnippetsForBot(botId);
+          if (!snippetsResponse.error) {
+            console.log('Refreshed snippets:', snippetsResponse.data); // Debug log
+            setSnippets(snippetsResponse.data || []);
+          }
+        }
+      }
+
+      toast.success('Snippet updated successfully');
+      
+      // Close dialog and reset state after successful update
+      setEditingSnippet(null);
+      setEditSnippetDomains([]);
+      setEditDomainInput('');
+      setEditAllowAllDomains(true);
+    } catch (error) {
+      console.error('Error updating snippet:', error);
+      toast.error('Failed to update snippet');
+    }
+  };
+
+  const handleToggleSnippetStatus = async (snippet: InstallationSnippetDTO) => {
+    try {
+      const newStatus = snippet.status === 'active' ? 'revoked' : 'active';
+      const response = await updateSnippet(snippet.id, { status: newStatus });
+
+      if (response.error) {
+        toast.error(response.error || 'Failed to update snippet status');
+        return;
+      }
+
+      toast.success(`Snippet ${newStatus === 'active' ? 'activated' : 'revoked'} successfully`);
+      
+      // Refresh snippets list
+      if (botId) {
+        const snippetsResponse = await getSnippetsForBot(botId);
+        if (!snippetsResponse.error) {
+          setSnippets(snippetsResponse.data || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating snippet status:', error);
+      toast.error('Failed to update snippet status');
+    }
+  };
+
+  const handleDeleteSnippet = async (snippetId: string) => {
+    if (!confirm('Are you sure you want to delete this snippet? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await deleteSnippet(snippetId);
+
+      if (response.error) {
+        toast.error(response.error || 'Failed to delete snippet');
+        return;
+      }
+
+      toast.success('Snippet deleted successfully');
+      
+      // Refresh snippets list
+      if (botId) {
+        const snippetsResponse = await getSnippetsForBot(botId);
+        if (!snippetsResponse.error) {
+          setSnippets(snippetsResponse.data || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting snippet:', error);
+      toast.error('Failed to delete snippet');
+    }
+  };
+
+  const handleAddDomain = () => {
+    const domain = extractDomain(newDomainInput);
+    if (domain && !newSnippetDomains.includes(domain)) {
+      setNewSnippetDomains([...newSnippetDomains, domain]);
+      setNewDomainInput('');
+    } else if (domain && newSnippetDomains.includes(domain)) {
+      toast.error('Domain already added');
+    } else if (!domain) {
+      toast.error('Please enter a valid domain');
+    }
+  };
+
+  const handleRemoveDomain = (domain: string) => {
+    setNewSnippetDomains(newSnippetDomains.filter(d => d !== domain));
+  };
+
+  // Helper function to extract domain from URL or domain string
+  const extractDomain = (input: string): string | null => {
+    console.log('extractDomain called with input:', input);
+    
+    if (!input || typeof input !== 'string') {
+      console.log('extractDomain: input is empty or not a string');
+      return null;
+    }
+    
+    const trimmed = input.trim().toLowerCase();
+    console.log('extractDomain: trimmed:', trimmed);
+    
+    if (!trimmed) {
+      console.log('extractDomain: trimmed is empty');
+      return null;
+    }
+    
+    // If it's a URL, extract the hostname
+    try {
+      // Add protocol if missing for URL parsing
+      const urlString = trimmed.startsWith('http://') || trimmed.startsWith('https://') 
+        ? trimmed 
+        : `http://${trimmed}`;
+      console.log('extractDomain: trying to parse URL:', urlString);
+      const url = new URL(urlString);
+      const hostname = url.hostname;
+      console.log('extractDomain: extracted hostname:', hostname);
+      return hostname;
+    } catch (error) {
+      console.log('extractDomain: URL parsing failed, trying fallback:', error);
+      // If URL parsing fails, assume it's already a domain
+      // Remove protocol if present
+      const cleaned = trimmed.replace(/^https?:\/\//, '').split('/')[0].split('?')[0].split('#')[0];
+      console.log('extractDomain: cleaned domain:', cleaned);
+      const result = cleaned || null;
+      console.log('extractDomain: returning:', result);
+      return result;
+    }
+  };
+
+  const handleEditAddDomain = () => {
+    console.log('=== handleEditAddDomain CALLED ===');
+    console.log('editDomainInput:', editDomainInput);
+    console.log('editDomainInput.trim():', editDomainInput.trim());
+    
+    const domain = extractDomain(editDomainInput);
+    console.log('Extracted domain:', domain);
+    console.log('Current editSnippetDomains (before update):', editSnippetDomains);
+    
+    if (!domain) {
+      console.error('Domain extraction failed!');
+      toast.error('Please enter a valid domain (e.g., example.com or http://example.com)');
+      return;
+    }
+    
+    // Use functional update to ensure we have the latest state
+    setEditSnippetDomains(prevDomains => {
+      console.log('setEditSnippetDomains called with prevDomains:', prevDomains);
+      
+      if (prevDomains.includes(domain)) {
+        console.log('Domain already exists in list');
+        toast.error('Domain already added');
+        return prevDomains;
+      }
+      
+      const newDomains = [...prevDomains, domain];
+      console.log('New domains array:', newDomains);
+      
+      // Automatically turn OFF "Allow All Domains" when a domain is added
+      setEditAllowAllDomains(false);
+      
+      // Clear input
+      setEditDomainInput('');
+      
+      // Show success
+      toast.success(`Domain "${domain}" added successfully`);
+      
+      return newDomains;
+    });
+  };
+
+  const handleEditRemoveDomain = (domain: string) => {
+    const newDomains = editSnippetDomains.filter(d => d !== domain);
+    setEditSnippetDomains(newDomains);
+    // Automatically turn ON "Allow All Domains" when all domains are removed
+    if (newDomains.length === 0) {
+      setEditAllowAllDomains(true);
+      console.log('DEBUG Frontend: Turned ON Allow All Domains toggle (all domains removed)'); // Debug log
+    }
+    console.log('DEBUG Frontend: Removed domain, new editSnippetDomains:', newDomains); // Debug log
+  };
+
+  // Update style prompt when communication style changes
+  useEffect(() => {
+    const selectedOption = styleOptions.find(opt => opt.value === communicationStyle);
+    if (selectedOption && (!stylePrompt || stylePrompt === selectedOption.defaultPrompt)) {
+      setStylePrompt(selectedOption.defaultPrompt);
+    }
+  }, [communicationStyle]);
+
+  const handleSaveBotConfiguration = async () => {
     if (!bot) return;
 
     try {
       // Prepare UI config payload
-      const uiPayload = {
-        name: `${data.botName} Theme`,
-        primary_color: data.primaryColor,
-        background_color: '#0f172a',
-        chat_title: data.botName,
-        intro_message: data.welcomeMessage,
-        avatar_url: data.logoUrl || ((bot.branding as any) || {}).logo_url || null,
-        position: uiConfig?.position ?? 'bottom-right',
-        height: uiConfig?.height ?? 600,
-        width: uiConfig?.width ?? 400,
-      };
-
-      let currentUiConfigId = uiConfigId;
-
-      try {
-        if (currentUiConfigId) {
-          const uiUpdateResponse = await updateUiConfig(currentUiConfigId, uiPayload);
-          if (uiUpdateResponse.error) {
-            toast.error(uiUpdateResponse.error || 'Failed to update UI configuration');
-            return;
-          }
-          setUiConfigId(currentUiConfigId);
-          setUiConfig(uiUpdateResponse.data);
-        } else {
-          const uiCreateResponse = await createUiConfig(uiPayload);
-          if (uiCreateResponse.error) {
-            toast.error(uiCreateResponse.error || 'Failed to create UI configuration');
-            return;
-          }
-          currentUiConfigId = uiCreateResponse.data.id;
-          setUiConfigId(currentUiConfigId);
-          setUiConfig(uiCreateResponse.data);
-        }
-      } catch (uiError) {
-        console.error('Error saving UI config:', uiError);
-        toast.error('Failed to save UI configuration');
-        return;
-      }
-
+      // Update branding JSONB with all UI configuration
       const updatedBranding = {
         ...(bot.branding as any || {}),
-        welcome_message: data.welcomeMessage,
-        primary_color: data.primaryColor,
-        assistant_name: data.botName,
+        // Logo and avatar
+        logo_url: (bot.branding as any)?.logo_url || null,
+        avatar_url: (bot.branding as any)?.avatar_url || (bot.branding as any)?.logo_url || null,
+        // Colors
+        primary_color: selectedColor,
+        background_color: (bot.branding as any)?.background_color || '#ffffff',
+        // Messages
+        welcome_message: welcomeMessage,
+        intro_message: welcomeMessage,
+        assistant_name: botName,
+        chat_title: botName,
+        // Widget positioning and sizing (preserve existing or use defaults)
+        position: (bot.branding as any)?.position || 'bottom-right',
+        height: (bot.branding as any)?.height || 600,
+        width: (bot.branding as any)?.width || 400,
       };
 
       const response = await updateBot(bot.id, {
         name: data.botName,
         branding: updatedBranding,
-        ui_config_id: currentUiConfigId,
       });
 
       if (response.error) {
@@ -433,104 +835,25 @@ const BotDetail = () => {
     const file = e.target.files?.[0];
     if (!file || !bot) return;
 
-    setIsUploading(true);
     try {
-      await mockUploadFile(file);
-      
-      const retrievalConfig = bot.retrieval_config as any || {};
-      const dataSources = retrievalConfig.data_sources || [];
-      
-      const newSource = {
-        id: Date.now().toString(),
-        name: file.name,
-        type: 'upload' as const,
-        status: 'processing' as const,
-        updatedAt: new Date().toISOString(),
-      };
-
-      const updatedConfig = {
-        ...retrievalConfig,
-        data_sources: [...dataSources, newSource],
-      };
-
-      const response = await updateBot(bot.id, { retrieval_config: updatedConfig });
-      if (response.error) {
-        toast.error(response.error || 'Failed to upload document');
-        return;
-      }
-      setBot(response.data);
-      toast.success('File uploaded successfully!');
-      e.target.value = ''; // Reset input
-    } catch (error) {
-      toast.error('Failed to upload file');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleCrawl = async () => {
-    if (!crawlUrl.trim() || !bot) {
-      toast.error('Please enter a valid URL');
-      return;
-    }
-
-    setIsCrawling(true);
-    try {
-      await mockStartCrawl(crawlUrl);
-      
-      const retrievalConfig = bot.retrieval_config as any || {};
-      const dataSources = retrievalConfig.data_sources || [];
-      
-      const newSource = {
-        id: Date.now().toString(),
-        name: crawlUrl,
-        type: 'crawl' as const,
-        status: 'processing' as const,
-        updatedAt: new Date().toISOString(),
-      };
-
-      const updatedConfig = {
-        ...retrievalConfig,
-        data_sources: [...dataSources, newSource],
-      };
-
-      const response = await updateBot(bot.id, { retrieval_config: updatedConfig });
-      if (response.error) {
-        toast.error(response.error || 'Failed to start crawl');
-        return;
-      }
-      setBot(response.data);
-      setCrawlUrl('');
-      toast.success('Crawl started successfully!');
-    } catch (error) {
-      toast.error('Failed to start crawl');
-    } finally {
-      setIsCrawling(false);
-    }
-  };
-
-  const handleDeleteDataSource = async (sourceId: string) => {
-    if (!bot) return;
-
-    const retrievalConfig = bot.retrieval_config as any || {};
-    const dataSources = retrievalConfig.data_sources || [];
-    const updatedDataSources = dataSources.filter((source: any) => source.id !== sourceId);
-
-    const updatedConfig = {
-      ...retrievalConfig,
-      data_sources: updatedDataSources,
-    };
-
-    try {
-      const response = await updateBot(bot.id, { retrieval_config: updatedConfig });
+      setIsUploadingDocument(true);
+      const response = await uploadBotDocument(bot.id, file);
       if (response.error) {
         toast.error(response.error || 'Failed to delete document');
         return;
       }
-      setBot(response.data);
-      toast.success('Document deleted successfully!');
+      toast.success('Document uploaded successfully!');
+      e.target.value = '';
+      if (response.data) {
+        setDocuments((prev) => [response.data, ...prev]);
+      } else {
+        fetchDocuments();
+      }
     } catch (error) {
-      toast.error('Failed to delete document');
+      console.error('Error uploading document:', error);
+      toast.error('Failed to upload document');
+    } finally {
+      setIsUploadingDocument(false);
     }
   };
 
@@ -981,118 +1304,81 @@ const BotDetail = () => {
                 <CardDescription>Manage documents and data sources for your bot's knowledge base</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {(() => {
-                  const retrievalConfig = bot.retrieval_config as any || {};
-                  const dataSources = retrievalConfig.data_sources || [];
-                  
-                  if (dataSources.length === 0) {
-                    return (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                        <p>No data sources yet</p>
-                        <p className="text-sm mt-2">Add documents or websites to build your knowledge base</p>
-                      </div>
-                    );
-                  }
-                  
-                  return (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b border-border">
-                            <th className="text-left py-3 px-4 font-medium">Name</th>
-                            <th className="text-center py-3 px-4 font-medium">Type</th>
-                            <th className="text-center py-3 px-4 font-medium">Date &amp; Time</th>
-                            <th className="text-center py-3 px-4 font-medium">Status</th>
-                            <th className="text-center py-3 px-4 font-medium">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {dataSources.map((source: any) => {
-                            const normalizedStatus = normalizeStatus(source.status);
-                            return (
-                              <tr key={source.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                                <td className="py-3 px-4">
-                                  <div className="flex items-center gap-2">
-                                    {source.type === 'upload' ? (
-                                      <FileText className="w-4 h-4 text-muted-foreground" />
-                                    ) : (
-                                      <Globe className="w-4 h-4 text-muted-foreground" />
-                                    )}
-                                    <span className="font-medium">{source.name}</span>
-                                  </div>
-                                </td>
-                                <td className="py-3 px-4 text-sm text-muted-foreground text-center">
-                                  {getDocumentType(source)}
-                                </td>
-                                <td className="py-3 px-4 text-sm text-muted-foreground whitespace-nowrap text-center">
-                                  {getDocumentDate(source)} · {getDocumentTime(source)}
-                                </td>
-                                <td className="py-3 px-4 text-center">
-                                  <Badge
-                                    variant={
-                                      normalizedStatus === 'Processed' || normalizedStatus === 'Active'
-                                        ? 'default'
-                                        : normalizedStatus === 'Inactive'
-                                        ? 'destructive'
-                                        : 'outline'
-                                    }
-                                    className="capitalize"
-                                  >
-                                    {normalizedStatus}
-                                  </Badge>
-                                </td>
-                                <td className="py-3 px-4 text-center">
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm"
-                                    onClick={() => handleDeleteDataSource(source.id)}
-                                    className="text-foreground hover:bg-muted/50"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  );
-                })()}
-                
-                {/* File Upload */}
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-base">Upload Files</h3>
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-primary/30 rounded-xl cursor-pointer hover:border-primary/50 transition-colors">
-                    <Upload className="w-8 h-8 text-primary mb-2" />
-                    <span className="text-sm text-muted-foreground">Click to upload or drag and drop</span>
-                    <input
-                      type="file"
-                      className="hidden"
-                      onChange={handleFileUpload}
-                      disabled={isUploading}
-                      accept=".pdf,.doc,.docx,.txt,.md"
-                    />
-                  </label>
-                </div>
-
-                {/* Website Crawl */}
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-base">Crawl Website</h3>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="https://example.com"
-                      value={crawlUrl}
-                      onChange={(e) => setCrawlUrl(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button onClick={handleCrawl} disabled={isCrawling || !crawlUrl.trim()}>
-                      {isCrawling ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <Globe className="w-4 h-4 mr-2" />}
-                      Crawl
-                    </Button>
+                {documentsLoading ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <RefreshCw className="w-5 h-5 mx-auto mb-4 animate-spin" />
+                    <p>Loading documents…</p>
                   </div>
-                </div>
+                ) : documents.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>No documents yet</p>
+                    <p className="text-sm mt-2">Upload PDFs, DOCs, or text files to build your knowledge base.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {documents.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="flex flex-wrap items-center gap-3 p-4 border rounded-lg"
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-[200px]">
+                          <FileText className="w-5 h-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium">{doc.filename}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatFileSize(doc.size)} · Uploaded {formatDate(doc.created_at)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                            onClick={() => handleDownloadDocument(doc.id, doc.filename, 'view')}
+                          >
+                            <Eye className="w-4 h-4" />
+                            View
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1"
+                            onClick={() => handleDownloadDocument(doc.id, doc.filename, 'download')}
+                          >
+                            <Download className="w-4 h-4" />
+                            Download
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteDocument(doc.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <label className="block cursor-pointer">
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                    accept=".pdf,.doc,.docx,.txt,.md"
+                  />
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2"
+                    type="button"
+                    disabled={isUploadingDocument}
+                  >
+                    <Upload className={`w-4 h-4 ${isUploadingDocument ? 'animate-bounce' : ''}`} />
+                    {isUploadingDocument ? 'Uploading…' : 'Add Document'}
+                  </Button>
+                </label>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1152,9 +1438,419 @@ const BotDetail = () => {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Installation Snippet Section */}
+            <Card className="glass-card">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Code2 className="h-5 w-5" />
+                      Installation Snippet
+                    </CardTitle>
+                    <CardDescription>
+                      Your bot's embed code snippet with domain allow-list and analytics
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => fetchSnippets(true)}
+                    disabled={snippetsLoading || isRefreshingSnippets}
+                    className="gap-2"
+                    title="Refresh snippet data"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${isRefreshingSnippets ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {snippetsLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : snippets.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Code2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-sm">Snippet not found</p>
+                    <p className="text-xs mt-1">Snippets are automatically created when you create a bot.</p>
+                    <Button 
+                      onClick={() => setIsCreateSnippetDialogOpen(true)} 
+                      className="mt-4"
+                      variant="outline"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Snippet
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Show only the first snippet (there should only be one) */}
+                    {snippets.slice(0, 1).map((snippet) => (
+                      <Card key={snippet.id} className="border border-border/50">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 space-y-3">
+                              <div className="flex items-center gap-3">
+                                <h4 className="font-semibold">Installation Snippet</h4>
+                                <Badge variant={snippet.status === 'active' ? 'default' : 'secondary'}>
+                                  {snippet.status}
+                                </Badge>
+                              </div>
+                              
+                              {/* Analytics */}
+                              <div className="grid grid-cols-3 gap-4 text-sm">
+                                <div>
+                                  <p className="text-muted-foreground text-xs">Usage Count</p>
+                                  <p className="font-semibold flex items-center gap-1">
+                                    <Activity className="h-4 w-4" />
+                                    {snippet.usage_count || 0}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground text-xs">Last Used</p>
+                                  <p className="font-semibold">
+                                    {snippet.last_used_at 
+                                      ? formatTimeAgo(snippet.last_used_at)
+                                      : 'Never'}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-muted-foreground text-xs">Allowed Domains</p>
+                                  <p className="font-semibold">
+                                    {snippet.allowed_domains && snippet.allowed_domains.length > 0
+                                      ? `${snippet.allowed_domains.length} domain(s)`
+                                      : 'All domains'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Domain List */}
+                              {snippet.allowed_domains && snippet.allowed_domains.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                  {snippet.allowed_domains.map((domain, idx) => (
+                                    <Badge key={idx} variant="outline" className="text-xs">
+                                      <Globe className="h-3 w-3 mr-1" />
+                                      {domain}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Embed Code Preview */}
+                              <div className="mt-3 p-3 bg-muted rounded-lg">
+                                <p className="text-xs text-muted-foreground mb-2">Embed Code:</p>
+                                <code className="text-xs block break-all">
+                                  data-snippet-id="{snippet.id}"
+                                </code>
+                              </div>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex flex-col gap-2 ml-4">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+                                  const embedCode = `<!-- Add this before closing </body> tag -->
+<script 
+  src="${apiBase}/static/widget.js"
+  data-snippet-id="${snippet.id}"
+  async>
+</script>`;
+                                  navigator.clipboard.writeText(embedCode);
+                                  toast.success('Embed code copied!');
+                                }}
+                              >
+                                <Copy className="h-4 w-4 mr-2" />
+                                Copy Code
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setEditingSnippet(snippet)}
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleToggleSnippetStatus(snippet)}
+                              >
+                                {snippet.status === 'active' ? (
+                                  <>
+                                    <X className="h-4 w-4 mr-2" />
+                                    Revoke
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check className="h-4 w-4 mr-2" />
+                                    Activate
+                                  </>
+                                )}
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDeleteSnippet(snippet.id)}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </motion.div>
+      
+      {/* Create Snippet Dialog */}
+      <Dialog open={isCreateSnippetDialogOpen} onOpenChange={setIsCreateSnippetDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Create Installation Snippet</DialogTitle>
+            <DialogDescription>
+              Create a new embed code snippet with optional domain restrictions
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Allow All Domains</Label>
+                <p className="text-sm text-muted-foreground">
+                  Allow the snippet to be used on any domain (recommended for testing)
+                </p>
+              </div>
+              <Switch 
+                checked={allowAllDomains} 
+                onCheckedChange={(checked) => {
+                  setAllowAllDomains(checked);
+                  if (checked) {
+                    setNewSnippetDomains([]);
+                    setNewDomainInput('');
+                  }
+                }}
+              />
+            </div>
+            
+            {!allowAllDomains && (
+              <div>
+                <Label>Allowed Domains</Label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Add domains to restrict where the snippet can be used.
+                </p>
+                <div className="flex gap-2 mb-2">
+                  <Input
+                    value={newDomainInput}
+                    onChange={(e) => setNewDomainInput(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddDomain();
+                      }
+                    }}
+                    placeholder="example.com"
+                  />
+                  <Button type="button" onClick={handleAddDomain} variant="outline">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {newSnippetDomains.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {newSnippetDomains.map((domain, idx) => (
+                      <Badge key={idx} variant="secondary" className="flex items-center gap-1">
+                        <Globe className="h-3 w-3" />
+                        {domain}
+                        <button
+                          onClick={() => handleRemoveDomain(domain)}
+                          className="ml-1 hover:text-destructive"
+                          aria-label={`Remove domain ${domain}`}
+                          title={`Remove domain ${domain}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => {
+                setIsCreateSnippetDialogOpen(false);
+                setAllowAllDomains(true);
+                setNewSnippetDomains([]);
+                setNewDomainInput('');
+              }}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateSnippet}>
+                Create Snippet
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Snippet Dialog */}
+      <Dialog open={editingSnippet !== null} onOpenChange={(open) => !open && setEditingSnippet(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Snippet</DialogTitle>
+            <DialogDescription>
+              Update domain allow-list and status
+            </DialogDescription>
+          </DialogHeader>
+          {editingSnippet && (
+            <div className="space-y-4">
+              <div>
+                <Label>Status</Label>
+                <div className="flex gap-2 mt-2">
+                  <Button
+                    variant={editingSnippet.status === 'active' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setEditingSnippet({ ...editingSnippet, status: 'active' })}
+                  >
+                    Active
+                  </Button>
+                  <Button
+                    variant={editingSnippet.status === 'revoked' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setEditingSnippet({ ...editingSnippet, status: 'revoked' })}
+                  >
+                    Revoked
+                  </Button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Allow All Domains</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Allow the snippet to be used on any domain (recommended for testing)
+                  </p>
+                </div>
+                <Switch 
+                  checked={editAllowAllDomains} 
+                  onCheckedChange={(checked) => {
+                    setEditAllowAllDomains(checked);
+                    if (checked) {
+                      setEditSnippetDomains([]);
+                      setEditDomainInput('');
+                    }
+                  }}
+                />
+              </div>
+              
+              {!editAllowAllDomains && (
+                <div>
+                  <Label>Allowed Domains</Label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Add domains to restrict where the snippet can be used.
+                  </p>
+                  {/* Debug info - remove in production */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <div className="mb-2 p-2 bg-muted rounded text-xs space-y-1">
+                      <div><strong>Debug State:</strong></div>
+                      <div>Allow All: {editAllowAllDomains ? 'YES' : 'NO'}</div>
+                      <div>Domains Array: {JSON.stringify(editSnippetDomains)}</div>
+                      <div>Domain Count: {editSnippetDomains.length}</div>
+                      <div>Input Value: "{editDomainInput}"</div>
+                      <div>Input Length: {editDomainInput.length}</div>
+                    </div>
+                  )}
+                  <div className="flex gap-2 mb-2">
+                    <Input
+                      value={editDomainInput}
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        console.log('Input onChange:', newValue);
+                        setEditDomainInput(newValue);
+                      }}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          console.log('Enter key pressed in input');
+                          handleEditAddDomain();
+                        }
+                      }}
+                      placeholder="example.com or http://example.com"
+                    />
+                    <Button 
+                      type="button" 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('=== ADD BUTTON CLICKED ===');
+                        console.log('Event:', e);
+                        console.log('editDomainInput:', editDomainInput);
+                        console.log('editDomainInput.trim():', editDomainInput.trim());
+                        console.log('editAllowAllDomains:', editAllowAllDomains);
+                        console.log('editSnippetDomains:', editSnippetDomains);
+                        handleEditAddDomain();
+                      }} 
+                      variant="outline"
+                      disabled={!editDomainInput.trim()}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add
+                    </Button>
+                  </div>
+                  <div className="mt-2">
+                    {editSnippetDomains.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {editSnippetDomains.map((domain, idx) => (
+                          <Badge key={idx} variant="secondary" className="flex items-center gap-1">
+                            <Globe className="h-3 w-3" />
+                            {domain}
+                            <button
+                              onClick={() => handleEditRemoveDomain(domain)}
+                              className="ml-1 hover:text-destructive"
+                              aria-label={`Remove domain ${domain}`}
+                              title={`Remove domain ${domain}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">
+                        No domains added yet. Add a domain above to restrict where the snippet can be used.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => {
+                  setEditingSnippet(null);
+                  setEditSnippetDomains([]);
+                  setEditDomainInput('');
+                  setEditAllowAllDomains(true);
+                }}>
+                  Cancel
+                </Button>
+                <Button onClick={() => handleUpdateSnippet(editingSnippet)}>
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isEmbedDialogOpen} onOpenChange={setIsEmbedDialogOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -1164,21 +1860,41 @@ const BotDetail = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto border border-border/50">
+            {snippets.length > 0 ? (
+              <>
+                <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto border border-border/50">
 {`<!-- Add this before closing </body> tag -->
 <script 
   src="${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/static/widget.js"
-  data-bot-id="${bot?.slug || bot?.id || ''}"
+  data-snippet-id="${snippets[0].id}"
   async>
 </script>`}
-            </pre>
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>Your bot must stay <strong>active</strong> for this snippet to render.</span>
-              <Button onClick={handleCopyEmbedCode} size="sm" variant="outline">
-                <Copy className="w-4 h-4 mr-2" />
-                Copy
-              </Button>
-            </div>
+                </pre>
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>Your bot must stay <strong>active</strong> for this snippet to render.</span>
+                  <Button onClick={handleCopyEmbedCode} size="sm" variant="outline">
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-sm text-muted-foreground mb-4">
+                  No snippet found. Please create a snippet first in the Settings tab.
+                </p>
+                <Button 
+                  onClick={() => {
+                    setIsEmbedDialogOpen(false);
+                    // Navigate to Settings tab - you may need to add tab state management
+                  }}
+                  variant="outline"
+                  size="sm"
+                >
+                  Create Snippet
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

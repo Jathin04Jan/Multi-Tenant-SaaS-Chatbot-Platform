@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, Boolean, DateTime, Integer, ForeignKey
+from sqlalchemy import Column, String, Text, DateTime, Integer, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -41,30 +41,31 @@ class InstallationSnippet(Base):
         comment="Full JavaScript snippet for installation (the code users embed on their websites)"
     )
     
-    # Metadata & Organization
-    name = Column(
-        String(255),
-        nullable=True,
-        comment="Optional name/identifier for the snippet (e.g., 'Production', 'Staging', 'v1.0')"
-    )
-    environment = Column(
-        String(50),
-        nullable=True,
-        comment="Environment type: 'production', 'staging', 'development'"
-    )
-    is_active = Column(
-        Boolean,
-        default=True,
+    # Status field for production-ready snippet management
+    status = Column(
+        String(20),
+        default="active",
         nullable=False,
-        comment="Whether this snippet is currently active/enabled"
+        index=True,
+        comment="Snippet status: 'active' | 'revoked'"
     )
     
     # Security & Access Control
     domain_whitelist = Column(
         JSONB,
         nullable=True,
-        comment="List of allowed domains where this snippet can be used (null = no restrictions)"
+        comment="List of allowed domains where this snippet can be used (null = no restrictions). Stored as JSON array of strings."
     )
+    
+    # Alias for domain_whitelist (for compatibility with GPT's naming)
+    @property
+    def allowed_domains(self):
+        """Get allowed domains as a list."""
+        if self.domain_whitelist is None:
+            return None
+        if isinstance(self.domain_whitelist, list):
+            return self.domain_whitelist
+        return []
     
     # Usage Tracking
     usage_count = Column(
@@ -90,8 +91,17 @@ class InstallationSnippet(Base):
     
     # Relationships
     user = relationship("User", backref="installation_snippets")
-    bot = relationship("Bot", backref="installation_snippets")
+    bot = relationship(
+        "Bot",
+        backref="installation_snippets",
+        passive_deletes=True  # Let database CASCADE handle deletion, don't update FK to None
+    )
+    
+    @property
+    def is_active(self) -> bool:
+        """Computed property: snippet is active if status is 'active'."""
+        return self.status == "active"
     
     def __repr__(self):
-        return f"<InstallationSnippet(id={self.id}, bot_id={self.bot_id}, name={self.name}, is_active={self.is_active})>"
+        return f"<InstallationSnippet(id={self.id}, bot_id={self.bot_id}, status={self.status})>"
 

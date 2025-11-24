@@ -6,7 +6,7 @@
 
 1. **`users`** - User/Tenant accounts (users = tenants)
 2. **`bots`** - Bot/Agent configurations
-3. **`ui_configs`** - UI configuration themes for chatbots
+3. **`documents`** - Knowledge sources uploaded by tenants (stored in MinIO)
 4. **`installation_snippets`** - Embed codes and installation scripts
 
 ---
@@ -29,15 +29,19 @@ In this multi-tenant system, **users are tenants**. Each user account represents
 | `domain` | VARCHAR(255) | NULLABLE | Tenant domain (optional) |
 | `status` | ENUM | NOT NULL, DEFAULT 'pending_verification' | User status: active, pending_verification, suspended |
 | `plan` | VARCHAR(50) | NULLABLE | Subscription plan (free, pro, enterprise) |
-| `is_verified` | BOOLEAN | NOT NULL, DEFAULT false | Email verification status |
 | `settings` | JSONB | NULLABLE | Miscellaneous configuration (limits, billing IDs, etc.) |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
 
 #### Status Enum Values
-- `active` - User/tenant account is active
-- `pending_verification` - Account created but email not verified (default)
-- `suspended` - Account suspended (cannot login)
+- `active` - User/tenant account is active and verified (can log in)
+- `pending_verification` - Account created but email not verified (default, cannot log in)
+- `suspended` - Account suspended (cannot log in)
+
+**Note:** `is_verified` is a computed property (not a database column) derived from `status`:
+- `status == 'active'` → `is_verified = true`
+- `status == 'pending_verification'` → `is_verified = false`
+- `status == 'suspended'` → `is_verified = false`
 
 #### Indexes
 - Primary Key: `id` (UUID)
@@ -60,15 +64,11 @@ Stores all chatbot/bot configurations and settings for each user/tenant.
 | `user_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Owner/creator of the bot |
 | `name` | VARCHAR(255) | NOT NULL | Bot name |
 | `description` | TEXT | NULLABLE | Bot persona summary/description |
-| `slug` | VARCHAR(255) | NULLABLE, UNIQUE, INDEXED | URL-friendly identifier |
 | `status` | ENUM | NOT NULL, DEFAULT 'draft', INDEXED | Bot status: draft, active, paused, archived |
-| `is_active` | BOOLEAN | NOT NULL, DEFAULT true | Quick enable/disable toggle |
-| `last_deployed_at` | TIMESTAMP WITH TIME ZONE | NULLABLE | When bot was last deployed/activated |
 | `llm_config` | JSONB | NULLABLE | LLM configuration (model, temperature, style, etc.) |
 | `retrieval_config` | JSONB | NULLABLE | RAG/Retrieval configuration (Vector DB, filters, chunking, etc.) |
 | `guardrails` | JSONB | NULLABLE | Content guardrails (moderation, blocked phrases, filters) |
-| `branding` | JSONB | NULLABLE | Branding fallback (logo, colors, welcome message, assistant name, widget sizing) |
-| `ui_config_id` | UUID | FOREIGN KEY → ui_configs.id, NULLABLE, INDEXED | Optional UI configuration reference |
+| `branding` | JSONB | NULLABLE | Branding and UI configuration (logo, colors, welcome message, assistant name, widget sizing, positioning) |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
 
@@ -78,29 +78,9 @@ Stores all chatbot/bot configurations and settings for each user/tenant.
 - `paused` - Bot is temporarily disabled
 - `archived` - Bot is deactivated/removed
 
----
-
-### `ui_configs` Table
-
-Stores reusable UI configuration themes for chatbots.
-
-#### Columns
-
-| Column Name | Type | Constraints | Description |
-|------------|------|-------------|-------------|
-| `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique UI config identifier |
-| `user_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Owner/tenant reference |
-| `name` | VARCHAR(100) | NULLABLE | Optional name for this UI config |
-| `primary_color` | VARCHAR(20) | NULLABLE | Primary theme color (e.g., '#6366f1') |
-| `background_color` | VARCHAR(20) | NULLABLE | Background color (e.g., '#ffffff') |
-| `chat_title` | VARCHAR(150) | NULLABLE | Chat widget title |
-| `intro_message` | TEXT | NULLABLE | Welcome/intro message shown to users |
-| `avatar_url` | TEXT | NULLABLE | Avatar/logo URL for the chatbot |
-| `position` | VARCHAR(50) | NULLABLE | Widget position (e.g., 'bottom-right', 'bottom-left') |
-| `height` | INTEGER | NULLABLE | Chat window height in pixels |
-| `width` | INTEGER | NULLABLE | Chat window width in pixels |
-| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
-| `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
+**Note:** `is_active` is a computed property (not a database column) derived from `status`:
+- `status == 'active'` → `is_active = true`
+- `status == 'draft'/'paused'/'archived'` → `is_active = false`
 
 ---
 
@@ -117,15 +97,21 @@ Stores embed codes and script URLs for installing bots on customer websites.
 | `bot_id` | UUID | FOREIGN KEY → bots.id, NOT NULL, INDEXED, CASCADE DELETE | Bot reference - snippet is specific to this bot |
 | `script_url` | TEXT | NULLABLE | CDN-hosted script URL |
 | `embed_code` | TEXT | NOT NULL | Full JavaScript snippet for installation |
-| `name` | VARCHAR(255) | NULLABLE | Optional name/identifier (e.g., 'Production', 'Staging') |
-| `environment` | VARCHAR(50) | NULLABLE | Environment type: 'production', 'staging', 'development' |
-| `is_active` | BOOLEAN | NOT NULL, DEFAULT true | Whether this snippet is currently active/enabled |
-| `domain_whitelist` | JSONB | NULLABLE | List of allowed domains (null = no restrictions) |
-| `usage_count` | INTEGER | NOT NULL, DEFAULT 0 | Number of times this snippet has been used/accessed |
-| `last_used_at` | TIMESTAMP WITH TIME ZONE | NULLABLE | Timestamp when snippet was last accessed/used |
+| `status` | VARCHAR(20) | NOT NULL, DEFAULT 'active', INDEXED | Snippet status: 'active' | 'revoked' |
+| `domain_whitelist` | JSONB | NULLABLE | List of allowed domains (null = no restrictions, stored as JSON array) |
+| `usage_count` | INTEGER | NOT NULL, DEFAULT 0 | Number of times this snippet has been used/accessed (tracks widget loads + chat messages) |
+| `last_used_at` | TIMESTAMP WITH TIME ZONE | NULLABLE | Timestamp when snippet was last accessed/used (updated on widget load and chat messages) |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
 | `expires_at` | TIMESTAMP WITH TIME ZONE | NULLABLE | Optional expiry timestamp (null = never expires) |
+
+**Note:** `is_active` is a computed property (not a database column) derived from `status`:
+- `status == 'active'` → `is_active = true`
+- `status == 'revoked'` → `is_active = false`
+
+**Note:** `name` and `environment` fields were removed as they were redundant:
+- One snippet per bot is enforced, so environment distinction is unnecessary
+- Bot name already identifies the snippet, so a separate name field is redundant
 
 ---
 
@@ -144,7 +130,6 @@ CREATE TABLE users (
     domain VARCHAR(255),
     status user_status NOT NULL DEFAULT 'pending_verification',
     plan VARCHAR(50),
-    is_verified BOOLEAN NOT NULL DEFAULT false,
     settings JSONB,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -163,47 +148,19 @@ CREATE TABLE bots (
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    slug VARCHAR(255) UNIQUE,
     status bot_status NOT NULL DEFAULT 'draft',
-    is_active BOOLEAN NOT NULL DEFAULT true,
-    last_deployed_at TIMESTAMP WITH TIME ZONE,
     llm_config JSONB,
     retrieval_config JSONB,
     guardrails JSONB,
     branding JSONB,
-    ui_config_id UUID REFERENCES ui_configs(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_bots_user_id ON bots(user_id);
 CREATE INDEX idx_bots_id ON bots(id);
-CREATE INDEX idx_bots_slug ON bots(slug);
 CREATE INDEX idx_bots_status ON bots(status);
-CREATE INDEX idx_bots_ui_config_id ON bots(ui_config_id);
 CREATE INDEX idx_bots_created_at ON bots(created_at);
-```
-
-### UI Configs Table
-```sql
-CREATE TABLE ui_configs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    name VARCHAR(100),
-    primary_color VARCHAR(20),
-    background_color VARCHAR(20),
-    chat_title VARCHAR(150),
-    intro_message TEXT,
-    avatar_url TEXT,
-    position VARCHAR(50),
-    height INTEGER,
-    width INTEGER,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_ui_configs_user_id ON ui_configs(user_id);
-CREATE INDEX idx_ui_configs_id ON ui_configs(id);
 ```
 
 ### Installation Snippets Table
@@ -214,9 +171,7 @@ CREATE TABLE installation_snippets (
     bot_id UUID NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
     script_url TEXT,
     embed_code TEXT NOT NULL,
-    name VARCHAR(255),
-    environment VARCHAR(50),
-    is_active BOOLEAN NOT NULL DEFAULT true,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
     domain_whitelist JSONB,
     usage_count INTEGER NOT NULL DEFAULT 0,
     last_used_at TIMESTAMP WITH TIME ZONE,
@@ -228,9 +183,57 @@ CREATE TABLE installation_snippets (
 CREATE INDEX idx_installation_snippets_user_id ON installation_snippets(user_id);
 CREATE INDEX idx_installation_snippets_bot_id ON installation_snippets(bot_id);
 CREATE INDEX idx_installation_snippets_id ON installation_snippets(id);
-CREATE INDEX idx_installation_snippets_is_active ON installation_snippets(is_active);
+CREATE INDEX idx_installation_snippets_status ON installation_snippets(status);
 CREATE INDEX idx_installation_snippets_created_at ON installation_snippets(created_at);
 CREATE INDEX idx_installation_snippets_user_bot ON installation_snippets(user_id, bot_id);
+```
+
+### `documents` Table
+
+Stores tenant-uploaded knowledge sources that live in MinIO. The backend controls object paths and never exposes them to the frontend.
+
+#### Columns
+
+| Column Name | Type | Constraints | Description |
+|------------|------|-------------|-------------|
+| `id` | UUID | PRIMARY KEY, NOT NULL | Document identifier |
+| `tenant_id` | UUID | FOREIGN KEY → users.id, NOT NULL, ON DELETE CASCADE | Owner/tenant reference |
+| `bot_id` | UUID | FOREIGN KEY → bots.id, NOT NULL, ON DELETE CASCADE | Bot this document belongs to |
+| `source_type` | ENUM('file','url','integration') | NOT NULL, DEFAULT 'file' | Origin of the knowledge item |
+| `source_url` | VARCHAR(512) | NULLABLE | Storage key (uploads) or remote URL |
+| `filename` | VARCHAR(255) | NULLABLE | Original filename (nullable for URL/integration) |
+| `content_type` | VARCHAR(128) | NULLABLE | Stored mime type |
+| `size` | INTEGER | NULLABLE | File size (bytes) |
+| `status` | ENUM('pending','processing','indexed','error') | NOT NULL, DEFAULT 'pending' | Ingestion/indexing status |
+| `metadata` | JSONB | NULLABLE | Additional metadata (checksums, crawler info, etc.) |
+| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL | Upload timestamp |
+| `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last modification |
+
+#### Notes
+- Tenants never provide storage paths. The backend builds the MinIO key as `{tenant_id}/{bot_id}/{document_id}/{filename}` and persists it in `source_url`.
+- Queries always filter by `tenant_id` to enforce isolation.
+
+### Documents Table
+```sql
+CREATE TABLE documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    bot_id UUID NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+    source_type document_source_type NOT NULL DEFAULT 'file',
+    source_url VARCHAR(512),
+    filename VARCHAR(255),
+    content_type VARCHAR(128),
+    size INTEGER,
+    status document_status NOT NULL DEFAULT 'pending',
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_documents_tenant_id ON documents(tenant_id);
+CREATE INDEX idx_documents_bot_id ON documents(bot_id);
+CREATE INDEX idx_documents_status ON documents(status);
+CREATE INDEX idx_documents_source_type ON documents(source_type);
 ```
 
 ## Key Features
@@ -242,35 +245,27 @@ CREATE INDEX idx_installation_snippets_user_bot ON installation_snippets(user_id
 4. ✅ **`status`** - Enum with three states (active, pending_verification, suspended)
 5. ✅ **`plan`** - Subscription plan field
 6. ✅ **`settings`** - JSONB for miscellaneous configuration
+7. ✅ **`is_verified`** - Computed property from `status` (not stored in database)
 
 ### Bots Table:
 1. ✅ **`user_id`** - Foreign key to users (CASCADE DELETE)
 2. ✅ **`status`** - Enum with four states (draft, active, paused, archived)
-3. ✅ **`ui_config_id`** - Optional foreign key to ui_configs (SET NULL on delete)
+3. ✅ **`is_active`** - Computed property from `status` (not stored in database)
 4. ✅ **`llm_config`** - JSONB for LLM configuration (model, temperature, style, etc.)
 5. ✅ **`retrieval_config`** - JSONB for RAG/Vector DB configuration
 6. ✅ **`guardrails`** - JSONB for content moderation and safety rules
-7. ✅ **`branding`** - JSONB for logo, colors, welcome message, assistant name (fallback if no ui_config_id)
-8. ✅ **`slug`** - URL-friendly identifier for public bot URLs
-
-### UI Configs Table:
-1. ✅ **`user_id`** - Foreign key to users (CASCADE DELETE)
-2. ✅ **`primary_color`** - Primary theme color
-3. ✅ **`background_color`** - Background color
-4. ✅ **`chat_title`** - Chat widget title
-5. ✅ **`intro_message`** - Welcome/intro message
-6. ✅ **`avatar_url`** - Avatar/logo URL
-7. ✅ **`position`** - Widget position (bottom-right, bottom-left, etc.)
-8. ✅ **`height`** - Chat window height in pixels
-9. ✅ **`width`** - Chat window width in pixels
+7. ✅ **`branding`** - JSONB for all UI configuration (logo, colors, welcome message, assistant name, widget sizing, positioning)
 
 ### Installation Snippets Table:
 1. ✅ **`user_id` + `bot_id`** - Dual foreign keys for flexibility
-2. ✅ **`embed_code`** - Full JavaScript snippet for installation
-3. ✅ **`script_url`** - CDN-hosted script URL
-4. ✅ **`domain_whitelist`** - JSONB for security (restrict domains)
-5. ✅ **`usage_count` & `last_used_at`** - Analytics tracking
-6. ✅ **`expires_at`** - Optional expiry for time-limited access
+2. ✅ **`status`** - String field for status management ('active' | 'revoked')
+3. ✅ **`is_active`** - Computed property from `status` (not stored in database)
+4. ✅ **`embed_code`** - Full JavaScript snippet for installation (uses `data-snippet-id`)
+5. ✅ **`script_url`** - CDN-hosted script URL (optional)
+6. ✅ **`domain_whitelist`** - JSONB for security (restrict domains, null = allow all)
+7. ✅ **`usage_count` & `last_used_at`** - Analytics tracking (widget loads + chat messages)
+8. ✅ **`expires_at`** - Optional expiry for time-limited access
+9. ✅ **One snippet per bot** - System enforces one snippet per bot (existing snippets are updated, not duplicated)
 
 ## Example Data
 
@@ -284,7 +279,7 @@ CREATE INDEX idx_installation_snippets_user_bot ON installation_snippets(user_id
   "domain": "acme.com",
   "status": "active",
   "plan": "pro",
-  "is_verified": true,
+  "is_verified": true,  // Computed from status (status == 'active')
   "settings": {
     "max_users": 100,
     "max_bots": 50,
@@ -292,6 +287,49 @@ CREATE INDEX idx_installation_snippets_user_bot ON installation_snippets(user_id
   },
   "created_at": "2024-01-01T12:00:00Z",
   "updated_at": "2024-01-01T12:00:00Z"
+}
+```
+
+### Bot Example
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "Support Assistant",
+  "description": "A friendly customer support bot",
+  "status": "active",
+  "is_active": true,  // Computed from status (status == 'active')
+  "llm_config": {
+    "temperature": 0.7,
+    "communication_style": "friendly"
+  },
+  "branding": {
+    "primary_color": "#6366f1",
+    "welcome_message": "Hello! How can I help?",
+    "assistant_name": "Support Assistant",
+    "position": "bottom-right",
+    "height": 600,
+    "width": 400
+  },
+  "created_at": "2024-01-01T12:00:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+
+### Installation Snippet Example
+```json
+{
+  "id": "s1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "bot_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "status": "active",
+  "is_active": true,  // Computed from status (status == 'active')
+  "domain_whitelist": null,
+  "usage_count": 1250,
+  "last_used_at": "2024-01-15T10:30:00Z",
+  "created_at": "2024-01-01T12:00:00Z",
+  "updated_at": "2024-01-15T10:30:00Z",
+  "expires_at": null
 }
 ```
 

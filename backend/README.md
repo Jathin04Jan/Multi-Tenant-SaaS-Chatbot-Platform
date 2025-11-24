@@ -52,14 +52,33 @@ Once the server is running:
 - **GET** `/api/v1/auth/me` - Get current user profile
 - **PATCH** `/api/v1/auth/me` - Update profile details (full name, company, domain)
 
-## 🤖 Bot & UI Config Endpoints
+## 🤖 Bot Endpoints
 
 - **GET** `/api/v1/bots` - List bots for the current user
-- **POST** `/api/v1/bots` - Create a bot (branding, guardrails, llm_config, retrieval_config, ui_config linkage)
+- **POST** `/api/v1/bots` - Create a bot (branding, guardrails, llm_config, retrieval_config)
+- **GET** `/api/v1/bots/{bot_id}` - Get bot details
 - **PATCH** `/api/v1/bots/{bot_id}` - Update bot details and configuration
 - **DELETE** `/api/v1/bots/{bot_id}` - Delete a bot and its dependent records
-- **POST/GET/PATCH/DELETE** `/api/v1/ui-configs` - Manage reusable chatbot UI themes
-- **GET** `/public/embed-config?bot_id=...` - Public endpoint used by `static/widget.js` (ACTIVE bots only)
+
+## 📦 Installation Snippet Endpoints
+
+- **POST** `/api/v1/bots/{bot_id}/snippets` - Create or get installation snippet (one per bot, auto-created)
+- **GET** `/api/v1/bots/{bot_id}/snippets` - List snippets for a bot
+- **GET** `/api/v1/snippets/{snippet_id}` - Get snippet details
+- **PATCH** `/api/v1/snippets/{snippet_id}` - Update snippet (domain allow-list, status)
+- **DELETE** `/api/v1/snippets/{snippet_id}` - Delete a snippet
+
+## 📂 Document Endpoints
+
+- **POST** `/api/v1/bots/{bot_id}/documents` - Upload a document; backend records `source_type`, `status`, `metadata`, and a secure `source_url`
+- **GET** `/api/v1/bots/{bot_id}/documents` - List documents for a bot with ingestion status and source info
+- **GET** `/api/v1/documents/{document_id}` - Download a document (auth-required, streams via backend using `source_url`)
+- **DELETE** `/api/v1/documents/{document_id}` - Delete document entry + underlying MinIO object
+
+## 🌐 Public & Chat Endpoints
+
+- **GET** `/public/embed-config?snippet_id=...` - Public endpoint for widget configuration (returns JWT token, validates domain allow-list, ACTIVE bots only)
+- **POST** `/api/v1/chat` - Chat endpoint for embedded widgets (JWT-authenticated, tracks usage)
 
 ## 🏗️ Architecture
 
@@ -113,28 +132,48 @@ alembic upgrade head
 alembic downgrade -1
 ```
 
+### Generate Large Test Datasets
+
+Use the bundled seeding script to stress-test paging, embeds, and analytics with thousands of rows:
+
+```bash
+cd backend
+python generate_test_data.py            # 1000 users, 5–6 bots each
+python generate_test_data.py --users 200 --min-bots 4 --max-bots 8
+```
+
+Each user is created as “Test User N” with hashed credentials and 5–6 bots containing realistic branding, guardrails, and retrieval config. Only run this in local/staging environments—never against production.
+
 ## 🔒 Security Features
 
-- Password hashing with bcrypt
-- JWT token-based authentication
-- CORS configuration
-- SQL injection protection
-- Input validation with Pydantic
+### Authentication & Authorization
+- ✅ **JWT Authentication** - Secure token-based authentication for all API endpoints
+- ✅ **Password Hashing** - bcrypt with automatic salt generation
+- ✅ **Token Expiration** - Configurable token expiration (default 7 days)
+- ✅ **Protected Routes** - Token-based route protection with dependency injection
 
-## 🔒 Security
+### Embed Security
+- ✅ **Short-Lived JWT Tokens** - Widgets receive 10-minute tokens (no API keys in frontend)
+- ✅ **Domain Allow-List** - Restrict where snippets can be embedded
+- ✅ **Snippet Status Management** - Active/revoked status control
+- ✅ **Bot Status Verification** - Only ACTIVE bots can be embedded
+- ✅ **One Snippet Per Bot** - Enforced to prevent confusion
+- ✅ **Origin Tracking** - Token includes request origin for audit
 
-✅ **JWT Authentication** - Fully implemented with secure token generation and validation
-✅ **Password Hashing** - bcrypt with automatic salt generation
-✅ **Database Security** - Uses Docker container PostgreSQL only (no local DB)
-✅ **Protected Routes** - Token-based route protection
+### Data Security
+- ✅ **Database Security** - Uses Docker container PostgreSQL only (no local DB)
+- ✅ **CORS Configuration** - Restricted to frontend domains
+- ✅ **SQL Injection Protection** - SQLAlchemy ORM prevents injection attacks
+- ✅ **Input Validation** - Pydantic schemas validate all inputs
+- ✅ **Environment Variables** - All sensitive data in `.env` (gitignored)
 
-See `SECURITY.md` for detailed security documentation.
+See [SECURITY.md](docs/SECURITY.md) and [EMBED_SECURITY_AND_SNIPPETS.md](docs/EMBED_SECURITY_AND_SNIPPETS.md) for detailed security documentation.
 
 ## 📦 Services
 
 ### PostgreSQL (Database)
 - Container: `yourbot_postgres`
-- Port: `5432`
+- Host Port: `5433` (for local connections); container listens on `5432`
 - Connected via Docker container only
 
 ### MinIO (Object Storage)
@@ -145,6 +184,34 @@ See `SECURITY.md` for detailed security documentation.
 
 See `docs/MINIO_SETUP.md` for detailed MinIO setup instructions.
 
+## 📦 Installation Snippets & Usage Tracking
+
+### Snippet Management
+
+- **One Snippet Per Bot**: System automatically creates/updates one snippet per bot
+- **Auto-Creation**: Snippets are created automatically when bots are activated
+- **Domain Allow-List**: Restrict where snippets can be embedded
+- **Status Management**: Activate/revoke snippets without deleting
+- **Usage Analytics**: Track widget loads and chat messages
+
+### Usage Tracking
+
+The `usage_count` and `last_used_at` fields are updated in two scenarios:
+
+1. **Widget Load**: When widget calls `/public/embed-config` → increments count
+2. **Chat Messages**: When user sends message via `/api/v1/chat` → increments count again
+
+This provides comprehensive analytics showing both installations and actual engagement.
+
+### Domain Allow-List
+
+- **Automatic Extraction**: URLs are converted to hostnames (e.g., `http://example.com/page` → `example.com`)
+- **Real-time Validation**: Domain is checked on every widget load
+- **No Restrictions**: `null` domain_whitelist means "allow all domains"
+- **Frontend Management**: Users can add/remove domains via Bot Detail page
+
+See [EMBED_SECURITY_AND_SNIPPETS.md](docs/EMBED_SECURITY_AND_SNIPPETS.md) for complete documentation.
+
 ## 📖 Additional Documentation
 
 See the `docs/` directory for detailed guides:
@@ -152,6 +219,8 @@ See the `docs/` directory for detailed guides:
 - `DEV_WORKFLOW.md` - Development workflow guide
 - `SETUP_ENV.md` - Environment variables setup
 - `MIGRATIONS_VS_CREATE_ALL.md` - Migration best practices
+- `EMBED_SECURITY_AND_SNIPPETS.md` - Complete guide to embed security and code snippets
+- `INSTALLATION_SNIPPETS_SCHEMA.md` - Installation snippets table schema
 
 ## 🚀 Production Deployment
 

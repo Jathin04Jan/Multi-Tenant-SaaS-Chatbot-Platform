@@ -62,11 +62,13 @@ Visit http://localhost:8000/docs for interactive API documentation (Swagger UI)
 Create a `.env` file in the `backend/` directory:
 
 ```env
-DATABASE_URL=postgresql://yourbot_user:yourbot_password@localhost:5432/yourbot_db
+DATABASE_URL=postgresql://yourbot_user:yourbot_password@localhost:5433/yourbot_db
 SECRET_KEY=your-secret-key-change-in-production
 ACCESS_TOKEN_EXPIRE_MINUTES=10080
 CORS_ORIGINS=http://localhost:5173,http://localhost:8080
 ```
+
+**Note:** Port `5433` is used (not `5432`) because docker-compose.yml maps container port 5432 to host port 5433 to avoid conflicts with local PostgreSQL installations.
 
 ## API Endpoints
 
@@ -90,6 +92,18 @@ To change the API URL, set the environment variable in `frontend/.env`:
 VITE_API_URL=http://localhost:8000
 ```
 
+## Seed Data for Testing
+
+Need thousands of users/bots to exercise pagination or embeds? Use the seeding script:
+
+```bash
+cd backend
+python generate_test_data.py            # 1000 users, 5–6 bots each
+python generate_test_data.py --users 200 --min-bots 4 --max-bots 8
+```
+
+Each “Test User N” receives multiple bots with full branding/guardrails so every feature has data. Only run this in local/staging environments—never against production.
+
 ## Troubleshooting
 
 ### Database Connection Issues
@@ -106,7 +120,7 @@ VITE_API_URL=http://localhost:8000
 
 3. Test connection manually:
    ```bash
-   psql -h localhost -U yourbot_user -d yourbot_db
+   psql -h localhost -p 5433 -U yourbot_user -d yourbot_db
    ```
 
 ### Migration Issues

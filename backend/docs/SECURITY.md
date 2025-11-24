@@ -42,13 +42,14 @@ The backend is configured to connect to PostgreSQL running in the Docker contain
 
 ```python
 # Default connection (from docker-compose.yml)
-DATABASE_URL=postgresql://yourbot_user:yourbot_password@localhost:5432/yourbot_db
+DATABASE_URL=postgresql://yourbot_user:yourbot_password@localhost:5433/yourbot_db
 ```
 
 **Important**: 
-- The connection uses `localhost:5432`, which is the **Docker container port**
+- The connection uses `localhost:5433` (mapped from container port 5432)
 - No local PostgreSQL instance is used
 - All database operations go through the Docker container
+- Port 5433 is used to avoid conflicts with local PostgreSQL installations
 
 ### Connection Pooling
 
@@ -83,6 +84,40 @@ All sensitive credentials are stored in `.env` file (gitignored):
 
 5. **CORS Configuration**: Restrict origins to your frontend domains only
 
+## 🔐 Embed Token Security
+
+### Short-Lived JWT Tokens for Widgets
+
+The platform uses **short-lived JWT tokens** for secure widget-to-API communication:
+
+1. **Token Creation** (`app/core/embed_tokens.py`):
+   - Uses `python-jose` for JWT encoding/decoding
+   - Tokens signed with `EMBED_TOKEN_SECRET` (separate from main JWT secret)
+   - Default expiration: 10 minutes (configurable via `EMBED_TOKEN_TTL_MINUTES`)
+   - Tokens include: `tenant_id`, `bot_id`, `snippet_id`, `origin`, `iat`, `exp`
+
+2. **Token Flow**:
+   - Widget loads → calls `/public/embed-config?snippet_id=...`
+   - Backend validates snippet status and domain allow-list
+   - Backend generates short-lived JWT token
+   - Widget stores token and uses it for `/api/v1/chat` requests
+   - Token expires after configured TTL
+
+3. **Security Features**:
+   - ✅ **No API Keys in Frontend**: Tokens are generated server-side
+   - ✅ **Domain Validation**: Only allowed domains can receive tokens
+   - ✅ **Snippet Status Check**: Only `active` snippets can be embedded
+   - ✅ **Short Expiration**: Tokens expire quickly (default 10 minutes)
+   - ✅ **Origin Tracking**: Token includes request origin for audit
+   - ✅ **Bot Status Verification**: Only `ACTIVE` bots can be embedded
+
+### Domain Allow-List Security
+
+- **Domain Validation**: Snippets can restrict usage to specific domains
+- **Automatic Extraction**: URLs are automatically converted to hostnames
+- **Real-time Validation**: Domain is checked on every widget load
+- **No Restrictions**: `null` domain_whitelist means "allow all domains"
+
 ## 📝 Security Checklist
 
 - [x] JWT token-based authentication
@@ -94,4 +129,9 @@ All sensitive credentials are stored in `.env` file (gitignored):
 - [x] CORS configuration
 - [x] Input validation with Pydantic
 - [x] SQL injection protection (SQLAlchemy ORM)
+- [x] Short-lived embed tokens for widgets
+- [x] Domain allow-list validation
+- [x] Snippet status management (active/revoked)
+- [x] Bot status verification for embeds
+- [x] One snippet per bot enforcement
 

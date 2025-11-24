@@ -51,7 +51,12 @@ const App = () => (
     <ThemeInitializer />
     <TooltipProvider>
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          v7_relativeSplatPath: true,
+          v7_startTransition: true,
+        }}
+      >
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Landing />} />

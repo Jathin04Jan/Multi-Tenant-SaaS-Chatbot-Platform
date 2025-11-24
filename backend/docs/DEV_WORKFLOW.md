@@ -67,6 +67,7 @@ The `reset_db.py` script will:
 - ✅ Recreate all tables from your models
 - ✅ Delete all MinIO objects in the configured bucket
 - ✅ Reset everything for a clean development state (⚠️ development only!)
+- ✅ (As of the bot deletion hardening) removing a bot now also purges its MinIO objects automatically, so `reset_db.py` is the nuclear option for wiping *everything*.
 
 ### Usage:
 ```bash

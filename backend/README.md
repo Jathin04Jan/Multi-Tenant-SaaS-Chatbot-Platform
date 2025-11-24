@@ -70,10 +70,11 @@ Once the server is running:
 
 ## 📂 Document Endpoints
 
-- **POST** `/api/v1/bots/{bot_id}/documents` - Upload a document; backend records `source_type`, `status`, `metadata`, and a secure `source_url`
+- **POST** `/api/v1/bots/{bot_id}/documents` - Upload a document (PDF/DOC/DOCX/TXT up to 1 GB); backend records `source_type`, `status`, `metadata`, and a secure `source_url`
+- **POST** `/api/v1/bots/{bot_id}/documents/crawl` - Register a crawled website/URL (stored as metadata, no MinIO upload)
 - **GET** `/api/v1/bots/{bot_id}/documents` - List documents for a bot with ingestion status and source info
-- **GET** `/api/v1/documents/{document_id}` - Download a document (auth-required, streams via backend using `source_url`)
-- **DELETE** `/api/v1/documents/{document_id}` - Delete document entry + underlying MinIO object
+- **GET** `/api/v1/documents/{document_id}` - Download a document (auth-required, streams via backend using `source_url` for file uploads)
+- **DELETE** `/api/v1/documents/{document_id}` - Delete document entry + underlying MinIO object (for uploads)
 
 ## 🌐 Public & Chat Endpoints
 

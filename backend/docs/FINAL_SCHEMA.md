@@ -243,18 +243,19 @@ Tracks knowledge sources uploaded or linked by tenants. Files live in MinIO (or 
 | `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique document identifier |
 | `tenant_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Owner/tenant reference |
 | `bot_id` | UUID | FOREIGN KEY → bots.id, NOT NULL, INDEXED, CASCADE DELETE | Associated bot |
-| `source_type` | ENUM('file','url','integration') | NOT NULL, DEFAULT 'file' | Where the knowledge came from |
+| `source_type` | ENUM('file','url','integration') | NOT NULL, DEFAULT 'file' | Where the knowledge came from (file upload vs. crawled URL vs. integration) |
 | `source_url` | VARCHAR(512) | NULLABLE | Generated MinIO key for uploads or remote URL for crawls/integrations |
 | `filename` | VARCHAR(255) | NULLABLE | Original filename (null for URL/integration sources) |
 | `content_type` | VARCHAR(128) | NULLABLE | MIME type |
-| `size` | INTEGER | NULLABLE | File size (bytes) |
-| `status` | ENUM('pending','processing','indexed','error') | NOT NULL, DEFAULT 'pending' | Ingestion/indexing pipeline state |
+| `size` | INTEGER | NULLABLE | File size (bytes). Only populated for uploads; URLs usually have `NULL`. |
+| `status` | ENUM('pending','processing','indexed','error') | NOT NULL, DEFAULT 'pending' | Ingestion/indexing pipeline state. Crawled URLs remain `processing` until the crawler ingests them. |
 | `metadata` | JSONB | NULLABLE | Extra payload (checksums, crawl info, etc.) |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Upload timestamp |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last mutation timestamp |
 
 ### Notes
 - The backend generates a storage path `{tenant_id}/{bot_id}/{document_id}/{filename}` and saves it in `source_url`. Clients never provide this value.
+- File uploads are validated server-side: only PDF/DOC/DOCX/TXT are accepted and max size is 1 GB. URLs are stored as metadata only (no MinIO object) and can be managed just like files.
 - Every query must include `tenant_id = current_user.id` to maintain isolation.
 
 ## 📊 `installation_snippets` Table

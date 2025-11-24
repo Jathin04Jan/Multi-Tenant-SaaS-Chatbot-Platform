@@ -142,7 +142,7 @@ Multi-Tenant-SaaS-Chatbot-Platform/
 - **RAG Integration**: Vectorization and embedding generation pipeline visualization
 - **Navigation**: Collapsible sidebar with persistent state
 - **Widget Delivery**: Static `widget.js` served by FastAPI with runtime theming via `/public/embed-config`
-- **Document Storage**: Secure, tenant-scoped uploads to MinIO via backend-only APIs with tracked `source_type`, ingestion `status`, and backend-owned storage paths (`source_url`)
+- **Document Storage**: Secure, tenant-scoped uploads to MinIO via backend-only APIs with tracked `source_type`, ingestion `status`, and backend-owned storage paths (`source_url`). File uploads are limited to PDF/DOC/DOCX/TXT and ≤1 GB per file, while website/documentation URLs can be added as metadata-only documents and managed in the same Knowledge Base UI.
 
 ## 🔌 API Integration
 
@@ -155,6 +155,7 @@ Key endpoints:
 - `GET /api/v1/bots/{bot_id}/snippets` for listing snippets for a bot
 - `GET/PATCH/DELETE /api/v1/snippets/{snippet_id}` for installation snippet management
 - `POST /api/v1/bots/{bot_id}/documents` to upload files (backend creates records with `source_type`, `status`, `metadata`, and a secure `source_url`)
+- `POST /api/v1/bots/{bot_id}/documents/crawl` to register a website/document URL (stored as `source_type = url`, no MinIO upload)
 - `GET /api/v1/bots/{bot_id}/documents` to list docs for a bot (shows ingestion status + source info)
 - `GET/DELETE /api/v1/documents/{document_id}` to download or delete files securely
 - `GET /public/embed-config?snippet_id=...` to serve runtime embed configuration with JWT tokens (ACTIVE bots only)
@@ -215,8 +216,8 @@ Access by clicking any bot card from the Bots page. Features include:
 - **Manage Knowledge Base Tab**:
   - View and manage uploaded documents with live status (`pending`, `processing`, `indexed`, `error`)
   - Inspect source type (file, URL, integration) and metadata captured during ingestion
-  - Manage crawled websites
-  - Add new documents or websites (uploads remain backend-only; storage paths are never exposed)
+  - Manage crawled websites (add URLs directly; they’re stored as metadata and queued for ingestion)
+  - Add new documents (PDF, DOC, DOCX, or TXT up to 1 GB per file; uploads remain backend-only) or queue website URLs (no MinIO storage)
 
 - **Analytics Tab**: Detailed analytics and performance metrics (placeholder)
 

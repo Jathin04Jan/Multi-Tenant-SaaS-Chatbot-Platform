@@ -48,6 +48,11 @@ export interface BotDocumentDTO {
   updated_at: string;
 }
 
+export interface CrawlDocumentPayload {
+  url: string;
+  name?: string;
+}
+
 export interface JobDTO {
   id: string;
   type: 'ingest' | 'embed' | 'sync';
@@ -351,6 +356,16 @@ export const listBotDocuments = async (
   botId: string
 ): Promise<ApiResponse<BotDocumentDTO[]>> => {
   return apiRequest<BotDocumentDTO[]>(`/api/v1/bots/${botId}/documents`);
+};
+
+export const createCrawlDocument = async (
+  botId: string,
+  payload: CrawlDocumentPayload
+): Promise<ApiResponse<BotDocumentDTO>> => {
+  return apiRequest<BotDocumentDTO>(`/api/v1/bots/${botId}/documents/crawl`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 };
 
 export const deleteBotDocument = async (

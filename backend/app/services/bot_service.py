@@ -5,6 +5,8 @@ from typing import Dict, Any, Optional
 from app.models.bot import Bot, BotStatus
 from app.models.user import User
 from app.schemas.bot import BotCreate, BotUpdate
+from app.models.document import Document
+from app.core.minio_client import delete_file
 
 
 class BotService:
@@ -136,6 +138,20 @@ class BotService:
         
         if not bot:
             return False
+
+        # Cleanup related MinIO documents before removing DB rows
+        documents = db.query(Document).filter(Document.bot_id == bot_id).all()
+        for doc in documents:
+            if getattr(doc, "source_type", None) == "file":
+                source_url = getattr(doc, "source_url", None)
+                if source_url:
+                    try:
+                        delete_file(source_url)
+                    except Exception:
+                        # Swallow errors so DB deletion still proceeds; logs handled by caller
+                        pass
+            db.delete(doc)
+        db.flush()
         
         # Use raw SQL to delete the bot, bypassing SQLAlchemy's relationship management
         # This ensures database CASCADE handles snippet deletion without SQLAlchemy

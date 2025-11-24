@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Upload, Globe, Trash2, RefreshCw, ArrowRight, ArrowLeft, CheckCircle2, Bot, Circle } from 'lucide-react';
-import { mockStartCrawl, mockGetGuardrails, mockSaveGuardrails, createBot, updateBot, createSnippet, uploadBotDocument } from '@/lib/api';
+import { mockStartCrawl, mockGetGuardrails, mockSaveGuardrails, createBot, updateBot, createSnippet, uploadBotDocument, createCrawlDocument } from '@/lib/api';
 import { toast } from 'sonner';
 
 const steps = [
@@ -58,6 +58,15 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
   const [chatMessages, setChatMessages] = useState<Array<{ type: 'user' | 'bot'; message: string }>>([
     { type: 'bot', message: 'Hello! How can I help you today?' }
   ]);
+
+  const normalizeUrl = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    if (/^https?:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
+    return `https://${trimmed}`;
+  };
 
   const handleResetWizard = useCallback(() => {
     resetWizard();
@@ -207,6 +216,55 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     setPendingUploads({});
   };
 
+  const saveCrawledSources = async (botId: string) => {
+    const crawlSources = dataSources.filter((source) => source.type === 'crawl');
+    if (crawlSources.length === 0) {
+      return;
+    }
+
+    let successCount = 0;
+    for (const source of crawlSources) {
+      const url = source.url || source.name;
+      if (!url) {
+        continue;
+      }
+
+      try {
+        const response = await createCrawlDocument(botId, {
+          url: normalizeUrl(url),
+          name: source.name,
+        });
+
+        if (response.error) {
+          toast.error(response.error || `Failed to register ${url}`);
+          updateDataSource(source.id, {
+            status: 'failed',
+            updatedAt: new Date().toISOString(),
+          });
+        } else {
+          successCount += 1;
+          updateDataSource(source.id, {
+            status: 'indexed',
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      } catch (error) {
+        console.error('Error registering crawl source:', error);
+        toast.error(`Failed to register ${url}`);
+        updateDataSource(source.id, {
+          status: 'failed',
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(
+        `Registered ${successCount} website${successCount > 1 ? 's' : ''} for crawling`
+      );
+    }
+  };
+
   const handleCrawl = async () => {
     if (!crawlUrl.trim()) {
       toast.error('Please enter a valid URL');
@@ -215,11 +273,13 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
 
     setIsCrawling(true);
     try {
-      await mockStartCrawl(crawlUrl);
+      const normalizedUrl = normalizeUrl(crawlUrl);
+      await mockStartCrawl(normalizedUrl);
       addDataSource({
         id: Date.now().toString(),
         type: 'crawl',
-        name: crawlUrl,
+        name: normalizedUrl,
+        url: normalizedUrl,
         status: 'processing',
         updatedAt: new Date().toISOString(),
       });
@@ -362,6 +422,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           } else {
             toast.success('Bot created and activated successfully! 🎉');
             await uploadQueuedDocuments(response.data.id);
+            await saveCrawledSources(response.data.id);
             
             // Create installation snippet for the bot
             try {
@@ -526,29 +587,37 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
               <div className="glass-card p-6 space-y-4">
                 <h3 className="font-semibold text-base">Documents ({dataSources.length})</h3>
                 <div className="space-y-2">
-                  {dataSources.map((source) => (
-                    <div key={source.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        {source.type === 'upload' ? (
-                          <Upload className="w-4 h-4 text-muted-foreground" />
-                        ) : (
-                          <Globe className="w-4 h-4 text-muted-foreground" />
-                        )}
-                        <span className="text-sm font-medium">{source.name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {source.status}
-                        </Badge>
+                  {dataSources.map((source) => {
+                    const label = source.type === 'crawl' ? (source.url || source.name) : source.name;
+                    return (
+                      <div key={source.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          {source.type === 'upload' ? (
+                            <Upload className="w-4 h-4 text-muted-foreground" />
+                          ) : (
+                            <Globe className="w-4 h-4 text-muted-foreground" />
+                          )}
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium break-all">{label}</span>
+                            {source.type === 'crawl' && (
+                              <span className="text-xs text-muted-foreground">Website</span>
+                            )}
+                          </div>
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {source.status}
+                          </Badge>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveSource(source.id)}
+                          className="h-8 w-8"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveSource(source.id)}
-                        className="h-8 w-8"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

@@ -34,6 +34,7 @@ export interface DataSource {
   type: 'upload' | 'crawl';
   status: 'queued' | 'processing' | 'indexed' | 'failed';
   size?: number;
+  url?: string;
   updatedAt: string;
 }
 

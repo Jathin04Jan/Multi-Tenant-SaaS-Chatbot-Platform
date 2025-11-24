@@ -32,11 +32,13 @@ class DocumentService:
         db: Session,
         tenant_id: UUID,
         bot_id: UUID,
-        filename: str,
+        filename: Optional[str],
         content_type: Optional[str],
         source_type: str = "file",
         metadata: Optional[dict] = None,
         status: str = "pending",
+        source_url: Optional[str] = None,
+        size: Optional[int] = None,
     ) -> Document:
         doc = Document(
             tenant_id=tenant_id,
@@ -44,6 +46,8 @@ class DocumentService:
             filename=filename,
             content_type=content_type,
             source_type=source_type,
+            source_url=source_url,
+            size=size,
             status=status,
             metadata_payload=metadata,
         )
@@ -58,7 +62,7 @@ class DocumentService:
         document_id: UUID,
         tenant_id: UUID,
         source_url: str,
-        size: int,
+        size: Optional[int],
         content_type: Optional[str],
         status: str = "indexed",
     ) -> Document:
@@ -69,10 +73,10 @@ class DocumentService:
         )
         if not doc:
             raise ValueError("Document not found")
-        doc.source_url = source_url
-        doc.size = size
-        doc.content_type = content_type
-        doc.status = status
+        setattr(doc, "source_url", source_url)
+        setattr(doc, "size", size)
+        setattr(doc, "content_type", content_type)
+        setattr(doc, "status", status)
         db.commit()
         db.refresh(doc)
         return doc

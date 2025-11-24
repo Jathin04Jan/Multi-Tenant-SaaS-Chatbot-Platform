@@ -456,6 +456,14 @@ const BotDetail = () => {
     }
   };
 
+  const handleOpenExternalDocument = (document: BotDocumentDTO) => {
+    if (!document.source_url) {
+      toast.error('No URL available for this document');
+      return;
+    }
+    window.open(document.source_url, '_blank', 'noopener');
+  };
+
   const handleShowEmbedCode = (event?: React.MouseEvent) => {
     if (event) {
       event.stopPropagation();
@@ -1328,49 +1336,94 @@ const BotDetail = () => {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {documents.map((doc) => (
-                      <div
-                        key={doc.id}
-                        className="flex flex-wrap items-center gap-3 p-4 border rounded-lg"
-                      >
-                        <div className="flex items-center gap-3 flex-1 min-w-[200px]">
-                          <FileText className="w-5 h-5 text-muted-foreground" />
-                          <div>
-                            <p className="font-medium">{doc.filename}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatFileSize(doc.size)} · Uploaded {formatDate(doc.created_at)}
-                            </p>
+                    {documents.map((doc) => {
+                      const isExternal = doc.source_type === 'url';
+                      const displayName = doc.filename || doc.source_url || 'External source';
+                      const metaInfo = isExternal
+                        ? `${doc.source_url || 'Website'}`
+                        : `${formatFileSize(doc.size)} · Uploaded ${formatDate(doc.created_at)}`;
+
+                      return (
+                        <div
+                          key={doc.id}
+                          className="flex flex-wrap items-center gap-3 p-4 border rounded-lg"
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-[200px]">
+                            {isExternal ? (
+                              <Globe className="w-5 h-5 text-muted-foreground" />
+                            ) : (
+                              <FileText className="w-5 h-5 text-muted-foreground" />
+                            )}
+                            <div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-medium break-all">{displayName}</p>
+                                <Badge variant="outline" className="text-xs capitalize">
+                                  {isExternal ? 'Website' : 'File'}
+                                </Badge>
+                                <Badge variant="secondary" className="text-xs capitalize">
+                                  {doc.status}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground break-all">{metaInfo}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {isExternal ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => handleOpenExternalDocument(doc)}
+                                disabled={!doc.source_url}
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                                Open
+                              </Button>
+                            ) : (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1"
+                                  onClick={() =>
+                                    handleDownloadDocument(
+                                      doc.id,
+                                      doc.filename || 'document',
+                                      'view'
+                                    )
+                                  }
+                                >
+                                  <Eye className="w-4 h-4" />
+                                  View
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1"
+                                  onClick={() =>
+                                    handleDownloadDocument(
+                                      doc.id,
+                                      doc.filename || 'document',
+                                      'download'
+                                    )
+                                  }
+                                >
+                                  <Download className="w-4 h-4" />
+                                  Download
+                                </Button>
+                              </>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteDocument(doc.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1"
-                            onClick={() => handleDownloadDocument(doc.id, doc.filename, 'view')}
-                          >
-                            <Eye className="w-4 h-4" />
-                            View
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1"
-                            onClick={() => handleDownloadDocument(doc.id, doc.filename, 'download')}
-                          >
-                            <Download className="w-4 h-4" />
-                            Download
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteDocument(doc.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
                 <input

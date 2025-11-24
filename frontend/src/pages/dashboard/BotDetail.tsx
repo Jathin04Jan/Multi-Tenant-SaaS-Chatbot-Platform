@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getBot, type BotDTO, updateBot, getSnippetsForBot, createSnippet, updateSnippet, deleteSnippet, type InstallationSnippetDTO, uploadBotDocument, listBotDocuments, deleteBotDocument, downloadBotDocument, type BotDocumentDTO } from '@/lib/api';
@@ -203,6 +203,7 @@ const BotDetail = () => {
   const [documents, setDocuments] = useState<BotDocumentDTO[]>([]);
   const [documentsLoading, setDocumentsLoading] = useState(false);
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Fetch bot data from API
   useEffect(() => {
@@ -1372,23 +1373,24 @@ const BotDetail = () => {
                     ))}
                   </div>
                 )}
-                <label className="block cursor-pointer">
-                  <input
-                    type="file"
-                    className="hidden"
-                    onChange={handleFileUpload}
-                    accept=".pdf,.doc,.docx,.txt,.md"
-                  />
-                  <Button
-                    variant="outline"
-                    className="w-full gap-2"
-                    type="button"
-                    disabled={isUploadingDocument}
-                  >
-                    <Upload className={`w-4 h-4 ${isUploadingDocument ? 'animate-bounce' : ''}`} />
-                    {isUploadingDocument ? 'Uploading…' : 'Add Document'}
-                  </Button>
-                </label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                  accept=".pdf,.doc,.docx,.txt,.md"
+                  aria-label="Upload document"
+                />
+                <Button
+                  variant="outline"
+                  className="w-full gap-2"
+                  type="button"
+                  disabled={isUploadingDocument}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className={`w-4 h-4 ${isUploadingDocument ? 'animate-bounce' : ''}`} />
+                  {isUploadingDocument ? 'Uploading…' : 'Add Document'}
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Check, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,12 @@ export const BrandingConfig = ({
   const [botName, setBotName] = useState(initialData.botName || '');
   const [welcomeMessage, setWelcomeMessage] = useState(initialData.welcomeMessage || '');
   const [selectedColor, setSelectedColor] = useState(initialData.primaryColor || colorCombinations[0].primary);
+
+  useEffect(() => {
+    setBotName(initialData.botName || '');
+    setWelcomeMessage(initialData.welcomeMessage || '');
+    setSelectedColor(initialData.primaryColor || colorCombinations[0].primary);
+  }, [initialData.botName, initialData.welcomeMessage, initialData.primaryColor]);
 
   const handleSave = async () => {
     await onSave({

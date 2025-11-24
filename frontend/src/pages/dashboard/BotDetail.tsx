@@ -95,6 +95,16 @@ const formatFileSize = (bytes?: number | null): string => {
   return `${value.toFixed(1)} ${units[index]}`;
 };
 
+const formatTime = (dateString: string): string => {
+  const date = new Date(dateString);
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
 // Helper to get time or generate random time for existing docs
 const getDocumentTime = (source: any): string => {
   const date = source.createdAt || source.updatedAt || source.created_at || source.updated_at;
@@ -754,7 +764,7 @@ const BotDetail = () => {
     }
   }, [communicationStyle]);
 
-  const handleSaveBotConfiguration = async () => {
+  const handleSaveBotConfiguration = async (data: BrandingData) => {
     if (!bot) return;
 
     try {
@@ -766,13 +776,13 @@ const BotDetail = () => {
         logo_url: (bot.branding as any)?.logo_url || null,
         avatar_url: (bot.branding as any)?.avatar_url || (bot.branding as any)?.logo_url || null,
         // Colors
-        primary_color: selectedColor,
+        primary_color: data.primaryColor,
         background_color: (bot.branding as any)?.background_color || '#ffffff',
         // Messages
-        welcome_message: welcomeMessage,
-        intro_message: welcomeMessage,
-        assistant_name: botName,
-        chat_title: botName,
+        welcome_message: data.welcomeMessage,
+        intro_message: data.welcomeMessage,
+        assistant_name: data.botName,
+        chat_title: data.botName,
         // Widget positioning and sizing (preserve existing or use defaults)
         position: (bot.branding as any)?.position || 'bottom-right',
         height: (bot.branding as any)?.height || 600,

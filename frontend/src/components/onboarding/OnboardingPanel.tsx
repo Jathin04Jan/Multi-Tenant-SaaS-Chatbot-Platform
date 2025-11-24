@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Stepper } from '@/components/shell/Stepper';
 import { BrandingForm } from '@/components/onboarding/BrandingForm';
@@ -59,14 +59,40 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     { type: 'bot', message: 'Hello! How can I help you today?' }
   ]);
 
+  const handleResetWizard = useCallback(() => {
+    resetWizard();
+    setCurrentStep(1);
+    setPendingUploads({});
+    setCrawlUrl('');
+    setIsUploading(false);
+    setIsCrawling(false);
+    setCreatedBotId(null);
+    setCreatedSnippetId(null);
+    setIndexingStatus('idle');
+    setIndexingProgress(0);
+    setTestMessage('');
+    setChatMessages([{ type: 'bot', message: 'Hello! How can I help you today?' }]);
+  }, [
+    resetWizard,
+    setCurrentStep,
+    setPendingUploads,
+    setCrawlUrl,
+    setIsUploading,
+    setIsCrawling,
+    setCreatedBotId,
+    setCreatedSnippetId,
+    setIndexingStatus,
+    setIndexingProgress,
+    setTestMessage,
+    setChatMessages,
+  ]);
+
   // Reset wizard when panel opens
   useEffect(() => {
     if (open) {
-      resetWizard();
-      setCurrentStep(1);
-      setPendingUploads({});
+      handleResetWizard();
     }
-  }, [open, resetWizard, setCurrentStep]);
+  }, [open, handleResetWizard]);
 
   // Map steps with completion status
   // Only show steps as completed if they are completed AND current step is at or beyond that step

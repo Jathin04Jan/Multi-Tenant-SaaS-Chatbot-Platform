@@ -2,6 +2,7 @@ import { Bot } from 'lucide-react';
 import { useWizardStore } from '@/store/wizard';
 import { motion } from 'framer-motion';
 import { useEffect, useMemo } from 'react';
+import { resolveAssetUrl } from '@/lib/media';
 
 // Helper to extract RGB values from hex color
 const hexToRgb = (hex: string) => {
@@ -37,6 +38,8 @@ const getBackgroundGradient = (primaryColor: string) => {
 
 export const BotPreview = () => {
   const { branding, persona, tone } = useWizardStore();
+  const logoSrc = resolveAssetUrl(branding.logo);
+  const logoScale = branding.logoZoom ?? 1;
 
   // Generate message colors for user bubbles
   const messageColors = useMemo(
@@ -98,10 +101,19 @@ export const BotPreview = () => {
           }}
         >
           <div
-            className="w-10 h-10 rounded-full flex items-center justify-center shadow-sm"
-            style={{ backgroundColor: `${branding.primaryColor}25` }}
+            className="w-10 h-10 rounded-full flex items-center justify-center shadow-sm overflow-hidden border border-white/10 bg-white/5"
+            style={{ backgroundColor: logoSrc ? undefined : `${branding.primaryColor}25` }}
           >
-            <Bot className="w-5 h-5" style={{ color: branding.primaryColor }} />
+            {logoSrc ? (
+              <img
+                src={logoSrc}
+                alt="Bot logo preview"
+                className="h-full w-full object-cover transition-transform"
+                style={{ transform: `scale(${logoScale})` }}
+              />
+            ) : (
+              <Bot className="w-5 h-5" style={{ color: branding.primaryColor }} />
+            )}
           </div>
           <div className="flex-1">
             <div className="font-medium" style={{ color: branding.primaryColor }}>
@@ -120,13 +132,22 @@ export const BotPreview = () => {
         {/* Welcome Message */}
         <div className="flex gap-3 relative z-10">
           <div
-            className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-md transition-all duration-300"
+            className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-md transition-all duration-300 overflow-hidden border border-white/10 bg-white/5"
             style={{ 
-              backgroundColor: `${branding.primaryColor}30`,
+              backgroundColor: logoSrc ? undefined : `${branding.primaryColor}30`,
               boxShadow: `0 4px 12px ${branding.primaryColor}25`
             }}
           >
-            <Bot className="w-4 h-4" style={{ color: branding.primaryColor }} />
+            {logoSrc ? (
+              <img
+                src={logoSrc}
+                alt="Bot logo"
+                className="h-full w-full object-cover transition-transform"
+                style={{ transform: `scale(${logoScale})` }}
+              />
+            ) : (
+              <Bot className="w-4 h-4" style={{ color: branding.primaryColor }} />
+            )}
           </div>
           <div
             className="p-3 rounded-2xl rounded-tl-none max-w-[80%] backdrop-blur-md transition-all duration-300"
@@ -163,13 +184,22 @@ export const BotPreview = () => {
         {/* Sample Bot Response */}
         <div className="flex gap-3 relative z-10">
           <div
-            className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-md transition-all duration-300"
+            className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-md transition-all duration-300 overflow-hidden border border-white/10 bg-white/5"
             style={{ 
-              backgroundColor: `${branding.primaryColor}30`,
+              backgroundColor: logoSrc ? undefined : `${branding.primaryColor}30`,
               boxShadow: `0 4px 12px ${branding.primaryColor}25`
             }}
           >
-            <Bot className="w-4 h-4" style={{ color: branding.primaryColor }} />
+            {logoSrc ? (
+              <img
+                src={logoSrc}
+                alt="Bot logo"
+                className="h-full w-full object-cover transition-transform"
+                style={{ transform: `scale(${logoScale})` }}
+              />
+            ) : (
+              <Bot className="w-4 h-4" style={{ color: branding.primaryColor }} />
+            )}
           </div>
           <div 
             className="p-3 rounded-2xl rounded-tl-none max-w-[80%] backdrop-blur-md transition-all duration-300"

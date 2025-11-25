@@ -139,6 +139,14 @@ class BotService:
         if not bot:
             return False
 
+        branding = bot.branding or {}
+        logo_key = branding.get("logo_object_key")
+        if logo_key:
+            try:
+                delete_file(logo_key)
+            except Exception:
+                pass
+
         # Cleanup related MinIO documents before removing DB rows
         documents = db.query(Document).filter(Document.bot_id == bot_id).all()
         for doc in documents:

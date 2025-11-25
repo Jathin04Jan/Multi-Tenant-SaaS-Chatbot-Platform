@@ -76,6 +76,11 @@ Once the server is running:
 - **GET** `/api/v1/documents/{document_id}` - Download a document (auth-required, streams via backend using `source_url` for file uploads)
 - **DELETE** `/api/v1/documents/{document_id}` - Delete document entry + underlying MinIO object (for uploads)
 
+## 🖼️ Upload Endpoints
+
+- **POST** `/api/v1/uploads/logo` - Upload a bot/company logo (PNG/JPG/SVG up to 10 MB). Stores the file in MinIO and returns a URL suitable for the `branding.logo_url` field.
+- **GET** `/api/v1/uploads/logo/{encoded_key}` - Stream a previously uploaded logo (public read, cached).
+
 ## 🌐 Public & Chat Endpoints
 
 - **GET** `/public/embed-config?snippet_id=...` - Public endpoint for widget configuration (returns JWT token, validates domain allow-list, ACTIVE bots only)

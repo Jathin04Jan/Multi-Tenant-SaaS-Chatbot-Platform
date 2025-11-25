@@ -827,13 +827,32 @@ const BotDetail = () => {
     if (!bot) return;
 
     try {
-      // Prepare UI config payload
-      // Update branding JSONB with all UI configuration
+      const existingBranding = (bot.branding as any) || {};
+      const nextLogoUrl =
+        data.logoUrl !== undefined
+          ? data.logoUrl
+          : existingBranding.logo_url ?? null;
+      const nextAvatarUrl =
+        data.logoUrl !== undefined
+          ? data.logoUrl
+          : existingBranding.avatar_url ?? existingBranding.logo_url ?? null;
+      const nextLogoZoom =
+        data.logoZoom !== undefined
+          ? data.logoZoom
+          : existingBranding.logo_zoom ?? 1;
+      const nextLogoMetadata = data.logoMetadata ?? null;
+
       const updatedBranding = {
-        ...(bot.branding as any || {}),
+        ...existingBranding,
         // Logo and avatar
-        logo_url: (bot.branding as any)?.logo_url || null,
-        avatar_url: (bot.branding as any)?.avatar_url || (bot.branding as any)?.logo_url || null,
+        logo_url: nextLogoUrl,
+        avatar_url: nextAvatarUrl,
+        logo_zoom: nextLogoZoom,
+        logo_object_key: nextLogoMetadata?.objectKey ?? null,
+        logo_filename: nextLogoMetadata?.filename ?? null,
+        logo_content_type: nextLogoMetadata?.contentType ?? null,
+        logo_size: nextLogoMetadata?.size ?? null,
+        logo_uploaded_at: nextLogoMetadata?.uploadedAt ?? null,
         // Colors
         primary_color: data.primaryColor,
         background_color: (bot.branding as any)?.background_color || '#ffffff',
@@ -1308,7 +1327,16 @@ const BotDetail = () => {
                     welcomeMessage: welcomeMessage || '',
                     primaryColor: selectedColor || colorCombinations[0].primary,
                     logoUrl: ((bot.branding as any) || {}).logo_url,
+                    logoZoom: ((bot.branding as any) || {}).logo_zoom ?? 1,
+                    logoMetadata: {
+                      objectKey: ((bot.branding as any) || {}).logo_object_key ?? null,
+                      filename: ((bot.branding as any) || {}).logo_filename ?? null,
+                      contentType: ((bot.branding as any) || {}).logo_content_type ?? null,
+                      size: ((bot.branding as any) || {}).logo_size ?? null,
+                      uploadedAt: ((bot.branding as any) || {}).logo_uploaded_at ?? null,
+                    },
                   }}
+                  botId={bot.id}
                   onSave={handleSaveBotConfiguration}
                 />
               </CardContent>

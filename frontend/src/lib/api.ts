@@ -339,6 +339,20 @@ export const mockSaveDocument = async (doc: Omit<DocumentDTO, 'id' | 'createdAt'
 
 // ----- Real document upload endpoints -----
 
+export interface LogoMetadata {
+  url: string;
+  object_key?: string;
+  filename?: string;
+  content_type?: string;
+  size?: number;
+  uploaded_at?: string;
+}
+
+export interface LogoUploadResponse {
+  logo_url: string;
+  logo?: LogoMetadata;
+}
+
 export const uploadBotDocument = async (
   botId: string,
   file: File
@@ -347,6 +361,21 @@ export const uploadBotDocument = async (
   formData.append('file', file);
 
   return apiRequest<BotDocumentDTO>(`/api/v1/bots/${botId}/documents`, {
+    method: 'POST',
+    body: formData,
+  });
+};
+
+export const uploadBrandLogo = async (
+  file: File,
+  options?: { botId?: string }
+): Promise<ApiResponse<LogoUploadResponse>> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const query = options?.botId ? `?bot_id=${options.botId}` : '';
+
+  return apiRequest<LogoUploadResponse>(`/api/v1/uploads/logo${query}`, {
     method: 'POST',
     body: formData,
   });

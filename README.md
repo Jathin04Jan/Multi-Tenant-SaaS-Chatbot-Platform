@@ -143,6 +143,7 @@ Multi-Tenant-SaaS-Chatbot-Platform/
 - **Navigation**: Collapsible sidebar with persistent state
 - **Widget Delivery**: Static `widget.js` served by FastAPI with runtime theming via `/public/embed-config`
 - **Document Storage**: Secure, tenant-scoped uploads to MinIO via backend-only APIs with tracked `source_type`, ingestion `status`, and backend-owned storage paths (`source_url`). File uploads are limited to PDF/DOC/DOCX/TXT and ≤1 GB per file, while website/documentation URLs can be added as metadata-only documents and managed in the same Knowledge Base UI.
+- **Brand Assets**: Logo uploader stores PNG/JPG/SVG files (≤10 MB) in MinIO, lets users fine-tune a zoom slider, and persists both the URL and `logo_zoom` factor in the bot's branding so dashboards and embeds stay in sync.
 
 ## 🔌 API Integration
 
@@ -196,6 +197,7 @@ The script creates active “Test User N” accounts with realistic bot configur
 3. **7-Step Wizard** - Complete configuration in a centered modal dialog:
    - Configure branding, tone, data sources, indexing, guardrails, test, and install
 4. **Live Preview** - Real-time preview of bot appearance during configuration
+5. **Brand Assets** - Upload company logos (PNG/JPG/SVG up to 10 MB) with an inline zoom slider to perfectly center them in the circular avatar. Files are stored securely in MinIO and referenced via the bot's `branding.logo_url`.
 
 ### Bot Detail Page
 Access by clicking any bot card from the Bots page. Features include:

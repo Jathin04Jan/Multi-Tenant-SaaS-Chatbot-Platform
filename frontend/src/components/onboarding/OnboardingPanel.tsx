@@ -361,6 +361,12 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           // Logo and avatar
           logo_url: branding.logo || null,
           avatar_url: branding.logo || null,
+          logo_zoom: branding.logoZoom ?? 1,
+          logo_object_key: branding.logoMetadata?.objectKey || null,
+          logo_filename: branding.logoMetadata?.filename || null,
+          logo_content_type: branding.logoMetadata?.contentType || null,
+          logo_size: branding.logoMetadata?.size ?? null,
+          logo_uploaded_at: branding.logoMetadata?.uploadedAt || null,
           // Colors
           primary_color: branding.primaryColor || '#6366f1',
           background_color: '#ffffff',

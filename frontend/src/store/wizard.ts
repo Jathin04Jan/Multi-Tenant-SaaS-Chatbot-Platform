@@ -1,8 +1,18 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export interface BrandLogoMetadata {
+  objectKey?: string | null;
+  filename?: string | null;
+  contentType?: string | null;
+  size?: number | null;
+  uploadedAt?: string | null;
+}
+
 export interface BrandConfig {
-  logo?: string;
+  logo?: string | null;
+  logoMetadata?: BrandLogoMetadata | null;
+  logoZoom: number;
   primaryColor: string;
   welcomeMessage: string;
 }
@@ -108,6 +118,9 @@ const initialState = {
   tenantId: null,
   agentId: null,
   branding: {
+    logo: null,
+    logoMetadata: null,
+    logoZoom: 1,
     primaryColor: '#6366f1',
     welcomeMessage: 'Hello! How can I help you today?',
   },

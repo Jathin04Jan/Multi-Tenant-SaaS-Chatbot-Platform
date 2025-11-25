@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 
 ILLEGAL_CHARS = re.compile(r"[^A-Za-z0-9._-]")
@@ -33,5 +33,12 @@ def build_object_key(
     """Build a safe object key for storage in MinIO."""
     clean_name = sanitize_filename(filename)
     return f"{tenant_id}/{bot_id}/{document_id}/{clean_name}"
+
+
+def build_brand_logo_key(user_id: UUID, filename: str) -> str:
+    """Build object key for tenant branding logos."""
+    clean_name = sanitize_filename(filename)
+    unique = uuid4()
+    return f"brand-logos/{user_id}/{unique}-{clean_name}"
 
 

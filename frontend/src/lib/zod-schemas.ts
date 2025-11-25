@@ -45,7 +45,12 @@ export const brandingSchema = z.object({
     .trim()
     .min(1, { message: 'Assistant name required' })
     .max(50, { message: 'Must be less than 50 characters' }),
-  logo: z.string().optional(),
+  logo: z.string().min(1).optional().nullable(),
+  logoZoom: z
+    .number()
+    .min(0.5, { message: 'Logo zoom too small' })
+    .max(2, { message: 'Logo zoom too large' })
+    .default(1),
   primaryColor: z
     .string()
     .regex(/^#[0-9A-F]{6}$/i, { message: 'Invalid hex color' }),

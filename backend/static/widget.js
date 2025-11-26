@@ -72,6 +72,75 @@
     return config.intro_message;
   };
 
+  const hexToRgb = (hex) => {
+    const sanitized = hex?.replace('#', '') || '';
+    if (sanitized.length !== 6) return { r: 99, g: 102, b: 241 };
+    return {
+      r: parseInt(sanitized.substring(0, 2), 16),
+      g: parseInt(sanitized.substring(2, 4), 16),
+      b: parseInt(sanitized.substring(4, 6), 16)
+    };
+  };
+
+  const rgbaFromHex = (hex, alpha = 1) => {
+    const { r, g, b } = hexToRgb(hex);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+
+  const createHeaderGradient = (color) => {
+    const softer = rgbaFromHex(color, 0.7);
+    return `linear-gradient(135deg, ${color || '#6366f1'}, ${softer})`;
+  };
+
+  const createAvatarElement = ({
+    imageUrl,
+    fallbackText = 'B',
+    size = 36,
+    backgroundColor = '#e2e8f0',
+    textColor = '#0f172a'
+  }) => {
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = `
+      width: ${size}px;
+      height: ${size}px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: ${backgroundColor};
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: ${Math.max(12, Math.floor(size * 0.45))}px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: ${textColor};
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.15);
+      flex-shrink: 0;
+    `;
+
+    const label = (fallbackText || 'AI').trim() || 'AI';
+
+    if (imageUrl) {
+      const img = document.createElement('img');
+      img.src = imageUrl;
+      img.alt = label;
+      img.style.cssText = `
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      `;
+      img.onerror = () => {
+        wrapper.textContent = label.slice(0, 2);
+        wrapper.style.background = '#e2e8f0';
+      };
+      wrapper.appendChild(img);
+    } else {
+      wrapper.textContent = label.slice(0, 2);
+    }
+
+    return wrapper;
+  };
+
   // Create widget container
   function createWidget() {
     const theme = getTheme();
@@ -84,6 +153,8 @@
     const button = document.createElement('button');
     button.id = 'yourbot-widget-button';
     button.setAttribute('aria-label', 'Open chat');
+    // Set button background - will be overridden if logo loads successfully
+    const buttonBgColor = theme.primary_color || '#6366f1';
     button.style.cssText = `
       position: fixed;
       bottom: 20px;
@@ -91,7 +162,7 @@
       width: 60px;
       height: 60px;
       border-radius: 50%;
-      background: ${theme.primary_color};
+      background: ${buttonBgColor};
       border: none;
       cursor: pointer;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -100,12 +171,55 @@
       align-items: center;
       justify-content: center;
       transition: transform 0.2s;
+      overflow: hidden;
+      padding: 0;
     `;
-    button.innerHTML = `
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-      </svg>
-    `;
+    
+    // Use logo/avatar if available, otherwise use default icon
+    const avatarUrl = theme.avatar_url || theme.logo_url;
+    if (avatarUrl && avatarUrl.trim() !== '') {
+      console.log('YourBot Widget: Setting button logo from:', avatarUrl);
+      const logoImg = document.createElement('img');
+      logoImg.src = avatarUrl;
+      logoImg.alt = 'Chat bot avatar';
+      logoImg.style.cssText = `
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transform: scale(${theme.logo_zoom || 1.0});
+        display: block;
+        background: transparent;
+      `;
+      logoImg.onload = () => {
+        console.log('YourBot Widget: Button logo loaded successfully');
+        // Ensure button background is transparent when logo is loaded
+        button.style.background = 'transparent';
+      };
+      logoImg.onerror = (e) => {
+        console.error('YourBot Widget: Failed to load button logo:', avatarUrl, e);
+        console.error('YourBot Widget: Error details:', {
+          src: logoImg.src,
+          naturalWidth: logoImg.naturalWidth,
+          naturalHeight: logoImg.naturalHeight
+        });
+        // Fallback to icon if image fails to load
+        button.style.background = theme.primary_color;
+        button.innerHTML = `
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+        `;
+      };
+      button.appendChild(logoImg);
+    } else {
+      console.warn('YourBot Widget: No avatar_url in theme, using default icon. Theme:', theme);
+      button.innerHTML = `
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        </svg>
+      `;
+    }
+    
     button.onmouseover = () => button.style.transform = 'scale(1.1)';
     button.onmouseout = () => button.style.transform = 'scale(1)';
     button.onclick = toggleWidget;
@@ -130,8 +244,9 @@
 
     // Header
     const header = document.createElement('div');
+    const headerBackground = createHeaderGradient(theme.primary_color || '#6366f1');
     header.style.cssText = `
-      background: ${theme.primary_color};
+      background: ${headerBackground};
       color: white;
       padding: 16px;
       display: flex;
@@ -142,11 +257,39 @@
     const headerLeft = document.createElement('div');
     headerLeft.style.cssText = 'display: flex; align-items: center; gap: 12px;';
     
-    if (theme.avatar_url) {
+    const headerAvatarUrl = theme.avatar_url || theme.logo_url;
+    if (headerAvatarUrl && headerAvatarUrl.trim() !== '') {
+      console.log('YourBot Widget: Setting header avatar from:', headerAvatarUrl);
       const avatar = document.createElement('img');
-      avatar.src = theme.avatar_url;
-      avatar.style.cssText = 'width: 32px; height: 32px; border-radius: 50%;';
+      avatar.src = headerAvatarUrl;
+      avatar.alt = 'Chat bot avatar';
+      const logoZoom = theme.logo_zoom || 1.0;
+      avatar.style.cssText = `
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        object-fit: cover;
+        transform: scale(${logoZoom});
+        display: block;
+        flex-shrink: 0;
+        background: rgba(255, 255, 255, 0.2);
+      `;
+      avatar.onload = () => {
+        console.log('YourBot Widget: Header avatar loaded successfully');
+      };
+      avatar.onerror = (e) => {
+        console.error('YourBot Widget: Failed to load header avatar:', headerAvatarUrl, e);
+        console.error('YourBot Widget: Error details:', {
+          src: avatar.src,
+          naturalWidth: avatar.naturalWidth,
+          naturalHeight: avatar.naturalHeight
+        });
+        // Hide avatar if image fails to load
+        avatar.style.display = 'none';
+      };
       headerLeft.appendChild(avatar);
+    } else {
+      console.warn('YourBot Widget: No avatar_url in theme for header. Theme:', theme);
     }
     
     const headerText = document.createElement('div');
@@ -172,21 +315,22 @@
     messagesContainer.style.cssText = `
       flex: 1;
       overflow-y: auto;
-      padding: 16px;
+      padding: 20px;
       display: flex;
       flex-direction: column;
       gap: 12px;
-      background: #ffffff;
+      background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
     `;
 
     // Input area
     const inputArea = document.createElement('div');
     inputArea.style.cssText = `
-      padding: 12px;
+      padding: 16px;
       border-top: 1px solid #e5e7eb;
       display: flex;
-      gap: 8px;
+      gap: 10px;
       background: #ffffff;
+      box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.05);
     `;
     const input = document.createElement('input');
     input.id = 'yourbot-input';
@@ -215,7 +359,7 @@
       width: 40px;
       height: 40px;
       border-radius: 50%;
-      background: ${theme.primary_color};
+      background: ${createHeaderGradient(theme.primary_color || '#6366f1')};
       border: none;
       cursor: pointer;
       display: flex;
@@ -252,9 +396,47 @@
     if (button && theme.primary_color) {
       button.style.background = theme.primary_color;
     }
+    
+    // Update button logo/avatar if theme changes
+    if (button && theme.avatar_url) {
+      const existingImg = button.querySelector('img');
+      if (existingImg) {
+        existingImg.src = theme.avatar_url;
+        existingImg.style.transform = `scale(${theme.logo_zoom || 1.0})`;
+      } else {
+        // Create new image if it doesn't exist
+        const logoImg = document.createElement('img');
+        logoImg.src = theme.avatar_url;
+        logoImg.style.cssText = `
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transform: scale(${theme.logo_zoom || 1.0});
+        `;
+        logoImg.onerror = () => {
+          logoImg.style.display = 'none';
+        };
+        button.innerHTML = '';
+        button.appendChild(logoImg);
+      }
+    }
+    
     if (header && theme.primary_color) {
       header.style.background = theme.primary_color;
     }
+    
+    // Update header avatar if theme changes
+    if (header && theme.avatar_url) {
+      const headerLeft = header.querySelector('div:first-child');
+      if (headerLeft) {
+        const existingAvatar = headerLeft.querySelector('img');
+        if (existingAvatar) {
+          existingAvatar.src = theme.avatar_url;
+          existingAvatar.style.transform = `scale(${theme.logo_zoom || 1.0})`;
+        }
+      }
+    }
+    
     if (sendButton instanceof HTMLElement && theme.primary_color) {
       sendButton.style.background = theme.primary_color;
       sendButton.style.color = '#ffffff';
@@ -310,46 +492,73 @@
     const messagesContainer = document.getElementById('yourbot-messages');
     if (!messagesContainer) return;
 
-    const messageDiv = document.createElement('div');
-    messageDiv.style.cssText = `
-      margin-bottom: 12px;
+    const messageRow = document.createElement('div');
+    messageRow.style.cssText = `
+      margin-bottom: 16px;
       display: flex;
+      gap: 10px;
+      align-items: flex-end;
       justify-content: ${sender === 'user' ? 'flex-end' : 'flex-start'};
+      flex-direction: ${sender === 'user' ? 'row-reverse' : 'row'};
+      width: 100%;
     `;
 
-    // Get theme for colors
     const theme = getTheme();
     const primaryColor = theme?.primary_color || '#6366f1';
-    
-    // Convert hex to RGB for light color (bot messages) - works with any theme color
-    const hexToRgb = (hex) => {
-      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-      return result ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16)
-      } : { r: 99, g: 102, b: 241 }; // Default indigo
-    };
-    
-    const rgb = hexToRgb(primaryColor);
-    // Create light version of theme color (20% opacity for better visibility)
-    const lightColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)`;
+    const softAccent = rgbaFromHex(primaryColor, 0.15);
+    const gradientAccent = `linear-gradient(135deg, ${primaryColor}, ${rgbaFromHex(primaryColor, 0.8)})`;
 
     const bubble = document.createElement('div');
     bubble.style.cssText = `
-      max-width: 70%;
-      padding: 10px 16px;
-      border-radius: 18px;
-      background: ${sender === 'user' ? primaryColor : lightColor};
-      color: ${sender === 'user' ? 'white' : '#333'};
+      max-width: 85%;
+      padding: 14px 18px;
+      border-radius: 22px;
+      background: ${sender === 'user' ? gradientAccent : '#ffffff'};
+      color: ${sender === 'user' ? '#ffffff' : '#0f172a'};
       font-size: 14px;
-      line-height: 1.5;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      line-height: 1.6;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+      border: ${sender === 'user' ? 'none' : `1px solid ${softAccent}`};
+      backdrop-filter: blur(6px);
+      word-break: break-word;
     `;
+
     bubble.textContent = text;
 
-    messageDiv.appendChild(bubble);
-    messagesContainer.appendChild(messageDiv);
+    const bubbleColumn = document.createElement('div');
+    bubbleColumn.style.cssText = `
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: ${sender === 'user' ? 'flex-end' : 'flex-start'};
+      width: 100%;
+    `;
+    bubbleColumn.appendChild(bubble);
+
+    if (sender === 'bot') {
+      const meta = document.createElement('span');
+      meta.textContent = theme?.chat_title || 'Assistant';
+      meta.style.cssText = `
+        font-size: 11px;
+        color: #94a3b8;
+      `;
+      bubbleColumn.appendChild(meta);
+    }
+
+    if (sender === 'bot') {
+      const avatar = createAvatarElement({
+        imageUrl: theme?.avatar_url,
+        fallbackText: theme?.chat_title || 'AI',
+        size: 42,
+        backgroundColor: rgbaFromHex(primaryColor, 0.15),
+        textColor: primaryColor
+      });
+      messageRow.appendChild(avatar);
+    }
+
+    messageRow.appendChild(bubbleColumn);
+
+    messagesContainer.appendChild(messageRow);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
 
@@ -425,6 +634,9 @@
 
       config = await response.json();
       console.info('YourBot Widget: Config loaded', config);
+      console.info('YourBot Widget: Theme data:', config.theme);
+      console.info('YourBot Widget: Avatar URL:', config.theme?.avatar_url);
+      console.info('YourBot Widget: Logo Zoom:', config.theme?.logo_zoom);
 
       // Use API base URL from config if provided
       if (config.api_base) {

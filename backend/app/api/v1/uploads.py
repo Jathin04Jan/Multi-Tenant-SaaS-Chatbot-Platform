@@ -9,7 +9,7 @@ from typing import Any, Dict, Optional, cast
 from urllib.parse import quote, unquote
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -23,6 +23,21 @@ from app.utils.object_keys import build_brand_logo_key
 
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
+
+
+@router.options("/logo/{encoded_key:path}")
+async def options_logo(encoded_key: str):
+    """Handle CORS preflight requests for logo endpoint."""
+    from fastapi.responses import Response
+    return Response(
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Max-Age": "3600",
+        },
+    )
 
 
 @router.post("/logo")
@@ -114,8 +129,8 @@ async def upload_logo(
 
 
 @router.get("/logo/{encoded_key:path}")
-async def get_logo(encoded_key: str):
-    """Stream a previously uploaded logo from MinIO."""
+async def get_logo(encoded_key: str, request: Request):
+    """Stream a previously uploaded logo from MinIO. Public endpoint for widget embedding."""
     object_key = unquote(encoded_key)
     if not object_key.startswith("brand-logos/"):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Logo not found")
@@ -125,9 +140,21 @@ async def get_logo(encoded_key: str):
     except RuntimeError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Logo not found")
 
+    # Get origin from request for CORS
+    origin = request.headers.get("origin", "*")
+    
+    # Explicitly set CORS headers for image loading from any origin (widget embedding)
+    headers = {
+        "Cache-Control": "max-age=3600",
+        "Access-Control-Allow-Origin": "*",  # Allow all origins for public logo access
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+        "Access-Control-Expose-Headers": "*",
+    }
+
     return StreamingResponse(
         BytesIO(data),
         media_type=content_type or "application/octet-stream",
-        headers={"Cache-Control": "max-age=3600"},
+        headers=headers,
     )
 

@@ -123,12 +123,39 @@ async def get_embed_config(
         base_url = f"{request.url.scheme}://{request.url.netloc}"
         base_url = base_url.replace("/public/embed-config", "").rstrip("/")
         
+        # Get logo/avatar URL and ensure it's absolute
+        logo_url = branding.get("avatar_url") or branding.get("logo_url")
+        logger.info(f"Embed config: Original logo_url from branding: {logo_url}")
+        logger.info(f"Embed config: Branding keys: {list(branding.keys())}")
+        
+        if logo_url:
+            # If it's already an absolute URL, check if it's pointing to localhost or needs to be updated
+            if logo_url.startswith(("http://", "https://")):
+                # If it's pointing to localhost or a different domain, reconstruct using current request
+                from urllib.parse import urlparse
+                parsed = urlparse(logo_url)
+                # Reconstruct using the current request's base URL
+                if "/uploads/logo/" in logo_url:
+                    # Extract the encoded key from the URL
+                    encoded_key = logo_url.split("/uploads/logo/")[-1]
+                    api_prefix = "/api/v1"  # Standard API prefix
+                    logo_url = f"{base_url}{api_prefix}/uploads/logo/{encoded_key}"
+                    logger.info(f"Embed config: Reconstructed logo_url: {logo_url}")
+                # Otherwise keep the original URL if it's a valid external URL
+            else:
+                # If relative URL, make it absolute using the API base URL
+                logo_url = f"{base_url}{logo_url}" if logo_url.startswith("/") else f"{base_url}/{logo_url}"
+                logger.info(f"Embed config: Made logo_url absolute: {logo_url}")
+        else:
+            logger.warning(f"Embed config: No logo_url found in branding for bot {bot.id}")
+        
         # Build theme config from branding JSONB
         theme = {
             "primary_color": branding.get("primary_color", "#6366f1"),
             "background_color": branding.get("background_color", "#ffffff"),
             "chat_title": branding.get("chat_title") or branding.get("assistant_name") or bot.name,
-            "avatar_url": branding.get("avatar_url") or branding.get("logo_url"),
+            "avatar_url": logo_url,  # Will be None if no logo
+            "logo_zoom": branding.get("logo_zoom", 1.0),
             "position": branding.get("position", "bottom-right"),
             "height": branding.get("height", 600),
             "width": branding.get("width", 400),
@@ -181,6 +208,32 @@ async def get_embed_config(
             base_url = f"{request.url.scheme}://{request.url.netloc}"
             base_url = base_url.replace("/public/embed-config", "").rstrip("/")
             
+            # Get logo/avatar URL and ensure it's absolute
+            logo_url = branding.get("avatar_url") or branding.get("logo_url")
+            logger.info(f"Embed config (legacy): Original logo_url from branding: {logo_url}")
+            logger.info(f"Embed config (legacy): Branding keys: {list(branding.keys())}")
+            
+            if logo_url:
+                # If it's already an absolute URL, check if it's pointing to localhost or needs to be updated
+                if logo_url.startswith(("http://", "https://")):
+                    # If it's pointing to localhost or a different domain, reconstruct using current request
+                    from urllib.parse import urlparse
+                    parsed = urlparse(logo_url)
+                    # Reconstruct using the current request's base URL
+                    if "/uploads/logo/" in logo_url:
+                        # Extract the encoded key from the URL
+                        encoded_key = logo_url.split("/uploads/logo/")[-1]
+                        api_prefix = "/api/v1"  # Standard API prefix
+                        logo_url = f"{base_url}{api_prefix}/uploads/logo/{encoded_key}"
+                        logger.info(f"Embed config (legacy): Reconstructed logo_url: {logo_url}")
+                    # Otherwise keep the original URL if it's a valid external URL
+                else:
+                    # If relative URL, make it absolute using the API base URL
+                    logo_url = f"{base_url}{logo_url}" if logo_url.startswith("/") else f"{base_url}/{logo_url}"
+                    logger.info(f"Embed config (legacy): Made logo_url absolute: {logo_url}")
+            else:
+                logger.warning(f"Embed config (legacy): No logo_url found in branding for bot {bot.id}")
+            
             # Build response (legacy format - no token for backward compatibility)
             config = {
                 "bot_id": str(bot.id),
@@ -189,7 +242,8 @@ async def get_embed_config(
                     "primary_color": branding.get("primary_color", "#6366f1"),
                     "background_color": branding.get("background_color", "#ffffff"),
                     "chat_title": branding.get("chat_title") or branding.get("assistant_name") or bot.name,
-                    "avatar_url": branding.get("avatar_url") or branding.get("logo_url"),
+                    "avatar_url": logo_url,
+                    "logo_zoom": branding.get("logo_zoom", 1.0),
                     "position": branding.get("position", "bottom-right"),
                     "height": branding.get("height", 600),
                     "width": branding.get("width", 400),

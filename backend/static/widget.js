@@ -88,8 +88,25 @@
   };
 
   const createHeaderGradient = (color) => {
-    const softer = rgbaFromHex(color, 0.7);
-    return `linear-gradient(135deg, ${color || '#6366f1'}, ${softer})`;
+    const primary = color || '#f97316';
+    const vivid = rgbaFromHex(primary, 0.9);
+    const deep = rgbaFromHex(primary, 0.6);
+    return `linear-gradient(135deg, ${vivid}, ${deep})`;
+  };
+
+  const createGlassPanel = ({
+    tintColor = '#6366f1',
+    border = '1px solid rgba(255, 255, 255, 0.08)',
+    blur = 24,
+    opacity = 0.65
+  } = {}) => {
+    const tinted = rgbaFromHex(tintColor, opacity);
+    return `
+      background: linear-gradient(145deg, rgba(15, 23, 42, 0.55), ${tinted});
+      border: ${border};
+      backdrop-filter: blur(${blur}px);
+      -webkit-backdrop-filter: blur(${blur}px);
+    `;
   };
 
   const createAvatarElement = ({
@@ -128,6 +145,7 @@
         height: 100%;
         object-fit: cover;
         display: block;
+        white-space: nowrap;
       `;
       img.onerror = () => {
         wrapper.textContent = label.slice(0, 2);
@@ -141,6 +159,38 @@
     return wrapper;
   };
 
+  let tooltipElement = null;
+
+  function ensureTooltip(text) {
+    if (!tooltipElement) {
+      tooltipElement = document.createElement('div');
+      tooltipElement.id = 'yourbot-widget-tooltip';
+      tooltipElement.style.cssText = `
+        position: fixed;
+        padding: 8px 12px;
+        border-radius: 10px;
+        background: rgba(15, 23, 42, 0.9);
+        color: white;
+        font-size: 12px;
+        box-shadow: 0 10px 35px rgba(15, 23, 42, 0.25);
+        pointer-events: none;
+        opacity: 0;
+        transform: translate(-50%, -6px);
+        transition: opacity 0.15s ease, transform 0.15s ease;
+        z-index: 10000;
+      `;
+      document.body.appendChild(tooltipElement);
+    }
+    tooltipElement.textContent = text;
+    return tooltipElement;
+  }
+
+  function hideTooltipImmediate() {
+    if (tooltipElement) {
+      tooltipElement.style.opacity = '0';
+    }
+  }
+
   // Create widget container
   function createWidget() {
     const theme = getTheme();
@@ -153,7 +203,6 @@
     const button = document.createElement('button');
     button.id = 'yourbot-widget-button';
     button.setAttribute('aria-label', 'Open chat');
-    // Set button background - will be overridden if logo loads successfully
     const buttonBgColor = theme.primary_color || '#6366f1';
     button.style.cssText = `
       position: fixed;
@@ -162,10 +211,10 @@
       width: 60px;
       height: 60px;
       border-radius: 50%;
-      background: ${buttonBgColor};
+      background: ${createHeaderGradient(buttonBgColor)};
       border: none;
       cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.25);
       z-index: 9998;
       display: flex;
       align-items: center;
@@ -173,53 +222,39 @@
       transition: transform 0.2s;
       overflow: hidden;
       padding: 0;
+      color: white;
     `;
-    
-    // Use logo/avatar if available, otherwise use default icon
-    const avatarUrl = theme.avatar_url || theme.logo_url;
-    if (avatarUrl && avatarUrl.trim() !== '') {
-      console.log('YourBot Widget: Setting button logo from:', avatarUrl);
-      const logoImg = document.createElement('img');
-      logoImg.src = avatarUrl;
-      logoImg.alt = 'Chat bot avatar';
-      logoImg.style.cssText = `
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        transform: scale(${theme.logo_zoom || 1.0});
-        display: block;
-        background: transparent;
-      `;
-      logoImg.onload = () => {
-        console.log('YourBot Widget: Button logo loaded successfully');
-        // Ensure button background is transparent when logo is loaded
-        button.style.background = 'transparent';
-      };
-      logoImg.onerror = (e) => {
-        console.error('YourBot Widget: Failed to load button logo:', avatarUrl, e);
-        console.error('YourBot Widget: Error details:', {
-          src: logoImg.src,
-          naturalWidth: logoImg.naturalWidth,
-          naturalHeight: logoImg.naturalHeight
-        });
-        // Fallback to icon if image fails to load
-        button.style.background = theme.primary_color;
-        button.innerHTML = `
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-          </svg>
-        `;
-      };
-      button.appendChild(logoImg);
-    } else {
-      console.warn('YourBot Widget: No avatar_url in theme, using default icon. Theme:', theme);
-      button.innerHTML = `
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-        </svg>
-      `;
-    }
-    
+    button.innerHTML = `
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke-linecap="round" stroke-linejoin="round"></path>
+        <polyline points="7 8 13 8 13 12" stroke-linecap="round" stroke-linejoin="round"></polyline>
+      </svg>
+    `;
+
+    const tooltip = ensureTooltip(`Chat with ${theme.chat_title || 'your assistant'}`);
+    const positionTooltip = () => {
+      if (!tooltip) return;
+      const rect = button.getBoundingClientRect();
+      tooltip.style.left = `${rect.left + rect.width / 2}px`;
+      tooltip.style.top = `${rect.top - 10}px`;
+    };
+    const showTooltip = () => {
+      if (!tooltip) return;
+      positionTooltip();
+      tooltip.style.opacity = '1';
+    };
+    const hideTooltip = () => {
+      if (!tooltip) return;
+      tooltip.style.opacity = '0';
+    };
+
+    button.addEventListener('mouseenter', showTooltip);
+    button.addEventListener('mouseleave', hideTooltip);
+    button.addEventListener('focus', showTooltip);
+    button.addEventListener('blur', hideTooltip);
+    window.addEventListener('scroll', hideTooltip, true);
+    window.addEventListener('resize', hideTooltip);
+
     button.onmouseover = () => button.style.transform = 'scale(1.1)';
     button.onmouseout = () => button.style.transform = 'scale(1)';
     button.onclick = toggleWidget;
@@ -233,25 +268,29 @@
       ${theme.position === 'bottom-left' ? 'left' : 'right'}: 20px;
       width: ${theme.width}px;
       height: ${theme.height}px;
-      background: #ffffff;
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+      border-radius: 20px;
+      box-shadow: 0 30px 80px rgba(2, 6, 23, 0.45);
       display: none;
       flex-direction: column;
       z-index: 9999;
       overflow: hidden;
+      ${createGlassPanel({ tintColor: theme.primary_color || '#f97316', opacity: 0.4 })}
     `;
 
     // Header
     const header = document.createElement('div');
-    const headerBackground = createHeaderGradient(theme.primary_color || '#6366f1');
+    const headerBackground = createHeaderGradient(theme.primary_color || '#f97316');
     header.style.cssText = `
       background: ${headerBackground};
+      border: 1px solid rgba(255,255,255,0.05);
+      backdrop-filter: blur(40px);
+      -webkit-backdrop-filter: blur(40px);
       color: white;
-      padding: 16px;
+      padding: 18px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      border-radius: 20px 20px 12px 12px;
     `;
     // Create header content
     const headerLeft = document.createElement('div');
@@ -293,10 +332,15 @@
     }
     
     const headerText = document.createElement('div');
+    headerText.style.cssText = 'display: flex; flex-direction: column; gap: 4px;';
     const title = document.createElement('div');
     title.style.cssText = 'font-weight: 600; font-size: 16px;';
-    title.textContent = theme.chat_title || 'Chat';
+    title.textContent = theme.chat_title || 'Assistant';
+    const subtitle = document.createElement('div');
+    subtitle.style.cssText = 'font-size: 12px; opacity: 0.85;';
+    subtitle.textContent = `${theme.tone || 'Friendly'} · Temperature ${theme.temperature ?? '0.70'}`;
     headerText.appendChild(title);
+    headerText.appendChild(subtitle);
     headerLeft.appendChild(headerText);
     
     header.appendChild(headerLeft);
@@ -304,7 +348,19 @@
     // Create close button
     const closeButton = document.createElement('button');
     closeButton.id = 'yourbot-close';
-    closeButton.style.cssText = 'background: none; border: none; color: white; cursor: pointer; font-size: 20px;';
+    closeButton.style.cssText = `
+      background: rgba(255,255,255,0.12);
+      border: none;
+      color: white;
+      cursor: pointer;
+      font-size: 18px;
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
     closeButton.textContent = '×';
     closeButton.onclick = toggleWidget;
     header.appendChild(closeButton);
@@ -315,22 +371,22 @@
     messagesContainer.style.cssText = `
       flex: 1;
       overflow-y: auto;
-      padding: 20px;
+      padding: 22px;
       display: flex;
       flex-direction: column;
       gap: 12px;
-      background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+      background: radial-gradient(circle at top, rgba(255,255,255,0.08), rgba(15,23,42,0.05));
     `;
 
     // Input area
     const inputArea = document.createElement('div');
     inputArea.style.cssText = `
-      padding: 16px;
-      border-top: 1px solid #e5e7eb;
+      padding: 18px;
+      border-top: 1px solid rgba(255,255,255,0.08);
       display: flex;
-      gap: 10px;
-      background: #ffffff;
-      box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.05);
+      gap: 12px;
+      background: rgba(15, 23, 42, 0.35);
+      backdrop-filter: blur(20px);
     `;
     const input = document.createElement('input');
     input.id = 'yourbot-input';
@@ -339,14 +395,31 @@
     input.style.cssText = `
       flex: 1;
       padding: 10px 16px;
-      border: 1px solid #e5e7eb;
-      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 999px;
       outline: none;
       font-size: 14px;
+      color: white;
+      background: rgba(255,255,255,0.06);
     `;
+    input.style.caretColor = theme.primary_color || '#f97316';
     input.onkeypress = (e) => {
       if (e.key === 'Enter') sendMessage();
     };
+    input.onfocus = () => (input.style.borderColor = rgbaFromHex(theme.primary_color || '#f97316', 0.7));
+    input.onblur = () => (input.style.borderColor = 'rgba(255,255,255,0.14)');
+
+    const placeholderStyleId = 'yourbot-placeholder-style';
+    if (!document.getElementById(placeholderStyleId)) {
+      const style = document.createElement('style');
+      style.id = placeholderStyleId;
+      style.textContent = `
+        #yourbot-input::placeholder {
+          color: rgba(255,255,255,0.6);
+        }
+      `;
+      document.head.appendChild(style);
+    }
 
     const sendButton = document.createElement('button');
     sendButton.innerHTML = `
@@ -356,16 +429,17 @@
       </svg>
     `;
     sendButton.style.cssText = `
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: ${createHeaderGradient(theme.primary_color || '#6366f1')};
+      width: 46px;
+      height: 46px;
+      border-radius: 16px;
+      background: ${createHeaderGradient(theme.primary_color || '#f97316')};
       border: none;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       color: white;
+      box-shadow: 0 10px 30px rgba(249, 115, 22, 0.45);
     `;
     sendButton.onclick = sendMessage;
 
@@ -394,31 +468,7 @@
     const sendButton = inputElement ? inputElement.nextElementSibling : null;
 
     if (button && theme.primary_color) {
-      button.style.background = theme.primary_color;
-    }
-    
-    // Update button logo/avatar if theme changes
-    if (button && theme.avatar_url) {
-      const existingImg = button.querySelector('img');
-      if (existingImg) {
-        existingImg.src = theme.avatar_url;
-        existingImg.style.transform = `scale(${theme.logo_zoom || 1.0})`;
-      } else {
-        // Create new image if it doesn't exist
-        const logoImg = document.createElement('img');
-        logoImg.src = theme.avatar_url;
-        logoImg.style.cssText = `
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          transform: scale(${theme.logo_zoom || 1.0});
-        `;
-        logoImg.onerror = () => {
-          logoImg.style.display = 'none';
-        };
-        button.innerHTML = '';
-        button.appendChild(logoImg);
-      }
+      button.style.background = createHeaderGradient(theme.primary_color);
     }
     
     if (header && theme.primary_color) {
@@ -478,6 +528,9 @@
     }
     if (button) {
       button.style.display = isOpen ? 'none' : 'flex';
+      if (isOpen) {
+        hideTooltipImmediate();
+      }
     }
 
     if (isOpen && initialIntroMessage) {
@@ -513,12 +566,12 @@
       max-width: 85%;
       padding: 14px 18px;
       border-radius: 22px;
-      background: ${sender === 'user' ? gradientAccent : '#ffffff'};
-      color: ${sender === 'user' ? '#ffffff' : '#0f172a'};
+      background: ${sender === 'user' ? gradientAccent : 'rgba(255,255,255,0.08)'};
+      color: ${sender === 'user' ? '#ffffff' : '#f8fafc'};
       font-size: 14px;
       line-height: 1.6;
       box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
-      border: ${sender === 'user' ? 'none' : `1px solid ${softAccent}`};
+      border: ${sender === 'user' ? 'none' : '1px solid rgba(255,255,255,0.08)'};
       backdrop-filter: blur(6px);
       word-break: break-word;
     `;
@@ -540,7 +593,7 @@
       meta.textContent = theme?.chat_title || 'Assistant';
       meta.style.cssText = `
         font-size: 11px;
-        color: #94a3b8;
+        color: rgba(255,255,255,0.65);
       `;
       bubbleColumn.appendChild(meta);
     }

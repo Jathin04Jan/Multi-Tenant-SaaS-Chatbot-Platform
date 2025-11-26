@@ -27,6 +27,7 @@ This directory contains detailed documentation for the backend API.
 ### Security
 - **[SECURITY.md](./SECURITY.md)** - Security features and best practices
 - **[EMBED_SECURITY_AND_SNIPPETS.md](./EMBED_SECURITY_AND_SNIPPETS.md)** - Comprehensive guide to embed security, code snippets, domain allow-list, and usage tracking
+- **[APPLICATION_SECURITY.md](./APPLICATION_SECURITY.md)** - Holistic security overview covering auth, embed tokens, avatars, storage, and hardening backlog
 
 ### Technical Explanations
 - **[EXPLANATIONS.md](./EXPLANATIONS.md)** - Technical concepts (SQLAlchemy, Alembic, etc.)

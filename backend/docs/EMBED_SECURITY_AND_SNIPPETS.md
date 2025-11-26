@@ -112,6 +112,13 @@ The embed system allows customers to install chatbots on their websites using a 
 - **Server-Side Lookup**: Bot and snippet are loaded from database (not trusted from client)
 - **Usage Tracking**: Every message increments usage count
 
+### Branding Assets in the Widget
+
+- Avatar/logo URLs come from the bot’s `branding` JSONB.  
+- `/public/embed-config` rewrites any relative or localhost URLs so embeds always load from `https://<api-host>/api/v1/uploads/logo/{key}`.  
+- The logo streaming endpoint sits behind FastAPI, adds explicit CORS headers, and never exposes MinIO credentials.  
+- See [APPLICATION_SECURITY.md](./APPLICATION_SECURITY.md#🖼️-branding--avatar-pipeline) for the full pipeline and hardening backlog (magic-byte validation, cache busting, signed URLs, etc.).
+
 ---
 
 ## 🔄 Code Snippet Flow

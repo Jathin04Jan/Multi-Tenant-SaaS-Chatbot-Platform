@@ -174,6 +174,7 @@ Each user is created as “Test User N” with hashed credentials and 5–6 bots
 - ✅ **Environment Variables** - All sensitive data in `.env` (gitignored)
 
 See [SECURITY.md](docs/SECURITY.md) and [EMBED_SECURITY_AND_SNIPPETS.md](docs/EMBED_SECURITY_AND_SNIPPETS.md) for detailed security documentation.
+For an end-to-end review (auth, embeds, avatars, storage, and future hardening), read [APPLICATION_SECURITY.md](docs/APPLICATION_SECURITY.md).
 
 ## 📦 Services
 

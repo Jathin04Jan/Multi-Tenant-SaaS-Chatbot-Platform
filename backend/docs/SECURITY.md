@@ -84,6 +84,23 @@ All sensitive credentials are stored in `.env` file (gitignored):
 
 5. **CORS Configuration**: Restrict origins to your frontend domains only
 
+## 🖼️ Branding & Avatar Security
+
+Brand assets (logos/avatars) flow through a tenant-scoped pipeline:
+
+1. **Authenticated upload** (`POST /api/v1/uploads/logo`) validates extension, MIME type, and size (≤10 MB) before writing to MinIO under `brand-logos/{tenant_id}/…` and merging metadata into `bot.branding`.
+2. **Config normalization** (`/public/embed-config`) rewrites relative or localhost URLs so the widget always receives absolute HTTPS links tied to the current API host, and only ACTIVE bots pass validation.
+3. **Controlled delivery** (`GET /api/v1/uploads/logo/{encoded_key}`) streams bytes from MinIO, now with `Access-Control-Allow-Origin: *` to support embeds on any customer domain, while still keeping MinIO credentials private.
+
+**Hardening backlog**
+
+- Inspect magic bytes (and optionally virus-scan) before persisting uploaded files.
+- Add cache-busting/version hashes when logo metadata changes so avatars refresh instantly.
+- Consider signed/time-limited URLs if brand assets should not remain publicly accessible forever.
+- Apply rate limiting to `/api/v1/uploads/logo` to prevent brute-force or spam uploads.
+
+See [APPLICATION_SECURITY.md](./APPLICATION_SECURITY.md#🖼️-branding--avatar-pipeline) for the full analysis.
+
 ## 🔐 Embed Token Security
 
 ### Short-Lived JWT Tokens for Widgets
@@ -134,4 +151,5 @@ The platform uses **short-lived JWT tokens** for secure widget-to-API communicat
 - [x] Snippet status management (active/revoked)
 - [x] Bot status verification for embeds
 - [x] One snippet per bot enforcement
+- [x] Tenant-scoped branding uploads via MinIO with normalized public delivery
 

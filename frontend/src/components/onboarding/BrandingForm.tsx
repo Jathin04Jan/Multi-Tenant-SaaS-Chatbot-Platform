@@ -15,11 +15,12 @@ import { toast } from 'sonner';
 import type { BrandLogoMetadata } from '@/store/wizard';
 
 interface BrandingFormProps {
-  onComplete: () => void;
+  onComplete: () => Promise<void> | void;
+  botId?: string | null;
 }
 
-export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
-  const { branding, updateBranding, updatePersona } = useWizardStore();
+export const BrandingForm = ({ onComplete, botId }: BrandingFormProps) => {
+  const { branding, updateBranding, updatePersona, persona } = useWizardStore();
   const [selectedColor, setSelectedColor] = useState<string>(
     branding.primaryColor || colorCombinations[0].primary
   );
@@ -42,16 +43,22 @@ export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
       ...branding,
       logoZoom: branding.logoZoom ?? 1,
       primaryColor: branding.primaryColor || colorCombinations[0].primary,
+      botName: persona.botName || '',
     },
     mode: 'onChange',
   });
 
   const logoZoomValue = watch('logoZoom', branding.logoZoom ?? 1);
+  const logoScale = logoZoomValue ?? 1;
 
   useEffect(() => {
     setLogoPreview(branding.logo);
     setLogoMetadata(branding.logoMetadata || null);
   }, [branding.logo, branding.logoMetadata]);
+
+  useEffect(() => {
+    setValue('botName', persona.botName || '');
+  }, [persona.botName, setValue]);
 
   const resolvedLogo = resolveAssetUrl(logoPreview);
   const hasLogo = Boolean(resolvedLogo);
@@ -79,8 +86,13 @@ export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
       return;
     }
 
+    if (!botId) {
+      toast.error('Draft bot is not ready yet. Please wait and try again.');
+      return;
+    }
+
     setIsUploadingLogo(true);
-    const response = await uploadBrandLogo(file);
+    const response = await uploadBrandLogo(file, { botId });
     setIsUploadingLogo(false);
 
     if (response.error || !response.data?.logo_url) {
@@ -128,7 +140,7 @@ export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
     updateBranding({ logoZoom: value });
   };
 
-  const onSubmit = (data: BrandingInput) => {
+  const onSubmit = async (data: BrandingInput) => {
     // Update branding (excluding botName)
     const { botName, ...brandingData } = data;
     updateBranding(brandingData);
@@ -138,7 +150,7 @@ export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
       updatePersona({ botName });
     }
     
-    onComplete();
+    await onComplete();
   };
 
   return (
@@ -196,8 +208,10 @@ export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
                 <img
                   src={resolvedLogo}
                   alt="Uploaded logo preview"
-                  className="h-full w-full object-cover transition-transform duration-300"
-                  style={{ transform: `scale(${logoZoomValue ?? 1})` }}
+                  className={cn(
+                    'h-full w-full object-cover transition-transform duration-300',
+                    `[transform:scale(${logoScale})]`
+                  )}
                 />
             ) : isUploadingLogo ? (
               <Loader2 className="w-8 h-8 animate-spin text-primary" />

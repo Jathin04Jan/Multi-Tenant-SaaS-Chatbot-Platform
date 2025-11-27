@@ -1,10 +1,14 @@
 import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Stepper } from '@/components/shell/Stepper';
 import { BrandingForm } from '@/components/onboarding/BrandingForm';
 import { BotPreview } from '@/components/onboarding/BotPreview';
 import { useWizardStore } from '@/store/wizard';
 import { motion } from 'framer-motion';
+import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { createDraftBot, getDraftBot } from '@/lib/api';
+import { toast } from 'sonner';
 
 const steps = [
   { number: 1, name: 'Brand & Persona', path: '/dashboard/onboarding/brand' },
@@ -17,10 +21,40 @@ const steps = [
 const Brand = () => {
   const navigate = useNavigate();
   const { completeStep, setCurrentStep, completedSteps } = useWizardStore();
+  const [draftBotId, setDraftBotId] = useState<string | null>(null);
+  const [loadingDraft, setLoadingDraft] = useState(true);
+  const [draftError, setDraftError] = useState<string | null>(null);
+
+  const initDraft = useCallback(async () => {
+    setLoadingDraft(true);
+    setDraftError(null);
+    try {
+      const existing = await getDraftBot();
+      if (!existing.error && existing.data) {
+        setDraftBotId(existing.data.id);
+      } else if (existing.status === 404) {
+        const created = await createDraftBot({ name: 'Assistant' });
+        if (created.error || !created.data) {
+          throw new Error(created.error || 'Failed to create draft bot.');
+        }
+        setDraftBotId(created.data.id);
+      } else {
+        throw new Error(existing.error || 'Unable to load draft bot.');
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to prepare draft bot.';
+      setDraftError(message);
+      toast.error(message);
+    } finally {
+      setLoadingDraft(false);
+    }
+  }, []);
 
   useEffect(() => {
     setCurrentStep(1);
-  }, [setCurrentStep]);
+    initDraft();
+  }, [initDraft, setCurrentStep]);
 
   const handleComplete = () => {
     completeStep(1);
@@ -38,6 +72,28 @@ const Brand = () => {
     }
     return { ...step, completed: isCompleted };
   });
+
+  if (loadingDraft) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <p>Preparing your draft bot...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (draftError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 space-y-4">
+        <p className="text-sm text-muted-foreground">{draftError}</p>
+        <Button onClick={initDraft} size="sm">
+          Try Again
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="container max-w-7xl px-4 py-8 space-y-8">
@@ -65,7 +121,7 @@ const Brand = () => {
           transition={{ duration: 0.4, delay: 0.1 }}
           className="glass-card p-8"
         >
-          <BrandingForm onComplete={handleComplete} />
+          <BrandingForm onComplete={handleComplete} botId={draftBotId} />
         </motion.div>
 
         <motion.div

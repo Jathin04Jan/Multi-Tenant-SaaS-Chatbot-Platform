@@ -51,6 +51,7 @@ export interface DataSource {
 interface WizardState {
   tenantId: string | null;
   agentId: string | null;
+  draftBotId: string | null;
   
   // Step 1: Brand & Persona
   branding: BrandConfig;
@@ -76,6 +77,7 @@ interface WizardState {
   // Actions
   setTenantId: (id: string) => void;
   setAgentId: (id: string) => void;
+  setDraftBotId: (id: string | null) => void;
   updateBranding: (branding: Partial<BrandConfig>) => void;
   updatePersona: (persona: Partial<PersonaConfig>) => void;
   updateTone: (tone: Partial<ToneConfig>) => void;
@@ -86,6 +88,7 @@ interface WizardState {
   setIndexingProgress: (progress: number) => void;
   setIndexingStatus: (status: WizardState['indexingStatus']) => void;
   completeStep: (step: number) => void;
+  setCompletedSteps: (steps: number[]) => void;
   setCurrentStep: (step: number) => void;
   resetWizard: () => void;
 }
@@ -117,6 +120,7 @@ const ensureSet = (value: unknown): Set<number> => {
 const initialState = {
   tenantId: null,
   agentId: null,
+  draftBotId: null,
   branding: {
     logo: null,
     logoMetadata: null,
@@ -125,7 +129,7 @@ const initialState = {
     welcomeMessage: 'Hello! How can I help you today?',
   },
   persona: {
-    botName: 'Assistant',
+    botName: '',
   },
   tone: {
     llmTemperature: 0.7,
@@ -156,6 +160,7 @@ export const useWizardStore = create<WizardState>()(
       
       setTenantId: (id) => set({ tenantId: id }),
       setAgentId: (id) => set({ agentId: id }),
+      setDraftBotId: (id) => set({ draftBotId: id }),
       
       updateBranding: (branding) =>
         set((state) => ({
@@ -205,10 +210,19 @@ export const useWizardStore = create<WizardState>()(
             completedSteps: new Set([...currentSteps, step]),
           };
         }),
+
+      setCompletedSteps: (steps) =>
+        set(() => ({
+          completedSteps: new Set(steps),
+        })),
       
       setCurrentStep: (step) => set({ currentStep: step }),
       
-      resetWizard: () => set(initialState),
+      resetWizard: () =>
+        set((state) => ({
+          ...initialState,
+          draftBotId: state.draftBotId,
+        })),
     }),
     {
       name: 'wizard-storage',

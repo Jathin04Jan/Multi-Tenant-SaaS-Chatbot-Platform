@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Stepper } from '@/components/shell/Stepper';
 import { BrandingForm } from '@/components/onboarding/BrandingForm';
@@ -11,8 +11,20 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Upload, Globe, Trash2, RefreshCw, ArrowRight, ArrowLeft, CheckCircle2, Bot, Circle } from 'lucide-react';
-import { mockStartCrawl, mockGetGuardrails, mockSaveGuardrails, createBot, updateBot, createSnippet, uploadBotDocument, createCrawlDocument } from '@/lib/api';
+import { Upload, Globe, Trash2, RefreshCw, ArrowRight, ArrowLeft, CheckCircle2, Bot, Circle, Loader2 } from 'lucide-react';
+import {
+  mockStartCrawl,
+  mockGetGuardrails,
+  mockSaveGuardrails,
+  updateBot,
+  createSnippet,
+  uploadBotDocument,
+  createCrawlDocument,
+  getDraftBot,
+  createDraftBot,
+  resetDraftBot,
+  type BotDTO,
+} from '@/lib/api';
 import { toast } from 'sonner';
 
 const steps = [
@@ -24,6 +36,9 @@ const steps = [
   { number: 6, name: 'Test Chat' },
   { number: 7, name: 'Deploy' },
 ];
+
+const DEFAULT_PRIMARY_COLOR = '#6366f1';
+const DEFAULT_WELCOME_MESSAGE = 'Hello! How can I help you today?';
 
 interface OnboardingPanelProps {
   open: boolean;
@@ -44,7 +59,14 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     branding,
     persona,
     tone,
-    guardrails
+    guardrails,
+    updateBranding,
+    updatePersona,
+    updateTone,
+    updateGuardrails,
+    draftBotId,
+    setDraftBotId,
+    setCompletedSteps,
   } = useWizardStore();
   const [crawlUrl, setCrawlUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
@@ -58,6 +80,26 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
   const [chatMessages, setChatMessages] = useState<Array<{ type: 'user' | 'bot'; message: string }>>([
     { type: 'bot', message: 'Hello! How can I help you today?' }
   ]);
+  const [isDraftLoading, setIsDraftLoading] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const [isResettingDraft, setIsResettingDraft] = useState(false);
+  const personaNameRef = useRef(persona.botName || '');
+  const draftBotIdRef = useRef<string | null>(null);
+
+  const isCustomAssistantName = (value?: string | null) => {
+    if (!value) return false;
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) return false;
+    return !['assistant', 'untitled bot', 'my bot'].includes(normalized);
+  };
+
+  useEffect(() => {
+    personaNameRef.current = persona.botName || '';
+  }, [persona.botName]);
+
+  useEffect(() => {
+    draftBotIdRef.current = draftBotId;
+  }, [draftBotId]);
 
   const normalizeUrl = (value: string) => {
     const trimmed = value.trim();
@@ -68,7 +110,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     return `https://${trimmed}`;
   };
 
-  const handleResetWizard = useCallback(() => {
+  const resetLocalWizardState = useCallback(() => {
     resetWizard();
     setCurrentStep(1);
     setPendingUploads({});
@@ -81,6 +123,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     setIndexingProgress(0);
     setTestMessage('');
     setChatMessages([{ type: 'bot', message: 'Hello! How can I help you today?' }]);
+    personaNameRef.current = '';
   }, [
     resetWizard,
     setCurrentStep,
@@ -96,12 +139,286 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     setChatMessages,
   ]);
 
-  // Reset wizard when panel opens
+  const hydrateWizardFromDraft = useCallback(
+    (bot: BotDTO) => {
+      const brandingConfig = (bot.branding ?? {}) as Record<string, any>;
+      const llmConfig = (bot.llm_config ?? {}) as Record<string, any>;
+      const guardrailsConfig = (bot.guardrails ?? {}) as Record<string, any>;
+
+      const assistantNameCandidate =
+        brandingConfig.assistant_name || brandingConfig.chat_title || '';
+      const fallbackBotName = isCustomAssistantName(bot.name) ? bot.name : '';
+      const resolvedAssistantName =
+        (isCustomAssistantName(assistantNameCandidate)
+          ? assistantNameCandidate
+          : '') || fallbackBotName;
+
+      updatePersona({
+        botName: resolvedAssistantName || '',
+      });
+      personaNameRef.current = resolvedAssistantName || '';
+
+      updateBranding({
+        logo: brandingConfig.logo_url || brandingConfig.avatar_url || null,
+        logoMetadata: {
+          objectKey: brandingConfig.logo_object_key ?? null,
+          filename: brandingConfig.logo_filename ?? null,
+          contentType: brandingConfig.logo_content_type ?? null,
+          size: brandingConfig.logo_size ?? null,
+          uploadedAt: brandingConfig.logo_uploaded_at ?? null,
+        },
+        logoZoom: brandingConfig.logo_zoom ?? 1,
+        primaryColor: brandingConfig.primary_color || DEFAULT_PRIMARY_COLOR,
+        welcomeMessage:
+          brandingConfig.welcome_message || DEFAULT_WELCOME_MESSAGE,
+      });
+
+      updateTone({
+        llmTemperature:
+          typeof llmConfig.temperature === 'number'
+            ? llmConfig.temperature
+            : 0.7,
+        communicationStyle:
+          (llmConfig.communication_style as any) || 'friendly',
+        stylePrompt:
+          typeof llmConfig.style_prompt === 'string'
+            ? llmConfig.style_prompt
+            : '',
+      });
+
+      updateGuardrails({
+        maxResponseLength: guardrailsConfig.max_response_length ?? 500,
+        blockedPhrases: guardrailsConfig.blocked_phrases ?? [],
+        enableFactChecking: guardrailsConfig.enable_fact_checking ?? true,
+        blockExplicitContent: guardrailsConfig.block_explicit_content ?? true,
+        blockPoliticalViews: guardrailsConfig.block_political_views ?? true,
+        strictlyStickToTopic:
+          guardrailsConfig.strictly_stick_to_topic ?? true,
+        blockPersonalInfo: guardrailsConfig.block_personal_info ?? true,
+        customInstructions: guardrailsConfig.custom_instructions ?? '',
+      });
+
+      const hasBrandingProgress =
+        isCustomAssistantName(resolvedAssistantName) ||
+        Boolean(brandingConfig.logo_url || brandingConfig.avatar_url) ||
+        (brandingConfig.primary_color &&
+          brandingConfig.primary_color !== DEFAULT_PRIMARY_COLOR) ||
+        (brandingConfig.welcome_message &&
+          brandingConfig.welcome_message !== DEFAULT_WELCOME_MESSAGE);
+
+      const hasToneProgress =
+        typeof llmConfig.temperature === 'number' ||
+        typeof llmConfig.communication_style === 'string' ||
+        typeof llmConfig.style_prompt === 'string';
+
+      const hasGuardrailProgress = Object.keys(guardrailsConfig).length > 0;
+
+      const completed: number[] = [];
+      if (hasBrandingProgress) completed.push(1);
+      if (hasToneProgress) completed.push(2);
+      if (hasGuardrailProgress) completed.push(3);
+
+      setCompletedSteps(completed);
+
+      const nextStep = hasGuardrailProgress
+        ? 4
+        : hasToneProgress
+        ? 3
+        : hasBrandingProgress
+        ? 2
+        : 1;
+      setCurrentStep(nextStep);
+    },
+    [
+      isCustomAssistantName,
+      setCompletedSteps,
+      setCurrentStep,
+      updateBranding,
+      updatePersona,
+      updateTone,
+      updateGuardrails,
+    ]
+  );
+
+  const isHydratingRef = useRef(false);
+
+  const ensureDraftBot = useCallback(
+    async (
+      seedName: string,
+      options?: {
+        forceReset?: boolean;
+      }
+    ): Promise<string | null> => {
+      const forceReset = options?.forceReset ?? false;
+      if (isHydratingRef.current) {
+        return draftBotIdRef.current;
+      }
+      isHydratingRef.current = true;
+      setIsDraftLoading(true);
+      setDraftError(null);
+      try {
+        const draftResponse = await getDraftBot();
+        if (!draftResponse.error && draftResponse.data) {
+          const isSameDraft = draftBotIdRef.current === draftResponse.data.id;
+          if (!isSameDraft || forceReset) {
+            resetLocalWizardState();
+          }
+          setDraftBotId(draftResponse.data.id);
+          hydrateWizardFromDraft(draftResponse.data);
+          return draftResponse.data.id;
+        }
+
+        if (draftResponse.status === 404) {
+        const created = await createDraftBot({
+          name: seedName || 'Assistant',
+        });
+          if (created.error || !created.data) {
+            throw new Error(created.error || 'Failed to create draft bot.');
+          }
+        resetLocalWizardState();
+        setDraftBotId(created.data.id);
+        hydrateWizardFromDraft(created.data);
+          return created.data.id;
+        }
+
+        throw new Error(draftResponse.error || 'Unable to load draft bot.');
+      } catch (error) {
+        console.error('Draft bot error:', error);
+        const message =
+          error instanceof Error ? error.message : 'Failed to load draft bot.';
+        setDraftError(message);
+        toast.error(message);
+        return null;
+      } finally {
+        isHydratingRef.current = false;
+        setIsDraftLoading(false);
+      }
+    },
+    [hydrateWizardFromDraft, resetLocalWizardState, setDraftBotId]
+  );
+
+  const handleResetWizard = useCallback(async () => {
+    if (isResettingDraft) {
+      return;
+    }
+    try {
+      setIsResettingDraft(true);
+      if (draftBotId) {
+        const response = await resetDraftBot();
+        if (response.error && response.status !== 404) {
+          throw new Error(response.error);
+        }
+      }
+      setDraftBotId(null);
+      resetLocalWizardState();
+      await ensureDraftBot(personaNameRef.current, { forceReset: true });
+      toast.success('Draft reset successfully.');
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to reset draft.';
+      toast.error(message);
+    } finally {
+      setIsResettingDraft(false);
+    }
+  }, [
+    draftBotId,
+    ensureDraftBot,
+    isResettingDraft,
+    resetLocalWizardState,
+    setDraftBotId,
+  ]);
+
   useEffect(() => {
     if (open) {
-      handleResetWizard();
+      ensureDraftBot(personaNameRef.current, { forceReset: true });
     }
-  }, [open, handleResetWizard]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const persistBrandingStep = useCallback(async (): Promise<boolean> => {
+    if (!draftBotId) {
+      toast.error('Draft bot is not ready yet. Please try again.');
+      return false;
+    }
+
+    const brandMetadata = branding.logoMetadata || {};
+    const payload = {
+      name: persona.botName || 'Assistant',
+      description: `A ${tone.communicationStyle} chatbot`,
+      branding: {
+        logo_url: branding.logo,
+        avatar_url: branding.logo,
+        logo_zoom: branding.logoZoom ?? 1,
+        logo_object_key: brandMetadata.objectKey ?? null,
+        logo_filename: brandMetadata.filename ?? null,
+        logo_content_type: brandMetadata.contentType ?? null,
+        logo_size: brandMetadata.size ?? null,
+        logo_uploaded_at: brandMetadata.uploadedAt ?? null,
+        primary_color: branding.primaryColor || '#6366f1',
+        background_color: '#ffffff',
+        welcome_message:
+          branding.welcomeMessage || 'Hello! How can I help you today?',
+        intro_message:
+          branding.welcomeMessage || 'Hello! How can I help you today?',
+        assistant_name: persona.botName || 'Assistant',
+        chat_title: persona.botName || 'Assistant',
+        position: 'bottom-right',
+        height: 600,
+        width: 400,
+      },
+    };
+
+    const response = await updateBot(draftBotId, payload);
+    if (response.error) {
+      toast.error(response.error || 'Failed to save branding. Please try again.');
+      return false;
+    }
+    return true;
+  }, [branding, draftBotId, persona.botName, tone.communicationStyle]);
+
+  const persistToneStep = useCallback(async (): Promise<boolean> => {
+    if (!draftBotId) {
+      toast.error('Draft bot is not ready yet. Please try again.');
+      return false;
+    }
+    const response = await updateBot(draftBotId, {
+      llm_config: {
+        model: 'gpt-4',
+        temperature: tone.llmTemperature,
+        communication_style: tone.communicationStyle,
+        style_prompt: tone.stylePrompt,
+      },
+    });
+    if (response.error) {
+      toast.error(response.error || 'Failed to save tone configuration.');
+      return false;
+    }
+    return true;
+  }, [draftBotId, tone]);
+
+  const persistGuardrailsStep = useCallback(async (): Promise<boolean> => {
+    if (!draftBotId) {
+      toast.error('Draft bot is not ready yet. Please try again.');
+      return false;
+    }
+    const response = await updateBot(draftBotId, {
+      guardrails: {
+        max_response_length: guardrails.maxResponseLength,
+        blocked_phrases: guardrails.blockedPhrases,
+        enable_fact_checking: guardrails.enableFactChecking,
+        block_explicit_content: guardrails.blockExplicitContent,
+        block_political_views: guardrails.blockPoliticalViews,
+        strictly_stick_to_topic: guardrails.strictlyStickToTopic,
+        block_personal_info: guardrails.blockPersonalInfo,
+        custom_instructions: guardrails.customInstructions,
+      },
+    });
+    if (response.error) {
+      toast.error(response.error || 'Failed to save guardrails.');
+      return false;
+    }
+    return true;
+  }, [draftBotId, guardrails]);
 
   // Map steps with completion status
   // Only show steps as completed if they are completed AND current step is at or beyond that step
@@ -116,22 +433,42 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
   });
 
   // Step 1: Brand & Persona
-  const handleBrandComplete = () => {
+  const handleBrandComplete = useCallback(async () => {
+    const brandingSaved = await persistBrandingStep();
+    if (!brandingSaved) {
+      return;
+    }
+    if (!persona.botName?.trim()) {
+      toast.error('Please provide an assistant name before continuing.');
+      return;
+    }
+    const saved = await persistBrandingStep();
+    if (!saved) {
+      return;
+    }
     completeStep(1);
     setCurrentStep(2);
-  };
+  }, [completeStep, persistBrandingStep, persona.botName, setCurrentStep]);
 
   // Step 2: Tone
-  const handleToneComplete = () => {
+  const handleToneComplete = useCallback(async () => {
+    const saved = await persistToneStep();
+    if (!saved) {
+      return;
+    }
     completeStep(2);
     setCurrentStep(3);
-  };
+  }, [completeStep, persistToneStep, setCurrentStep]);
 
   // Step 3: Guardrails
-  const handleGuardrailsContinue = () => {
+  const handleGuardrailsContinue = useCallback(async () => {
+    const saved = await persistGuardrailsStep();
+    if (!saved) {
+      return;
+    }
     completeStep(3);
     setCurrentStep(4);
-  };
+  }, [completeStep, persistGuardrailsStep, setCurrentStep]);
 
   // Step 4: Documents
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -348,17 +685,17 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
 
   // Step 7: Deploy
   const handleFinish = async () => {
-    try {
-      // Get bot name from persona (BrandingForm updates persona.botName)
-      const botName = persona.botName || 'My Bot';
+    if (!draftBotId) {
+      toast.error('Draft bot is not ready yet. Please try again.');
+      return;
+    }
 
-      // Prepare bot data from wizard store
-      // All UI configuration is stored in branding JSONB
-      const botData = {
+    try {
+      const botName = persona.botName || 'My Bot';
+      const payload = {
         name: botName,
         description: `A ${tone.communicationStyle} chatbot`,
         branding: {
-          // Logo and avatar
           logo_url: branding.logo || null,
           avatar_url: branding.logo || null,
           logo_zoom: branding.logoZoom ?? 1,
@@ -367,15 +704,14 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           logo_content_type: branding.logoMetadata?.contentType || null,
           logo_size: branding.logoMetadata?.size ?? null,
           logo_uploaded_at: branding.logoMetadata?.uploadedAt || null,
-          // Colors
           primary_color: branding.primaryColor || '#6366f1',
           background_color: '#ffffff',
-          // Messages
-          welcome_message: branding.welcomeMessage || 'Hello! How can I help you today?',
-          intro_message: branding.welcomeMessage || 'Hello! How can I help you today?',
+          welcome_message:
+            branding.welcomeMessage || 'Hello! How can I help you today?',
+          intro_message:
+            branding.welcomeMessage || 'Hello! How can I help you today?',
           assistant_name: botName,
           chat_title: botName,
-          // Widget positioning and sizing
           position: 'bottom-right',
           height: 600,
           width: 400,
@@ -397,7 +733,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           custom_instructions: guardrails.customInstructions,
         },
         retrieval_config: {
-          data_sources: dataSources.map(ds => ({
+          data_sources: dataSources.map((ds) => ({
             id: ds.id,
             name: ds.name,
             type: ds.type,
@@ -408,57 +744,46 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           chunk_overlap: 200,
           embedding_model: 'text-embedding-ada-002',
         },
+        status: 'active' as const,
       };
-      
-      // Create bot via API
-      const response = await createBot(botData);
-      
+
+      const response = await updateBot(draftBotId, payload);
       if (response.error) {
-        toast.error(response.error || 'Failed to create bot');
+        toast.error(response.error || 'Failed to finalize bot.');
         return;
       }
-      
-      // Store bot ID for embed code
-      if (response.data) {
-        setCreatedBotId(response.data.id);
-        
-        // PRODUCTION: Automatically activate the bot after creation
-        // This makes the bot immediately embeddable
-        try {
-          const activateResponse = await updateBot(response.data.id, { status: 'active' });
-          if (activateResponse.error) {
-            toast.warning('Bot created but activation failed. Please activate it manually.');
-          } else {
-            toast.success('Bot created and activated successfully! 🎉');
-            await uploadQueuedDocuments(response.data.id);
-            await saveCrawledSources(response.data.id);
-            
-            // Create installation snippet for the bot
-            try {
-              const snippetResponse = await createSnippet(response.data.id, {
-                bot_id: response.data.id,
-                status: 'active',
-                // allowed_domains: undefined means allow all domains (good for testing)
-              });
-              
-              if (snippetResponse.error) {
-                toast.warning('Bot created but snippet creation failed. You can create a snippet manually from the bot detail page.');
-              } else if (snippetResponse.data) {
-                setCreatedSnippetId(snippetResponse.data.id);
-                toast.success('Installation snippet created!');
-              }
-            } catch (snippetError) {
-              console.error('Error creating snippet:', snippetError);
-              toast.warning('Bot created but snippet creation failed. You can create a snippet manually from the bot detail page.');
-            }
-          }
-        } catch (activateError) {
-          console.error('Error activating bot:', activateError);
-          toast.warning('Bot created but activation failed. Please activate it manually.');
+
+      setCreatedBotId(draftBotId);
+      toast.success('Bot created and activated successfully! 🎉');
+
+      await uploadQueuedDocuments(draftBotId);
+      await saveCrawledSources(draftBotId);
+
+      try {
+        const snippetResponse = await createSnippet(draftBotId, {
+          bot_id: draftBotId,
+          status: 'active',
+        });
+
+        if (snippetResponse.error) {
+          toast.warning(
+            'Bot created but snippet creation failed. You can create a snippet manually from the bot detail page.'
+          );
+        } else if (snippetResponse.data) {
+          setCreatedSnippetId(snippetResponse.data.id);
+          toast.success('Installation snippet created!');
         }
+      } catch (snippetError) {
+        console.error('Error creating snippet:', snippetError);
+        toast.warning(
+          'Bot created but snippet creation failed. You can create a snippet manually from the bot detail page.'
+        );
       }
-      
+
       completeStep(7);
+      setDraftBotId(null);
+      resetLocalWizardState();
+      await ensureDraftBot(personaNameRef.current, { forceReset: true });
     } catch (error) {
       console.error('Error creating bot:', error);
       toast.error('Failed to create bot. Please try again.');
@@ -480,7 +805,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
             {/* Branding Section */}
             <div className="grid lg:grid-cols-2 gap-6">
               <div className="glass-card p-6">
-                <BrandingForm onComplete={handleBrandComplete} />
+                <BrandingForm onComplete={handleBrandComplete} botId={draftBotId} />
               </div>
               <div>
                 <BotPreview />
@@ -987,30 +1312,48 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
             variant="ghost"
             size="sm"
             onClick={handleResetWizard}
-            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
+            disabled={isResettingDraft || isDraftLoading}
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground disabled:opacity-60"
           >
             <RefreshCw className="w-4 h-4" />
-            Reset
+            {isResettingDraft ? 'Resetting...' : 'Reset'}
           </Button>
         </DialogHeader>
 
-        <div className="mt-4 space-y-6">
-          {/* Stepper */}
-          <div className="glass-card p-4">
-            <Stepper steps={stepsWithCompletion} currentStep={currentStep} />
+        {draftError ? (
+          <div className="mt-6 p-6 text-center space-y-4 glass-card">
+            <p className="text-sm text-muted-foreground">{draftError}</p>
+            <Button
+              onClick={() => ensureDraftBot(personaNameRef.current, { forceReset: true })}
+              size="sm"
+            >
+              Try Again
+            </Button>
           </div>
+        ) : isDraftLoading ? (
+          <div className="mt-6 flex flex-col items-center justify-center py-16 space-y-4">
+            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Preparing your draft bot...</p>
+          </div>
+        ) : (
+          <div className="mt-4 space-y-6">
+            {/* Stepper */}
+            <div className="glass-card p-4">
+              <Stepper steps={stepsWithCompletion} currentStep={currentStep} />
+            </div>
 
-          {/* Step Content */}
-          <motion.div
-            key={currentStep}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="min-h-[350px]"
-          >
-            {renderStepContent()}
-          </motion.div>
-        </div>
+            {/* Step Content */}
+            <motion.div
+              key={currentStep}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="min-h-[350px]"
+            >
+              {renderStepContent()}
+            </motion.div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { FileText, Database, ArrowRight, Bot, Activity, MessageCircle, CheckCircle2, Clock, Zap, Bell, Settings, Link as LinkIcon, TrendingUp, Users, Shield, RefreshCw, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { EmbedCodeDialog } from '@/components/EmbedCodeDialog';
-import { apiRequest } from '@/lib/api';
+import { apiRequest, getBots, type BotDTO } from '@/lib/api';
 
 interface UserData {
   full_name: string;
@@ -21,6 +21,9 @@ const Overview = () => {
   const { completedSteps } = useWizardStore();
   const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
   const [userData, setUserData] = useState<UserData | null>(null);
+  const [bots, setBots] = useState<BotDTO[]>([]);
+  const [botsLoading, setBotsLoading] = useState(true);
+  const [botsError, setBotsError] = useState<string | null>(null);
 
   // Fetch user data on mount
   useEffect(() => {
@@ -40,6 +43,42 @@ const Overview = () => {
 
     fetchUserData();
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchBots = async () => {
+      try {
+        setBotsLoading(true);
+        const response = await getBots();
+
+        if (!isMounted) return;
+
+        if (response.error) {
+          setBots([]);
+          setBotsError(response.error);
+          return;
+        }
+
+        setBots(response.data || []);
+        setBotsError(null);
+      } catch (error) {
+        if (!isMounted) return;
+        setBots([]);
+        setBotsError(error instanceof Error ? error.message : 'Failed to load bots');
+      } finally {
+        if (isMounted) {
+          setBotsLoading(false);
+        }
+      }
+    };
+
+    fetchBots();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
   
   // Check if onboarding is complete (all 5 steps completed)
   const isOnboardingComplete = completedSteps instanceof Set 
@@ -47,6 +86,20 @@ const Overview = () => {
     : Array.isArray(completedSteps) 
     ? (completedSteps as number[]).length >= 5 && [1, 2, 3, 4, 5].every(step => (completedSteps as number[]).includes(step))
     : false;
+
+  const totalConversations = useMemo(
+    () => bots.reduce((sum, bot) => sum + (bot.conversations_count ?? 0), 0),
+    [bots]
+  );
+
+  const showWelcomeExperience =
+    !botsLoading &&
+    !botsError &&
+    bots.length === 0 &&
+    totalConversations === 0;
+
+  const friendlyName =
+    (userData?.full_name || userName || 'friend').split(' ')[0] || 'friend';
 
   // Recent activity feed
   const recentActivity = [
@@ -121,7 +174,9 @@ const Overview = () => {
         className="flex items-center justify-between"
       >
         <div className="space-y-3">
-          <h1 className="text-4xl font-bold">Overview</h1>
+          <h1 className="text-4xl font-bold">
+            {showWelcomeExperience ? 'Welcome' : 'Overview'}
+          </h1>
           <motion.div
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
@@ -130,18 +185,159 @@ const Overview = () => {
           >
             <Sparkles className="w-5 h-5 text-primary" />
             <p className="text-lg text-muted-foreground">
-              Welcome back,{' '}
-              <span className="font-semibold text-foreground">
-                {userData?.full_name || userName || 'there'}
-              </span>
-              ! Here's your workspace at a glance.
+              {showWelcomeExperience ? (
+                <>
+                  Hello, <span className="font-semibold text-foreground">{friendlyName}</span>! Let's build your first AI assistant together.
+                </>
+              ) : (
+                <>
+                  Welcome back,{' '}
+                  <span className="font-semibold text-foreground">
+                    {userData?.full_name || userName || 'there'}
+                  </span>
+                  ! Here's your workspace at a glance.
+                </>
+              )}
             </p>
           </motion.div>
         </div>
       </motion.div>
 
       {/* Separator */}
-      <div className="border-t border-[hsl(40_20%_75%)] dark:hidden" />
+      {!showWelcomeExperience && <div className="border-t border-[hsl(40_20%_75%)] dark:hidden" />}
+
+      {showWelcomeExperience ? (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="grid gap-6 mt-6"
+        >
+          <div className="glass-card rounded-2xl p-8 border-2 border-primary/20 bg-gradient-to-br from-primary/5 via-background to-background">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              <div className="space-y-4">
+                <p className="text-xl text-primary font-semibold flex items-center gap-2">
+                  <Sparkles className="w-5 h-5" />
+                  New workspace detected
+                </p>
+                <h2 className="text-3xl font-bold leading-tight">
+                  Hello, {friendlyName}! <span className="text-primary">Let's build your first bot.</span>
+                </h2>
+                <p className="text-muted-foreground max-w-2xl">
+                  You have a fresh canvas — no bots or activity yet. We'll guide you through creating a friendly AI assistant, connecting your knowledge, and sharing it with your customers in just a few minutes.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <Link to="/dashboard/onboarding">
+                    <Button size="lg" className="rounded-xl">
+                      Start guided setup
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </Link>
+                  <Link to="/dashboard/agents">
+                    <Button size="lg" variant="outline" className="rounded-xl">
+                      Skip to bot builder
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 min-w-[220px]">
+                {[
+                  { label: 'Bots live', value: bots.length },
+                  { label: 'Conversations', value: totalConversations },
+                  { label: 'Docs indexed', value: 0 },
+                  { label: 'Integrations', value: 0 },
+                ].map((stat) => (
+                  <div key={stat.label} className="p-4 rounded-2xl bg-muted/30 border border-border/50 text-center">
+                    <p className="text-2xl font-bold">{stat.value}</p>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      {stat.label}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid lg:grid-cols-3 gap-4">
+            {[
+              {
+                title: 'Give your bot a persona',
+                description: 'Name your assistant, pick a tone, and define how it should greet people.',
+                action: 'Go to bot builder',
+                href: '/dashboard/onboarding',
+                icon: Bot,
+              },
+              {
+                title: 'Add product knowledge',
+                description: 'Upload docs, paste URLs, or connect integrations so your bot stays accurate.',
+                action: 'Add knowledge',
+                href: '/dashboard/onboarding/data',
+                icon: Database,
+              },
+              {
+                title: 'Test the experience',
+                description: 'Chat with your bot, tweak responses, then embed it on your site.',
+                action: 'Open tester',
+                href: '/dashboard/agents',
+                icon: MessageCircle,
+              },
+            ].map((card, idx) => (
+              <motion.div
+                key={card.title}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.1 * idx }}
+                className="glass-card rounded-2xl border border-border/50 p-5 flex flex-col justify-between"
+              >
+                <div className="space-y-3">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                    <card.icon className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-xl font-semibold">{card.title}</h3>
+                  <p className="text-sm text-muted-foreground">{card.description}</p>
+                </div>
+                <Link to={card.href}>
+                  <Button variant="ghost" className="justify-start px-0 text-primary hover:text-primary">
+                    {card.action}
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.4 }}
+            className="glass-card rounded-2xl p-6 border border-border/50"
+          >
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground uppercase tracking-wide">
+                  Need inspiration?
+                </p>
+                <h3 className="text-2xl font-semibold mt-1">
+                  Explore demo bots and best practices before publishing.
+                </h3>
+              </div>
+              <div className="flex gap-3 flex-wrap">
+                <Link to="/demo/live">
+                  <Button variant="outline" className="rounded-xl">
+                    View demo bots
+                  </Button>
+                </Link>
+                <Link to="/dashboard/knowledge">
+                  <Button className="rounded-xl">
+                    Import sample data
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : (
+        <>
 
       {/* Main Content */}
       <div className="glass-card rounded-2xl p-6 mt-4 space-y-8">
@@ -408,6 +604,9 @@ const Overview = () => {
           </div>
         </motion.div>
       </div>
+
+        </>
+      )}
 
       {/* Embed Code Dialog */}
       <EmbedCodeDialog open={embedDialogOpen} onOpenChange={setEmbedDialogOpen} />

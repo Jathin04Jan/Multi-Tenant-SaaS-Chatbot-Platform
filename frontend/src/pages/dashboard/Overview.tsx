@@ -175,7 +175,7 @@ const Overview = () => {
       >
         <div className="space-y-3">
           <h1 className="text-4xl font-bold">
-            {showWelcomeExperience ? 'Welcome' : 'Overview'}
+            {showWelcomeExperience ? 'Welcome' : 'Home'}
           </h1>
           <motion.div
             initial={{ opacity: 0, x: -10 }}

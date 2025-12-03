@@ -468,10 +468,10 @@ export const mockListJobs = async (): Promise<ApiResponse<JobDTO[]>> => {
 
 // Billing
 const planLimits: Record<SubscriptionDTO['plan'], { messagesLimit: number; storageLimitMb: number; botsLimit: number }> = {
-  free: { messagesLimit: 100, storageLimitMb: 50, botsLimit: 1 },
-  pro: { messagesLimit: 10000, storageLimitMb: 1024, botsLimit: 10 },
-  business: { messagesLimit: 100000, storageLimitMb: 10240, botsLimit: 999 },
-  enterprise: { messagesLimit: 999999, storageLimitMb: 999999, botsLimit: 999 },
+  free: { messagesLimit: 100, storageLimitMb: 10240, botsLimit: 1 }, // 10 GB
+  pro: { messagesLimit: 10000, storageLimitMb: 102400, botsLimit: 10 }, // 100 GB
+  business: { messagesLimit: 100000, storageLimitMb: 512000, botsLimit: 999 }, // 500 GB
+  enterprise: { messagesLimit: 999999, storageLimitMb: 1048576, botsLimit: 999 }, // 1 TB
 };
 
 let _subscription: SubscriptionDTO = {

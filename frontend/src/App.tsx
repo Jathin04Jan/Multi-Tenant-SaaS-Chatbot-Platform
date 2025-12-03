@@ -23,6 +23,8 @@ import Test from "./pages/dashboard/onboarding/Test";
 import Install from "./pages/dashboard/onboarding/Install";
 import Profile from "./pages/dashboard/settings/Profile";
 import Billing from "./pages/dashboard/settings/Billing";
+import Usage from "./pages/dashboard/settings/Usage";
+import TopUp from "./pages/dashboard/settings/TopUp";
 import Checkout from "./pages/dashboard/settings/Checkout";
 import Appearance from "./pages/dashboard/settings/Appearance";
 import Guardrails from "./pages/dashboard/Guardrails";
@@ -92,6 +94,8 @@ const App = () => (
             <Route path="settings/appearance" element={<Appearance />} />
             <Route path="settings/profile" element={<Profile />} />
             <Route path="settings/billing" element={<Billing />} />
+            <Route path="settings/usage" element={<Usage />} />
+            <Route path="settings/topup" element={<TopUp />} />
             <Route path="settings/payment" element={<Checkout />} />
 
             {/* [schema-demo:additive] Demo routes also available under dashboard shell */}

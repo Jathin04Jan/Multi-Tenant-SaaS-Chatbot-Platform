@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 
 const navigation = [
   {
-    name: 'Overview',
+    name: 'Home',
     href: '/dashboard',
     icon: LayoutDashboard,
   },

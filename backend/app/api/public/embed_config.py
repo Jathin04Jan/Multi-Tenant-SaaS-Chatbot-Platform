@@ -25,6 +25,7 @@ async def get_embed_config(
     request: Request,
     snippet_id: Optional[str] = Query(None, description="Installation snippet ID (UUID) - preferred method"),
     bot_id: Optional[str] = Query(None, description="Bot ID (UUID) - DEPRECATED: use snippet_id instead"),
+    origin: Optional[str] = Query(None, description="Origin/hostname of the page embedding the widget (sent by widget.js)"),
     db: Session = Depends(get_db)
 ):
     """
@@ -43,21 +44,29 @@ async def get_embed_config(
     Query Parameters:
     - snippet_id: Installation snippet ID (UUID) - preferred
     - bot_id: Bot ID (UUID) - DEPRECATED, use snippet_id instead
+    - origin: Origin/hostname of the embedding page (sent by widget.js, preferred over headers)
     
     Returns:
     - Bot UI configuration including theme, positioning, intro message
     - JWT token for authenticating chat API requests
     """
     
-    # Extract origin from request headers
-    origin = request.headers.get("origin") or request.headers.get("referer") or ""
+    # Extract hostname from origin parameter (preferred) or request headers (fallback)
     host = None
     if origin:
-        try:
-            parsed = urlparse(origin)
-            host = parsed.hostname
-        except Exception:
-            pass
+        # Widget explicitly sent the origin - use it directly (may include port)
+        host = origin.strip()
+    else:
+        # Fallback to headers (original behavior)
+        origin_header = request.headers.get("origin") or request.headers.get("referer") or ""
+        if origin_header:
+            try:
+                parsed = urlparse(origin_header)
+                host = parsed.hostname
+            except Exception:
+                pass
+    
+    logger.info(f"Embed config: Extracted hostname: {host} (from origin param: {origin is not None})")
     
     # Primary flow: Use snippet_id (production-ready)
     if snippet_id:
@@ -77,23 +86,27 @@ async def get_embed_config(
             )
         
         # Check snippet status
-        if snippet.status != "active":
+        snippet_status = str(snippet.status) if snippet.status else ""
+        if snippet_status != "active":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Snippet is not active"
             )
         
-        # Domain allow-list validation
+        # Domain allow-list validation (original logic - restored)
         if snippet.domain_whitelist:
             allowed_domains = snippet.domain_whitelist if isinstance(snippet.domain_whitelist, list) else []
             if allowed_domains and host not in allowed_domains:
-                # Also check without www prefix
+                # Also check without www prefix (original behavior)
                 host_without_www = host.replace("www.", "") if host else None
                 if host_without_www not in allowed_domains:
+                    logger.warning(f"Embed config: Domain '{host}' not in allowed list: {allowed_domains}")
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
                         detail=f"Domain '{host}' is not allowed. Allowed domains: {', '.join(allowed_domains)}"
                     )
+            
+            logger.info(f"Embed config: Domain '{host}' validated against allow-list: {allowed_domains}")
         
         # Load associated bot
         bot = db.query(Bot).filter(Bot.id == snippet.bot_id).first()
@@ -111,9 +124,9 @@ async def get_embed_config(
             )
         
         # Update snippet usage tracking
-        snippet.usage_count += 1
+        snippet.usage_count += 1  # type: ignore
         from datetime import datetime, timezone
-        snippet.last_used_at = datetime.now(timezone.utc)
+        snippet.last_used_at = datetime.now(timezone.utc)  # type: ignore
         db.commit()
         
         # Get branding/UI configuration from JSONB

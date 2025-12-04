@@ -230,21 +230,41 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
 
       const hasGuardrailProgress = Object.keys(guardrailsConfig).length > 0;
 
-      const completed: number[] = [];
-      if (hasBrandingProgress) completed.push(1);
-      if (hasToneProgress) completed.push(2);
-      if (hasGuardrailProgress) completed.push(3);
+      // Get existing progress from store to preserve steps 4-7
+      const existingCompletedSteps = useWizardStore.getState().completedSteps;
+      const existingCurrentStep = useWizardStore.getState().currentStep;
+      
+      // Build detected progress from database (steps 1-3)
+      const detectedCompleted: number[] = [];
+      if (hasBrandingProgress) detectedCompleted.push(1);
+      if (hasToneProgress) detectedCompleted.push(2);
+      if (hasGuardrailProgress) detectedCompleted.push(3);
 
-      setCompletedSteps(completed);
+      // Merge detected progress with existing progress
+      // Preserve steps 4-7 from existing store if they exist
+      const existingArray = existingCompletedSteps instanceof Set 
+        ? Array.from(existingCompletedSteps)
+        : Array.isArray(existingCompletedSteps) 
+          ? existingCompletedSteps 
+          : [];
+      
+      // Combine detected steps (1-3) with existing steps (4-7)
+      const mergedCompleted = [...new Set([...detectedCompleted, ...existingArray.filter(s => s > 3)])];
+      setCompletedSteps(mergedCompleted);
 
-      const nextStep = hasGuardrailProgress
+      // Only update currentStep if existing step is not ahead of detected step
+      // This preserves user's position if they were on step 4, 5, 6, or 7
+      const detectedNextStep = hasGuardrailProgress
         ? 4
         : hasToneProgress
         ? 3
         : hasBrandingProgress
         ? 2
         : 1;
-      setCurrentStep(nextStep);
+      
+      // Use existing step if it's ahead of detected step, otherwise use detected step
+      const finalStep = existingCurrentStep > detectedNextStep ? existingCurrentStep : detectedNextStep;
+      setCurrentStep(finalStep);
     },
     [
       isCustomAssistantName,
@@ -351,7 +371,21 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
 
   useEffect(() => {
     if (open) {
-      ensureDraftBot(personaNameRef.current, { forceReset: true });
+      // Only force reset if there's no existing draft or completed steps
+      // This preserves progress when reopening the modal
+      const existingDraftId = draftBotIdRef.current;
+      const existingCompleted = useWizardStore.getState().completedSteps;
+      let hasExistingProgress = false;
+      if (existingCompleted instanceof Set) {
+        hasExistingProgress = existingCompleted.size > 0;
+      } else {
+        const completedArray = existingCompleted as number[];
+        hasExistingProgress = Array.isArray(completedArray) && completedArray.length > 0;
+      }
+      
+      // Only force reset if no existing draft or no progress
+      const shouldForceReset = !existingDraftId || !hasExistingProgress;
+      ensureDraftBot(personaNameRef.current, { forceReset: shouldForceReset });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -804,10 +838,10 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
         );
       }
 
+      // Mark step 7 as complete and stay on step 7 to show embed code
       completeStep(7);
-      setDraftBotId(null);
-      resetLocalWizardState();
-      await ensureDraftBot(personaNameRef.current, { forceReset: true });
+      // Don't reset state here - keep createdBotId and createdSnippetId to show embed code
+      // The state will be reset when user clicks "Finish" button
     } catch (error) {
       console.error('Error creating bot:', error);
       toast.error('Failed to create bot. Please try again.');
@@ -1301,11 +1335,14 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
               </Button>
               {createdBotId ? (
                 <Button 
-                  onClick={() => {
+                  onClick={async () => {
+                    // Clear draft bot ID to prevent new draft creation
+                    setDraftBotId(null);
+                    // Reset all local state
+                    resetLocalWizardState();
+                    // Close modal
                     onOpenChange(false);
-                    resetWizard();
-                    setCreatedBotId(null);
-                    setCreatedSnippetId(null);
+                    // Reload to refresh bot list
                     window.location.reload();
                   }} 
                   size="default" 

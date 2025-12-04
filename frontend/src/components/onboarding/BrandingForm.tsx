@@ -56,9 +56,16 @@ export const BrandingForm = ({ onComplete, botId }: BrandingFormProps) => {
     setLogoMetadata(branding.logoMetadata || null);
   }, [branding.logo, branding.logoMetadata]);
 
+  // Sync botName from store to form field whenever it changes
+  // This ensures the field is populated when navigating back to step 1
   useEffect(() => {
-    setValue('botName', persona.botName || '');
-  }, [persona.botName, setValue]);
+    const currentBotName = persona.botName || '';
+    // Only update if the form value is different to avoid unnecessary re-renders
+    const currentFormValue = watch('botName') || '';
+    if (currentFormValue !== currentBotName) {
+      setValue('botName', currentBotName, { shouldValidate: true, shouldDirty: false });
+    }
+  }, [persona.botName, setValue, watch]);
 
   const resolvedLogo = resolveAssetUrl(logoPreview);
   const hasLogo = Boolean(resolvedLogo);

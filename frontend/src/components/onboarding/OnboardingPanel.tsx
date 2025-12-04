@@ -145,18 +145,35 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
       const llmConfig = (bot.llm_config ?? {}) as Record<string, any>;
       const guardrailsConfig = (bot.guardrails ?? {}) as Record<string, any>;
 
+      // Prioritize bot.name (the main name field) over branding fields
+      // This ensures the name is always preserved when navigating back
+      const botNameFromMain = bot.name && bot.name.trim() ? bot.name.trim() : '';
       const assistantNameCandidate =
         brandingConfig.assistant_name || brandingConfig.chat_title || '';
-      const fallbackBotName = isCustomAssistantName(bot.name) ? bot.name : '';
-      const resolvedAssistantName =
-        (isCustomAssistantName(assistantNameCandidate)
-          ? assistantNameCandidate
-          : '') || fallbackBotName;
+      
+      // Get current store value to preserve user input if they're in the middle of editing
+      const currentStoreBotName = useWizardStore.getState().persona.botName;
+      
+      // If store already has a custom name, preserve it (user might be editing or just navigated back)
+      // Only hydrate from database if store is empty or has default value
+      let resolvedAssistantName = '';
+      if (currentStoreBotName && currentStoreBotName.trim() && isCustomAssistantName(currentStoreBotName)) {
+        // Preserve user's current input - don't overwrite with database value
+        resolvedAssistantName = currentStoreBotName.trim();
+      } else {
+        // Store is empty or has default value - hydrate from database
+        resolvedAssistantName = 
+          (isCustomAssistantName(botNameFromMain) ? botNameFromMain : '') ||
+          (isCustomAssistantName(assistantNameCandidate) ? assistantNameCandidate : '') ||
+          botNameFromMain || // Fallback to bot.name even if not "custom" (preserves saved value)
+          assistantNameCandidate || // Fallback to branding fields
+          '';
+      }
 
       updatePersona({
-        botName: resolvedAssistantName || '',
+        botName: resolvedAssistantName,
       });
-      personaNameRef.current = resolvedAssistantName || '';
+      personaNameRef.current = resolvedAssistantName;
 
       updateBranding({
         logo: brandingConfig.logo_url || brandingConfig.avatar_url || null,
@@ -262,9 +279,13 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           const isSameDraft = draftBotIdRef.current === draftResponse.data.id;
           if (!isSameDraft || forceReset) {
             resetLocalWizardState();
+            setDraftBotId(draftResponse.data.id);
+            hydrateWizardFromDraft(draftResponse.data);
+          } else {
+            // Same draft - only update draftBotId, don't overwrite store
+            // This preserves user's current input when navigating between steps
+            setDraftBotId(draftResponse.data.id);
           }
-          setDraftBotId(draftResponse.data.id);
-          hydrateWizardFromDraft(draftResponse.data);
           return draftResponse.data.id;
         }
 
@@ -434,21 +455,24 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
 
   // Step 1: Brand & Persona
   const handleBrandComplete = useCallback(async () => {
+    // Get the latest botName from store to avoid stale closure issues
+    const currentBotName = useWizardStore.getState().persona.botName;
+    
+    // Check botName first before attempting to save
+    if (!currentBotName?.trim()) {
+      toast.error('Please provide an assistant name before continuing.');
+      return;
+    }
+    
+    // Save branding configuration (only once)
     const brandingSaved = await persistBrandingStep();
     if (!brandingSaved) {
       return;
     }
-    if (!persona.botName?.trim()) {
-      toast.error('Please provide an assistant name before continuing.');
-      return;
-    }
-    const saved = await persistBrandingStep();
-    if (!saved) {
-      return;
-    }
+    
     completeStep(1);
     setCurrentStep(2);
-  }, [completeStep, persistBrandingStep, persona.botName, setCurrentStep]);
+  }, [completeStep, persistBrandingStep, setCurrentStep]);
 
   // Step 2: Tone
   const handleToneComplete = useCallback(async () => {

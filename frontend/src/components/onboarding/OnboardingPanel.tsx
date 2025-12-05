@@ -396,9 +396,15 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
       return false;
     }
 
+    // Get the latest botName from store to ensure we have the most recent value
+    const currentBotName = useWizardStore.getState().persona.botName;
+    const botNameToSave = currentBotName && currentBotName.trim() ? currentBotName.trim() : 'Assistant';
+    
+    console.log('Persisting branding step - botName:', botNameToSave, 'from store:', currentBotName);
+
     const brandMetadata = branding.logoMetadata || {};
     const payload = {
-      name: persona.botName || 'Assistant',
+      name: botNameToSave,
       description: `A ${tone.communicationStyle} chatbot`,
       branding: {
         logo_url: branding.logo,

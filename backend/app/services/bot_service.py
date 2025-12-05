@@ -162,11 +162,15 @@ class BotService:
         
         # Update only provided fields
         update_data = bot_update.model_dump(exclude_unset=True)
+        print(f"DEBUG: Updating bot {bot_id} with fields: {list(update_data.keys())}")
+        if 'name' in update_data:
+            print(f"DEBUG: Setting bot name to: '{update_data['name']}'")
         for field, value in update_data.items():
             setattr(bot, field, value)
         
         db.commit()
         db.refresh(bot)
+        print(f"DEBUG: Bot name after update: '{bot.name}'")
         
         return bot
     

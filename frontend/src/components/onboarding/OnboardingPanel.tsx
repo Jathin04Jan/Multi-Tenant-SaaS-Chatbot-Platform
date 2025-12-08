@@ -20,6 +20,7 @@ import {
   createSnippet,
   uploadBotDocument,
   createCrawlDocument,
+  listBotDocuments,
   getDraftBot,
   createDraftBot,
   resetDraftBot,
@@ -55,6 +56,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     addDataSource, 
     removeDataSource, 
     updateDataSource,
+    replaceDataSources,
     resetWizard,
     branding,
     persona,
@@ -538,26 +540,36 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!draftBotId) {
+      toast.error('Draft bot is not ready yet. Please wait and try again.');
+      return;
+    }
 
     setIsUploading(true);
     try {
-      const uploadId =
-        typeof crypto !== 'undefined' && 'randomUUID' in crypto
-          ? crypto.randomUUID()
-          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const response = await uploadBotDocument(draftBotId, file);
+      if (response.error || !response.data) {
+        toast.error(response.error || `Failed to upload ${file.name}`);
+        return;
+      }
 
-      setPendingUploads((prev) => ({ ...prev, [uploadId]: file }));
+      const doc = response.data;
       addDataSource({
-        id: uploadId,
-        type: 'upload',
-        name: file.name,
-        status: 'queued',
-        size: file.size,
-        updatedAt: new Date().toISOString(),
+        id: doc.id,
+        type: doc.source_type === 'url' ? 'crawl' : 'upload',
+        name: doc.filename || doc.metadata?.original_name || file.name,
+        status: (doc.status as DataSource['status']) || 'indexed',
+        size: doc.size ?? file.size,
+        url: doc.source_url || undefined,
+        updatedAt: doc.updated_at || new Date().toISOString(),
       });
-      toast.success('Document added. It will upload when you finish setup.');
-    } catch (error) {
-      toast.error('Failed to queue file for upload');
+      toast.success('Document uploaded successfully.');
+    } catch (error: any) {
+      console.error('Error uploading document:', error);
+      const message =
+        error?.response?.data?.detail ||
+        (error instanceof Error ? error.message : 'Failed to upload document');
+      toast.error(message);
     } finally {
       setIsUploading(false);
       if (e.target) {
@@ -576,49 +588,8 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     });
   };
 
-  const uploadQueuedDocuments = async (botId: string) => {
-    const entries = Object.entries(pendingUploads);
-    if (entries.length === 0) {
-      return;
-    }
-
-    let successCount = 0;
-    for (const [sourceId, file] of entries) {
-      try {
-        const response = await uploadBotDocument(botId, file);
-        if (response.error) {
-          updateDataSource(sourceId, {
-            status: 'failed',
-            updatedAt: new Date().toISOString(),
-          });
-          toast.error(response.error || `Failed to upload ${file.name}`);
-        } else {
-          updateDataSource(sourceId, {
-            status: 'indexed',
-            updatedAt: new Date().toISOString(),
-          });
-          successCount += 1;
-        }
-      } catch (error: any) {
-        console.error('Error uploading document:', error);
-        updateDataSource(sourceId, {
-          status: 'failed',
-          updatedAt: new Date().toISOString(),
-        });
-        const message =
-          error?.response?.data?.detail ||
-          (error instanceof Error ? error.message : 'Failed to upload document');
-        toast.error(message);
-      }
-    }
-
-    if (successCount > 0) {
-      toast.success(
-        `Uploaded ${successCount} document${successCount > 1 ? 's' : ''} to MinIO`
-      );
-    }
-    setPendingUploads({});
-  };
+  // Queued upload helper remains for compatibility but no longer used
+  const uploadQueuedDocuments = async (_botId: string) => {};
 
   const saveCrawledSources = async (botId: string) => {
     const crawlSources = dataSources.filter((source) => source.type === 'crawl');
@@ -695,6 +666,33 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
       setIsCrawling(false);
     }
   };
+
+  // Load documents from backend for the current draft bot (so refresh/resume keeps docs)
+  useEffect(() => {
+    const loadDocuments = async () => {
+      if (!draftBotId) return;
+      try {
+        const resp = await listBotDocuments(draftBotId);
+        if (resp.error || !resp.data) {
+          console.error('Failed to load documents for draft bot:', resp.error);
+          return;
+        }
+        const docs = resp.data.map((doc) => ({
+          id: doc.id,
+          name: doc.filename || doc.metadata?.original_name || 'Document',
+          type: doc.source_type === 'url' ? 'crawl' : 'upload',
+          status: (doc.status as DataSource['status']) || 'indexed',
+          size: doc.size ?? undefined,
+          url: doc.source_url || undefined,
+          updatedAt: doc.updated_at || doc.created_at,
+        }));
+        replaceDataSources(docs);
+      } catch (error) {
+        console.error('Error loading documents for draft bot:', error);
+      }
+    };
+    loadDocuments();
+  }, [draftBotId, replaceDataSources]);
 
   const handleDataContinue = () => {
     if (dataSources.length === 0) {

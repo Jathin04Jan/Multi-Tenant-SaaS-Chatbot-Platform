@@ -77,7 +77,7 @@ interface WizardState {
   // Actions
   setTenantId: (id: string) => void;
   setAgentId: (id: string) => void;
-  setDraftBotId: (id: string | null) => void;
+  setDraftBotId: (id: string | null) => void
   updateBranding: (branding: Partial<BrandConfig>) => void;
   updatePersona: (persona: Partial<PersonaConfig>) => void;
   updateTone: (tone: Partial<ToneConfig>) => void;
@@ -87,6 +87,7 @@ interface WizardState {
   updateDataSource: (id: string, updates: Partial<DataSource>) => void;
   setIndexingProgress: (progress: number) => void;
   setIndexingStatus: (status: WizardState['indexingStatus']) => void;
+  replaceDataSources: (sources: DataSource[]) => void;
   completeStep: (step: number) => void;
   setCompletedSteps: (steps: number[]) => void;
   setCurrentStep: (step: number) => void;
@@ -198,6 +199,7 @@ export const useWizardStore = create<WizardState>()(
             s.id === id ? { ...s, ...updates } : s
           ),
         })),
+      replaceDataSources: (sources) => set({ dataSources: sources }),
       
       setIndexingProgress: (progress) => set({ indexingProgress: progress }),
       setIndexingStatus: (status) => set({ indexingStatus: status }),

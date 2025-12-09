@@ -45,123 +45,6 @@ const vectorLimits: Record<SubscriptionDTO['plan'], number> = {
   enterprise: 10000000,
 };
 
-const ensureDemoUsage = (value: number, limit: number, ratio = 0.35) => {
-  if (!isFinite(limit) || limit === 0) return value;
-  if (value <= 0) return Math.min(limit, limit * ratio);
-  if (value >= limit) return Math.max(limit * (1 - ratio), limit - limit * 0.1);
-  return value;
-};
-
-const getPlanAnalytics = (sub: SubscriptionDTO) => {
-  const usage = sub.usage;
-  const storageLimitGb = usage.storageLimitMb / 1024;
-  const storageUsedGb = usage.storageMb / 1024;
-  const storageUsedDemoGb = ensureDemoUsage(storageUsedGb, storageLimitGb, 0.25);
-  const storageRemainingDemoGb = Math.max(0, storageLimitGb - storageUsedDemoGb);
-
-  const totalTokens = usage.messagesLimit * TOKENS_PER_MESSAGE;
-  const tokensUsedActual = Math.min(totalTokens, usage.messages * TOKENS_PER_MESSAGE);
-  const tokensUsedDemo = ensureDemoUsage(tokensUsedActual, totalTokens, 0.45);
-  const tokensRemainingDemo = Math.max(0, totalTokens - tokensUsedDemo);
-
-  const botLimit = usage.botsLimit === 999 ? 50 : usage.botsLimit;
-  const botsUsedDemo = ensureDemoUsage(usage.bots, botLimit, 0.2);
-  const botsRemainingDemo =
-    usage.botsLimit === 999 ? Infinity : Math.max(0, usage.botsLimit - botsUsedDemo);
-
-  const vectorLimit = vectorLimits[sub.plan];
-  const vectorUsage = Math.round(
-    vectorLimit *
-      (usage.storageLimitMb > 0 ? Math.min(1, usage.storageMb / usage.storageLimitMb) : 0.25)
-  );
-
-  const apiLimit = usage.messagesLimit * 3;
-  const apiUsed = Math.min(apiLimit, usage.messages * 2);
-  const apiRemaining = Math.max(0, apiLimit - apiUsed);
-
-  const billingMetrics: BillingMetric[] = [
-    {
-      label: 'Tokens remaining this cycle',
-      value: `${formatCompact(tokensRemainingDemo)} / ${formatCompact(totalTokens)}`,
-      hint: `Estimated at ${TOKENS_PER_MESSAGE} tokens per message.`,
-      detail: `Of ~${formatCompact(totalTokens)} tokens included in your ${sub.plan} plan.`,
-    },
-    {
-      label: 'Upload capacity remaining',
-      value: `${formatCompact(storageRemainingDemoGb, 2)} / ${formatCompact(storageLimitGb, 2)} GB`,
-      hint: `${formatCompact(storageUsedDemoGb, 2)} GB currently in use.`,
-      detail: `Document storage left from ${formatCompact(storageLimitGb, 2)} GB included.`,
-    },
-    {
-      label: 'Bot slots available',
-      value:
-        botsRemainingDemo === Infinity
-          ? `${formatCompact(botsUsedDemo)} / ∞`
-          : usage.botsLimit === 999
-            ? `${formatCompact(botsUsedDemo)} / ∞`
-            : `${formatCompact(botsRemainingDemo)} / ${formatCompact(usage.botsLimit)}`,
-      hint: `${formatCompact(botsUsedDemo)} active bots in this workspace.`,
-      detail:
-        usage.botsLimit === 999
-          ? 'Bots are effectively unmetered on this plan.'
-          : `Of ${formatCompact(usage.botsLimit)} total bots allowed on this plan.`,
-    },
-  ];
-
-  const vectorBreakdown = {
-    limit: vectorLimit,
-    used: vectorUsage,
-    remaining: Math.max(0, vectorLimit - vectorUsage),
-    documents: Math.max(1, Math.round(vectorUsage / 2400)),
-    words: vectorUsage * 5,
-  };
-
-  const apiBreakdown = {
-    apiRemaining,
-    apiLimit,
-    apiUsed,
-    avgPerDay: Math.max(1, Math.round(apiUsed / 30)),
-    estDays: Math.max(1, Math.round(apiRemaining / Math.max(1, apiUsed / 30))),
-  };
-
-  return {
-    billingMetrics,
-    vectorBreakdown,
-    apiBreakdown,
-    storageLimitGb,
-    storageUsedDemoGb,
-    storageRemainingDemoGb,
-    botsUsedDemo,
-    botsRemainingDemo,
-    tokensRemainingDemo,
-    totalTokens,
-  };
-};
-
-const buildSummaryCards = (
-  analytics: ReturnType<typeof getPlanAnalytics> | null,
-  sub: SubscriptionDTO | null,
-) => {
-  if (!analytics || !sub) return [];
-  return [
-    {
-      label: 'Storage',
-      value: `${formatCompact(analytics.storageUsedDemoGb, 2)} / ${formatCompact(analytics.storageLimitGb, 2)} GB`,
-      hint: 'Document storage currently consumed.',
-      detail: `${formatCompact(analytics.storageUsedDemoGb, 2)} GB in use`,
-    },
-    {
-      label: 'Chatbots',
-      value: `${
-        analytics.botsRemainingDemo === Infinity
-          ? `${formatCompact(analytics.botsUsedDemo)} / ∞`
-          : `${formatCompact(analytics.botsUsedDemo)} / ${formatCompact(sub.usage.botsLimit)}`
-      }`,
-      hint: 'Bots live in this workspace.',
-      detail: sub.usage.botsLimit === 999 ? 'Unlimited bots on this plan' : 'Upgrade to add more bots',
-    },
-  ];
-};
 const Billing = () => {
   const [sub, setSub] = useState<SubscriptionDTO | null>(null);
   const [loading, setLoading] = useState(true);
@@ -202,6 +85,11 @@ const Billing = () => {
     ? (() => {
         const usage = sub.usage;
         const totalRequests = usage.messages;
+        const tokensRemaining = Math.max(
+          0,
+          (usage.messagesLimit - usage.messages) * TOKENS_PER_MESSAGE,
+        );
+        const storageRemainingGb = Math.max(0, (usage.storageLimitMb - usage.storageMb) / 1024);
         const storageLimitGb = usage.storageLimitMb / 1024;
         const storageUsedGb = usage.storageMb / 1024;
         const botsRemaining =
@@ -226,48 +114,28 @@ const Billing = () => {
         const apiUsed = Math.min(apiLimit, usage.messages * 2);
         const apiRemaining = Math.max(0, apiLimit - apiUsed);
 
-        const ensureDemoUsage = (value: number, limit: number, ratio = 0.35) => {
-          if (!isFinite(limit) || limit === 0) return value;
-          if (value <= 0) return Math.min(limit, limit * ratio);
-          if (value >= limit) return Math.max(limit * (1 - ratio), limit - limit * 0.1);
-          return value;
-        };
-
-        const storageUsedDemoGb = ensureDemoUsage(storageUsedGb, storageLimitGb, 0.25);
-        const storageRemainingDemoGb = Math.max(0, storageLimitGb - storageUsedDemoGb);
-
-        const totalTokens = usage.messagesLimit * TOKENS_PER_MESSAGE;
-        const tokensUsedActual = Math.min(totalTokens, usage.messages * TOKENS_PER_MESSAGE);
-        const tokensUsedDemo = ensureDemoUsage(tokensUsedActual, totalTokens, 0.45);
-        const tokensRemainingDemo = Math.max(0, totalTokens - tokensUsedDemo);
-
-        const botLimit = usage.botsLimit === 999 ? 50 : usage.botsLimit;
-        const botsUsedDemo = ensureDemoUsage(usage.bots, botLimit, 0.2);
-        const botsRemainingDemo =
-          usage.botsLimit === 999 ? Infinity : Math.max(0, usage.botsLimit - botsUsedDemo);
-
         const billingMetrics: BillingMetric[] = [
           {
             label: 'Tokens remaining this cycle',
-            value: `${formatCompact(tokensRemainingDemo)} / ${formatCompact(totalTokens)}`,
+            value: `${formatCompact(tokensRemaining)} / ${formatCompact(totalTokens)}`,
             hint: `Estimated at ${TOKENS_PER_MESSAGE} tokens per message.`,
             detail: `Of ~${formatCompact(totalTokens)} tokens included in your ${sub.plan} plan.`,
           },
           {
             label: 'Upload capacity remaining',
-            value: `${formatCompact(storageRemainingDemoGb, 2)} / ${formatCompact(storageLimitGb, 2)} GB`,
-            hint: `${formatCompact(storageUsedDemoGb, 2)} GB currently in use.`,
+            value: `${formatCompact(storageRemainingGb, 2)} / ${formatCompact(storageLimitGb, 2)} GB`,
+            hint: `${formatCompact(storageUsedGb, 2)} GB currently in use.`,
             detail: `Document storage left from ${formatCompact(storageLimitGb, 2)} GB included.`,
           },
           {
             label: 'Bot slots available',
             value:
-              botsRemainingDemo === Infinity
-                ? `${formatCompact(botsUsedDemo)} / ∞`
+              botsRemaining === Infinity
+                ? `${formatCompact(usage.bots)} / ∞`
                 : usage.botsLimit === 999
-                  ? `${formatCompact(botsUsedDemo)} / ∞`
-                  : `${formatCompact(botsRemainingDemo)} / ${formatCompact(usage.botsLimit)}`,
-            hint: `${formatCompact(botsUsedDemo)} active bots in this workspace.`,
+                  ? `${formatCompact(usage.bots)} / ∞`
+                  : `${formatCompact(botsRemaining)} / ${formatCompact(usage.botsLimit)}`,
+            hint: `${formatCompact(usage.bots)} active bots in this workspace.`,
             detail:
               usage.botsLimit === 999
                 ? 'Bots are effectively unmetered on this plan.'
@@ -290,47 +158,28 @@ const Billing = () => {
           estDays: Math.max(1, Math.round(apiRemaining / Math.max(1, apiUsed / 30))),
         };
 
-        return {
-          billingMetrics,
-          vectorBreakdown,
-          apiBreakdown,
-          storageLimitGb,
-          storageUsedDemoGb,
-          storageRemainingDemoGb,
-          botsUsedDemo,
-          botsRemainingDemo,
-          tokensRemainingDemo,
-          totalTokens,
-        };
+        return { billingMetrics, vectorBreakdown, apiBreakdown };
       })()
     : null;
 
-  const summaryCards = buildSummaryCards(planAnalytics, sub);
-
-const buildSummaryCards = (
-  analytics: ReturnType<typeof planAnalytics> | null,
-  sub: SubscriptionDTO | null,
-) => {
-  if (!analytics || !sub) return [];
-  return [
-    {
-      label: 'Storage',
-      value: `${formatCompact(analytics.storageUsedDemoGb, 2)} / ${formatCompact(analytics.storageLimitGb, 2)} GB`,
-      hint: 'Document storage currently consumed.',
-      detail: `${formatCompact(analytics.storageUsedDemoGb, 2)} GB in use`,
-    },
-    {
-      label: 'Chatbots',
-      value: `${
-        analytics.botsRemainingDemo === Infinity
-          ? `${formatCompact(analytics.botsUsedDemo)} / ∞`
-          : `${formatCompact(analytics.botsUsedDemo)} / ${formatCompact(sub.usage.botsLimit)}`
-      }`,
-      hint: 'Bots live in this workspace.',
-      detail: sub.usage.botsLimit === 999 ? 'Unlimited bots on this plan' : 'Upgrade to add more bots',
-    },
-  ];
-};
+  const summaryCards = sub
+    ? [
+        {
+          label: 'Storage',
+          value: `${formatCompact(sub.usage.storageMb / 1024, 2)} / ${formatCompact(sub.usage.storageLimitMb / 1024, 2)} GB`,
+          hint: 'Document storage currently consumed.',
+          detail: `${formatCompact(sub.usage.storageMb / 1024, 2)} GB in use`,
+        },
+        {
+          label: 'Chatbots',
+          value: `${formatCompact(sub.usage.bots)} / ${
+            sub.usage.botsLimit === 999 ? '∞' : formatCompact(sub.usage.botsLimit)
+          }`,
+          hint: 'Bots live in this workspace.',
+          detail: sub.usage.botsLimit === 999 ? 'Unlimited bots on this plan' : 'Upgrade to add more bots',
+        },
+      ]
+    : [];
 
   return (
     <div className="container max-w-7xl px-4 py-8 space-y-8">

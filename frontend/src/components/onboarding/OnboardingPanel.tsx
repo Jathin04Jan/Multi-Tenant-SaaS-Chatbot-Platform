@@ -31,14 +31,14 @@ interface OnboardingPanelProps {
 }
 
 export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) => {
-  const { 
-    completedSteps, 
-    currentStep, 
-    setCurrentStep, 
-    completeStep, 
-    dataSources, 
-    addDataSource, 
-    removeDataSource, 
+  const {
+    completedSteps,
+    currentStep,
+    setCurrentStep,
+    completeStep,
+    dataSources,
+    addDataSource,
+    removeDataSource,
     updateDataSource,
     resetWizard,
     branding,
@@ -97,11 +97,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
   ]);
 
   // Reset wizard when panel opens
-  useEffect(() => {
-    if (open) {
-      handleResetWizard();
-    }
-  }, [open, handleResetWizard]);
+
 
   // Map steps with completion status
   // Only show steps as completed if they are completed AND current step is at or beyond that step
@@ -334,9 +330,9 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     setTestMessage(''); // Clear input after sending
     // Simulate bot response
     setTimeout(() => {
-      setChatMessages(prev => [...prev, { 
-        type: 'bot', 
-        message: 'This is a test response. In production, this would come from your chatbot API.' 
+      setChatMessages(prev => [...prev, {
+        type: 'bot',
+        message: 'This is a test response. In production, this would come from your chatbot API.'
       }]);
     }, 500);
   };
@@ -409,19 +405,19 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           embedding_model: 'text-embedding-ada-002',
         },
       };
-      
+
       // Create bot via API
       const response = await createBot(botData);
-      
+
       if (response.error) {
         toast.error(response.error || 'Failed to create bot');
         return;
       }
-      
+
       // Store bot ID for embed code
       if (response.data) {
         setCreatedBotId(response.data.id);
-        
+
         // PRODUCTION: Automatically activate the bot after creation
         // This makes the bot immediately embeddable
         try {
@@ -432,7 +428,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
             toast.success('Bot created and activated successfully! 🎉');
             await uploadQueuedDocuments(response.data.id);
             await saveCrawledSources(response.data.id);
-            
+
             // Create installation snippet for the bot
             try {
               const snippetResponse = await createSnippet(response.data.id, {
@@ -440,7 +436,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                 status: 'active',
                 // allowed_domains: undefined means allow all domains (good for testing)
               });
-              
+
               if (snippetResponse.error) {
                 toast.warning('Bot created but snippet creation failed. You can create a snippet manually from the bot detail page.');
               } else if (snippetResponse.data) {
@@ -457,7 +453,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           toast.warning('Bot created but activation failed. Please activate it manually.');
         }
       }
-      
+
       completeStep(7);
     } catch (error) {
       console.error('Error creating bot:', error);
@@ -476,7 +472,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                 Customize how your chatbot looks and sounds
               </p>
             </div>
-            
+
             {/* Branding Section */}
             <div className="grid lg:grid-cols-2 gap-6">
               <div className="glass-card p-6">
@@ -504,10 +500,10 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
             </div>
 
             <div className="flex gap-3">
-              <Button 
-                onClick={() => setCurrentStep(1)} 
-                variant="outline" 
-                size="default" 
+              <Button
+                onClick={() => setCurrentStep(1)}
+                variant="outline"
+                size="default"
                 className="flex-1"
               >
                 Back
@@ -535,17 +531,17 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
             </div>
 
             <div className="flex gap-3">
-              <Button 
-                onClick={() => setCurrentStep(2)} 
-                variant="outline" 
-                size="default" 
+              <Button
+                onClick={() => setCurrentStep(2)}
+                variant="outline"
+                size="default"
                 className="flex-1"
               >
                 Back
               </Button>
-              <Button 
-                onClick={handleGuardrailsContinue} 
-                size="default" 
+              <Button
+                onClick={handleGuardrailsContinue}
+                size="default"
                 className="flex-1"
               >
                 Continue <ArrowRight className="ml-2 h-4 w-4" />
@@ -643,10 +639,10 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
             )}
 
             <div className="flex gap-3">
-              <Button 
-                onClick={() => setCurrentStep(3)} 
-                variant="outline" 
-                size="default" 
+              <Button
+                onClick={() => setCurrentStep(3)}
+                variant="outline"
+                size="default"
                 className="flex-1"
               >
                 Back
@@ -758,17 +754,17 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
 
               {indexingStatus === 'completed' && (
                 <div className="flex gap-3">
-                  <Button 
-                    onClick={() => setCurrentStep(4)} 
-                    variant="outline" 
-                    size="default" 
+                  <Button
+                    onClick={() => setCurrentStep(4)}
+                    variant="outline"
+                    size="default"
                     className="flex-1"
                   >
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back
                   </Button>
-                  <Button 
-                    onClick={() => setCurrentStep(6)} 
-                    size="default" 
+                  <Button
+                    onClick={() => setCurrentStep(6)}
+                    size="default"
                     className="flex-1"
                   >
                     Continue <ArrowRight className="ml-2 h-4 w-4" />
@@ -837,8 +833,8 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                     onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleTestMessage()}
                     className="flex-1"
                   />
-                  <Button 
-                    onClick={handleTestMessage} 
+                  <Button
+                    onClick={handleTestMessage}
                     disabled={!testMessage.trim()}
                     size="default"
                   >
@@ -849,10 +845,10 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
             </div>
 
             <div className="flex gap-3">
-              <Button 
-                onClick={() => setCurrentStep(4)} 
-                variant="outline" 
-                size="default" 
+              <Button
+                onClick={() => setCurrentStep(4)}
+                variant="outline"
+                size="default"
                 className="flex-1"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back
@@ -888,7 +884,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                     <div className="relative">
                       <div className="p-4 bg-muted rounded-lg font-mono text-xs overflow-x-auto border border-border/50">
                         <code className="text-xs whitespace-pre">
-{createdSnippetId ? `<!-- Add this before closing </body> tag -->
+                          {createdSnippetId ? `<!-- Add this before closing </body> tag -->
 <script 
   src="${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/static/widget.js"
   data-snippet-id="${createdSnippetId}"
@@ -898,9 +894,9 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                         </code>
                       </div>
                       {createdSnippetId && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="absolute top-2 right-2 h-7 px-3 text-xs"
                           onClick={() => {
                             const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -928,7 +924,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                         <li>The chatbot widget will appear on your website</li>
                       </ol>
                       <p className="mt-2 text-xs">
-                        <strong>Note:</strong> The widget will only work if your bot status is <strong>active</strong>. 
+                        <strong>Note:</strong> The widget will only work if your bot status is <strong>active</strong>.
                         You can manage bot status from the bot detail page.
                       </p>
                     </div>
@@ -942,24 +938,24 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
             </div>
 
             <div className="flex gap-3">
-              <Button 
-                onClick={() => setCurrentStep(6)} 
-                variant="outline" 
-                size="default" 
+              <Button
+                onClick={() => setCurrentStep(6)}
+                variant="outline"
+                size="default"
                 className="flex-1"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back
               </Button>
               {createdBotId ? (
-                <Button 
+                <Button
                   onClick={() => {
                     onOpenChange(false);
                     resetWizard();
                     setCreatedBotId(null);
                     setCreatedSnippetId(null);
                     window.location.reload();
-                  }} 
-                  size="default" 
+                  }}
+                  size="default"
                   className="flex-1"
                 >
                   Finish <CheckCircle2 className="ml-2 h-4 w-4" />

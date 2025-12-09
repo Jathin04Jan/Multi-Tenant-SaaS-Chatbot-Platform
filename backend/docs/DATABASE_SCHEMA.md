@@ -1,6 +1,6 @@
 # Complete Database Schema
 
-[← Docs Index](./README.md) · [Backend Quick Start](../README.md) · [Project Overview](../../README.md)
+[← Docs Index](./README.md) · [Backend Quick Start](../README.md) · [Project Overview](../../README.md) · [Schema Diagram](./SCHEMA_DIAGRAM.md)
 
 ## Tables Overview
 

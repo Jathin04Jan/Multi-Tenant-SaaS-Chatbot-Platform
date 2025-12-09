@@ -2,6 +2,9 @@ from app.models.user import User, UserStatus
 from app.models.bot import Bot, BotStatus
 from app.models.installation_snippet import InstallationSnippet
 from app.models.document import Document
+from app.models.pricing_plan import PricingPlan
+from app.models.pricing_plan_country_price import PricingPlanCountryPrice
+from app.models.app_setting import AppSetting
 
 __all__ = [
     "User",
@@ -10,5 +13,8 @@ __all__ = [
     "BotStatus",
     "InstallationSnippet",
     "Document",
+    "PricingPlan",
+    "PricingPlanCountryPrice",
+    "AppSetting",
 ]
 

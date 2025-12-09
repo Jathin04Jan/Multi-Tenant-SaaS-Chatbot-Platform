@@ -8,6 +8,9 @@
 2. **`bots`** - Bot/Agent configurations
 3. **`documents`** - Knowledge sources uploaded by tenants (stored in MinIO)
 4. **`installation_snippets`** - Embed codes and installation scripts
+5. **`pricing_plans`** - Global subscription plans (Free, Pro, Enterprise, etc.)
+6. **`pricing_plan_country_prices`** - Country/region-specific pricing for each plan
+7. **`app_settings`** - Global application settings and landing page content
 
 ---
 

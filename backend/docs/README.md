@@ -22,6 +22,9 @@ This directory contains detailed documentation for the backend API.
 - **[BOTS_SCHEMA.md](./BOTS_SCHEMA.md)** – Bots table schema documentation
 - **[DOCUMENTS_SCHEMA.md](./DOCUMENTS_SCHEMA.md)** – Knowledge source/document storage schema (details file-type/size limits and URL support)
 - **[INSTALLATION_SNIPPETS_SCHEMA.md](./INSTALLATION_SNIPPETS_SCHEMA.md)** – Installation snippets table schema documentation
+- **[PRICING_PLANS_SCHEMA.md](./PRICING_PLANS_SCHEMA.md)** – Pricing plans and country-specific pricing schema (global, admin-only)
+- **[APP_SETTINGS_SCHEMA.md](./APP_SETTINGS_SCHEMA.md)** – Global application settings and landing page content schema (admin-only)
+- **[GLOBAL_CONFIGURATION_TABLES.md](./GLOBAL_CONFIGURATION_TABLES.md)** – Overview of global configuration tables (pricing plans, app settings)
 - **[MIGRATIONS_VS_CREATE_ALL.md](./MIGRATIONS_VS_CREATE_ALL.md)** – Explanation of Alembic migrations vs `create_all()`
 
 ### Security

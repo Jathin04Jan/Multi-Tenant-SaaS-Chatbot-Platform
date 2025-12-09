@@ -10,6 +10,9 @@ This document provides the complete database schema for the Multi-Tenant SaaS Ch
 2. **`bots`** - Bot/Agent configurations
 3. **`documents`** - Uploaded knowledge sources stored in MinIO
 4. **`installation_snippets`** - Embed codes and installation scripts
+5. **`pricing_plans`** - Global subscription plans (Free, Pro, Enterprise, etc.) - **Admin-only**
+6. **`pricing_plan_country_prices`** - Country/region-specific pricing for each plan - **Admin-only**
+7. **`app_settings`** - Global application settings and landing page content - **Admin-only**
 
 ---
 
@@ -415,9 +418,10 @@ CREATE INDEX idx_documents_source_type ON documents(source_type);
 
 ## 🎯 Summary
 
-- **4 Tables**: `users`, `bots`, `documents`, `installation_snippets`
+- **7 Tables**: `users`, `bots`, `documents`, `installation_snippets`, `pricing_plans`, `pricing_plan_country_prices`, `app_settings`
 - **2 Enums**: `user_status`, `bot_status`
 - **All relationships** properly configured with foreign keys and CASCADE DELETE
 - **All indexes** optimized for common query patterns
 - **UI Configuration**: Stored directly in `branding` JSONB field (no separate table needed)
 - **One Snippet Per Bot**: System enforces one snippet per bot (existing snippets are updated, not duplicated)
+- **Global Configuration**: `pricing_plans`, `pricing_plan_country_prices`, and `app_settings` are global (admin-only) tables for platform-wide configuration

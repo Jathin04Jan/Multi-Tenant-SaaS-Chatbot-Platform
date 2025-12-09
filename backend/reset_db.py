@@ -18,6 +18,9 @@ from app.models import (
     Bot,
     InstallationSnippet,
     Document,
+    PricingPlan,
+    PricingPlanCountryPrice,
+    AppSetting,
 )  # Import all models to register them
 
 

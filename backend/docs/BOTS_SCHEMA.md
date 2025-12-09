@@ -23,7 +23,7 @@ Stores all chatbot/bot configurations and settings for each user/tenant.
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
 
 ### Status Enum Values
-- **`draft`** - Bot is being created/configured (default)
+- **`draft`** - Bot is being created/configured (default). Used for in-progress bot creation. Each user can have only one draft bot at a time. Draft bots are automatically created when the user starts the bot creation wizard and are updated at each step. When the wizard is completed, the draft bot's status is changed to `active`.
 - **`active`** - Bot is live and operational (can be embedded)
 - **`paused`** - Bot is temporarily disabled
 - **`archived`** - Bot is deactivated/removed
@@ -208,7 +208,14 @@ CREATE INDEX idx_bots_created_at ON bots(created_at);
 - Supports complex nested configurations
 - Enables querying with PostgreSQL JSONB operators
 
-### 5. **Additional Fields Added**
+### 5. **Draft Bot System**
+- **One Draft Per User**: Each user can have only one draft bot at a time. This is enforced at the API level.
+- **Step-by-Step Persistence**: All configuration (branding, tone, guardrails) is saved to the database immediately when the user clicks "Next" on each step of the wizard.
+- **Immediate Document Upload**: Documents are uploaded to database and MinIO immediately when added in Step 4 (not queued for later). This ensures documents persist even if the user exits and resumes.
+- **Progress Preservation**: If the user exits the wizard and returns, their progress is restored from the database, including all uploaded documents.
+- **Draft Cleanup**: When a draft bot is completed (status changed to `active`), a new draft can be created. The "Reset" button in the wizard deletes the draft bot and all associated assets (logo, documents) from MinIO.
+
+### 6. **Additional Fields Added**
 - `status`: Lifecycle management (draft, active, paused, archived) - single source of truth
 - `is_active`: Computed property (not stored) - derived from `status == 'active'`
 - `updated_at`: Automatically tracks when bot was last modified (includes activation/deployment)

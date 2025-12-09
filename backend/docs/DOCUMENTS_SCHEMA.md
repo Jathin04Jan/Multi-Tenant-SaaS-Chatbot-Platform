@@ -26,11 +26,29 @@ This table stores metadata for tenant knowledge sources persisted in MinIO or re
 
 ## API Surface
 
-- `POST /api/v1/bots/{bot_id}/documents` – Upload a document (backend validates type/size, uploads to MinIO, responds with metadata)
+- `POST /api/v1/bots/{bot_id}/documents` – Upload a document (backend validates type/size, **uploads to MinIO immediately**, creates database record, responds with metadata). **Documents are not queued** - they are persisted immediately to ensure they survive wizard exits and page refreshes.
 - `POST /api/v1/bots/{bot_id}/documents/crawl` – Register a crawled website (stored as `source_type = url`, no MinIO upload)
-- `GET /api/v1/bots/{bot_id}/documents` – List documents for the bot (tenant ownership enforced)
+- `GET /api/v1/bots/{bot_id}/documents` – List documents for the bot (tenant ownership enforced). Used by the wizard to re-hydrate document list when resuming.
 - `GET /api/v1/documents/{document_id}` – Download a file (streams bytes, requires tenant auth)
-- `DELETE /api/v1/documents/{document_id}` – Remove file + metadata
+- `DELETE /api/v1/documents/{document_id}` – Remove file + metadata (also deletes MinIO object)
+
+### Immediate Upload Behavior
+
+**Important**: Documents are uploaded to both the database and MinIO **immediately** when added in Step 4 of the bot creation wizard. This ensures:
+
+1. **Persistence**: Documents persist even if the user exits the wizard or refreshes the page
+2. **Resume Capability**: When the user returns to the wizard, documents are re-hydrated from the database
+3. **No Data Loss**: Documents are never lost due to incomplete wizard sessions
+4. **Production Ready**: The system handles partial bot creation gracefully
+
+The frontend calls `POST /api/v1/bots/{bot_id}/documents` as soon as a file is selected, and the backend:
+1. Validates the file (type, size)
+2. Creates the database record with `status = 'pending'`
+3. Uploads the file to MinIO
+4. Updates the database record with the `source_url` (MinIO object key)
+5. Returns the document metadata to the frontend
+
+The frontend then updates its local state with the document ID and status, ensuring the UI reflects the persisted state.
 
 ### Future Enhancements
 

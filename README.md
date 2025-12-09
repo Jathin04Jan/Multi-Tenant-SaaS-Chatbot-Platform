@@ -100,14 +100,14 @@ Multi-Tenant-SaaS-Chatbot-Platform/
 2. **Authentication** - Sign up, sign in, email verification
 3. **Dashboard** - Overview with KPIs and quick actions
 4. **Bots Management** - View all bots, create new bots, and manage existing ones
-5. **7-Step Bot Creation Wizard**:
-   - **Step 1: Brand & Persona** - Assistant name, logo, color theme, welcome message (persisted to `branding`)
-   - **Step 2: Tone** - LLM temperature, communication style, editable prompts (stored in `llm_config`)
-   - **Step 3: Data Sources** - Upload documents or crawl websites (syncs with retrieval config)
-   - **Step 4: Indexing** - Vectorization & RAG pipeline stages with real progress indicators
-   - **Step 5: Guardrails** - Content filters, blocked phrases, custom instructions (stored in `guardrails`)
+5. **7-Step Bot Creation Wizard** (All steps save to database immediately):
+   - **Step 1: Brand & Persona** - Assistant name, logo, color theme, welcome message (saved to database when clicking "Next")
+   - **Step 2: Tone** - LLM temperature, communication style, editable prompts (saved to database when clicking "Next")
+   - **Step 3: Guardrails** - Content filters, blocked phrases, custom instructions (saved to database when clicking "Next")
+   - **Step 4: Documents** - Upload documents or crawl websites (documents upload immediately to database and MinIO, not queued)
+   - **Step 5: Indexing** - Vectorization & RAG pipeline stages with real progress indicators
    - **Step 6: Test Chat** - Interactive chat interface reflecting saved configuration
-   - **Step 7: Install** - Production embed code backed by `/public/embed-config`
+   - **Step 7: Deploy** - Production embed code backed by `/public/embed-config`
 6. **Bot Detail Page** - Comprehensive bot management with:
    - Analytics cards (conversations, users, response time, satisfaction, etc.)
    - Full configuration editing (branding, tone, guardrails)
@@ -195,7 +195,11 @@ The script creates active “Test User N” accounts with realistic bot configur
 1. **Bots Page** - View all created bots in a grid layout
 2. **Create New Bot** - Click the "+" card to open the creation wizard
 3. **7-Step Wizard** - Complete configuration in a centered modal dialog:
-   - Configure branding, tone, data sources, indexing, guardrails, test, and install
+   - **Draft Bot System**: Each user can have one draft bot at a time. Progress is saved to the database at each step.
+   - **Step-by-Step Persistence**: All configuration (branding, tone, guardrails) is saved to the database immediately when clicking "Next" on each step.
+   - **Immediate Document Upload**: Documents are uploaded to database and MinIO immediately when added in Step 4 (not queued for later). This ensures documents persist even if the user exits and resumes.
+   - **Progress Preservation**: If you exit the wizard and return, your progress is restored from the database, including all uploaded documents.
+   - Configure branding, tone, guardrails, documents, indexing, test chat, and deployment
 4. **Live Preview** - Real-time preview of bot appearance during configuration
 5. **Brand Assets** - Upload company logos (PNG/JPG/SVG up to 10 MB) with an inline zoom slider to perfectly center them in the circular avatar. Files are stored securely in MinIO and referenced via the bot's `branding.logo_url`.
 
@@ -233,7 +237,7 @@ Access by clicking any bot card from the Bots page. Features include:
     - Auto-refresh every 30 seconds
     - Manual refresh button
 
-- **Quick Actions**: Start/Pause/Stop bot, Edit, Share, Embed Code, Export Data, Delete (wired to backend actions)
+- **Quick Actions**: Start/Pause/Stop bot, Edit, Share, Embed Code, Export Data, Delete (fully functional - delete removes bot from database and cleans up associated resources)
 
 ## 🎨 Customizing Design Tokens
 

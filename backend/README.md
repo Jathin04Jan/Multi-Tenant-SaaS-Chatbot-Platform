@@ -60,6 +60,14 @@ Once the server is running:
 - **PATCH** `/api/v1/bots/{bot_id}` - Update bot details and configuration
 - **DELETE** `/api/v1/bots/{bot_id}` - Delete a bot and its dependent records
 
+### Draft Bot Endpoints (Bot Creation Wizard)
+
+- **GET** `/api/v1/bots/draft` - Get the current user's draft bot (if exists)
+- **POST** `/api/v1/bots/draft` - Create or update a draft bot (one per user, enforced)
+- **DELETE** `/api/v1/bots/draft` - Delete the current user's draft bot and associated assets (logo, documents)
+
+**Draft Bot System**: Each user can have only one draft bot at a time. This is enforced at the API level. Draft bots are used during the 7-step bot creation wizard to persist progress. All configuration (branding, tone, guardrails) is saved to the database immediately when the user clicks "Next" on each step. When the wizard is completed, the draft bot's status is changed to `active`.
+
 ## 📦 Installation Snippet Endpoints
 
 - **POST** `/api/v1/bots/{bot_id}/snippets` - Create or get installation snippet (one per bot, auto-created)
@@ -72,9 +80,11 @@ Once the server is running:
 
 - **POST** `/api/v1/bots/{bot_id}/documents` - Upload a document (PDF/DOC/DOCX/TXT up to 1 GB); backend records `source_type`, `status`, `metadata`, and a secure `source_url`
 - **POST** `/api/v1/bots/{bot_id}/documents/crawl` - Register a crawled website/URL (stored as metadata, no MinIO upload)
-- **GET** `/api/v1/bots/{bot_id}/documents` - List documents for a bot with ingestion status and source info
+- **GET** `/api/v1/bots/{bot_id}/documents` - List documents for a bot with ingestion status and source info. Used by the wizard to re-hydrate document list when resuming.
 - **GET** `/api/v1/documents/{document_id}` - Download a document (auth-required, streams via backend using `source_url` for file uploads)
 - **DELETE** `/api/v1/documents/{document_id}` - Delete document entry + underlying MinIO object (for uploads)
+
+**Immediate Upload Behavior**: Documents are uploaded to both the database and MinIO immediately when added in Step 4 of the bot creation wizard. This ensures persistence and allows users to exit and resume without losing their uploaded documents.
 
 ## 🖼️ Upload Endpoints
 

@@ -38,7 +38,7 @@ npm run dev                # http://localhost:8080
 - [Backend Quick Start (`backend/README.md`)](backend/README.md)
 - [Backend Docs Index (`backend/docs/README.md`)](backend/docs/README.md)
 - [Setup Guides](backend/docs/README.md#setup--configuration) – virtualenv, database, MinIO
-- [Database Schema References](backend/docs/README.md#database) – users, bots, installation snippets
+- [Database Schema References](backend/docs/README.md#database) – users, bots, documents, installation snippets, pricing plans, app settings
 - [Security & Troubleshooting](backend/docs/README.md#security) – JWT, CORS, diagnostics
 - **[Embed Security & Code Snippets](backend/docs/EMBED_SECURITY_AND_SNIPPETS.md)** – Complete guide to embed system, security, domain allow-list, and usage tracking
 
@@ -163,7 +163,7 @@ Key endpoints:
 - `POST /api/v1/chat` for widget chat messages (JWT-authenticated)
 
 Supporting services:
-- PostgreSQL for relational data (users, bots, installation snippets)
+- PostgreSQL for relational data (users, bots, documents, installation snippets, pricing plans, app settings)
 - MinIO for document storage
 - Alembic migrations for schema evolution (optional during local dev)
 

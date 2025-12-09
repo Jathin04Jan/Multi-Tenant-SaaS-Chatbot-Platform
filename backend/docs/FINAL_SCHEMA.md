@@ -155,6 +155,63 @@ CREATE INDEX idx_users_id ON users(id);
 }
 ```
 
+### Pricing Plan Example
+```json
+{
+  "id": "p1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "name": "Pro",
+  "description": "Perfect for growing businesses",
+  "is_highlighted": true,
+  "sort_order": {
+    "position": 2,
+    "category": "standard"
+  },
+  "limits": {
+    "max_bots": 10,
+    "max_docs": 100,
+    "max_chats_per_month": 10000,
+    "max_storage_gb": 50
+  },
+  "support_level": "email",
+  "features": [
+    "Unlimited chats",
+    "Priority support",
+    "Custom branding",
+    "Advanced analytics"
+  ],
+  "created_at": "2024-01-01T12:00:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+
+### Pricing Plan Country Price Example
+```json
+{
+  "id": "c1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "plan_id": "p1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "country_code": "US-CENTRAL",
+  "currency": "USD",
+  "billing_interval": "monthly",
+  "price": 2999,
+  "is_active": true,
+  "created_at": "2024-01-01T12:00:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+**Note**: `price: 2999` represents $29.99 (stored in cents).
+
+### App Setting Example
+```json
+{
+  "key": "landing.hero_title",
+  "value": "Build AI-Powered Chatbots in Minutes",
+  "description": "Main hero section title on landing page",
+  "is_public": true,
+  "created_at": "2024-01-01T12:00:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+
 ---
 
 ## 🔐 Security Notes
@@ -163,6 +220,8 @@ CREATE INDEX idx_users_id ON users(id);
 - **Email**: Unique constraint prevents duplicate accounts
 - **Status**: Controls account access (active, pending, suspended)
 - **Settings**: JSONB allows flexible configuration storage
+- **Global Configuration**: `pricing_plans`, `pricing_plan_country_prices`, and `app_settings` are admin-only (only platform admins can create/modify)
+- **Public Settings**: Only `app_settings` with `is_public = true` can be exposed via public API
 
 ---
 
@@ -173,6 +232,9 @@ CREATE INDEX idx_users_id ON users(id);
 3. **Status Control**: Enum-based status for account management
 4. **Flexible Settings**: JSONB for miscellaneous configuration
 5. **Multi-tenant Ready**: Each user is their own tenant
+6. **Global Configuration**: `pricing_plans`, `pricing_plan_country_prices`, and `app_settings` are global (admin-only) tables for platform-wide configuration
+7. **Country-Based Pricing**: Supports different prices for different regions/countries via `pricing_plan_country_prices`
+8. **Public/Private Settings**: `app_settings.is_public` flag controls which settings can be exposed via public API
 
 ---
 
@@ -403,6 +465,137 @@ CREATE INDEX idx_documents_status ON documents(status);
 CREATE INDEX idx_documents_source_type ON documents(source_type);
 ```
 
+### Pricing Plans Table
+```sql
+CREATE TABLE pricing_plans (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    description TEXT,
+    is_highlighted BOOLEAN NOT NULL DEFAULT false,
+    sort_order JSONB,
+    limits JSONB,
+    support_level VARCHAR(50),
+    features JSONB,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_pricing_plans_id ON pricing_plans(id);
+CREATE INDEX idx_pricing_plans_is_highlighted ON pricing_plans(is_highlighted);
+```
+
+### Pricing Plan Country Prices Table
+```sql
+CREATE TABLE pricing_plan_country_prices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    plan_id UUID NOT NULL REFERENCES pricing_plans(id) ON DELETE CASCADE,
+    country_code VARCHAR(10) NOT NULL,
+    currency VARCHAR(10) NOT NULL,
+    billing_interval VARCHAR(20) NOT NULL,
+    price INTEGER NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_pricing_plan_country_prices_id ON pricing_plan_country_prices(id);
+CREATE INDEX idx_pricing_plan_country_prices_plan_id ON pricing_plan_country_prices(plan_id);
+CREATE INDEX idx_pricing_plan_country_prices_country_code ON pricing_plan_country_prices(country_code);
+```
+
+### App Settings Table
+```sql
+CREATE TABLE app_settings (
+    key VARCHAR(255) PRIMARY KEY,
+    value JSONB NOT NULL,
+    description TEXT,
+    is_public BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_app_settings_key ON app_settings(key);
+CREATE INDEX idx_app_settings_is_public ON app_settings(is_public);
+```
+
+---
+
+## 📊 `pricing_plans` Table
+
+Stores all subscription plans that can be offered to tenants (Free, Pro, Enterprise, etc.). These are **global** plans, not per-tenant. Only platform admins can create or modify entries.
+
+### Complete Table Structure
+
+| Column Name | Type | Constraints | Description |
+|------------|------|-------------|-------------|
+| `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique plan ID |
+| `name` | TEXT | NOT NULL | Display name (e.g., 'Free', 'Pro', 'Enterprise') |
+| `description` | TEXT | NULLABLE | Short tagline/description |
+| `is_highlighted` | BOOLEAN | NOT NULL, DEFAULT false | Mark as "Most Popular" in UI |
+| `sort_order` | JSONB | NULLABLE | Ordering configuration for UI display |
+| `limits` | JSONB | NULLABLE | Plan limits (e.g., { "max_bots": 1, "max_docs": 20 }) |
+| `support_level` | VARCHAR(50) | NULLABLE | Support level (None, email, call, priority, etc.) |
+| `features` | JSONB | NULLABLE | List of features (e.g., ["Unlimited chats", "Priority support"]) |
+| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
+| `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
+
+### Notes
+- Plans are global, not per-tenant
+- Only platform admins can create or modify pricing plans
+- Tenants reference plans (e.g., via `users.plan` field or future `subscriptions` table)
+- Backend enforces limits via `plan.limits` when tenants use the system
+
+---
+
+## 📊 `pricing_plan_country_prices` Table
+
+Stores pricing per country/region for each plan. Allows different pricing for different markets.
+
+### Complete Table Structure
+
+| Column Name | Type | Constraints | Description |
+|------------|------|-------------|-------------|
+| `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique row ID |
+| `plan_id` | UUID | FOREIGN KEY → pricing_plans.id, NOT NULL, INDEXED, CASCADE DELETE | Maps price to plan |
+| `country_code` | VARCHAR(10) | NOT NULL, INDEXED | Country/region code (e.g., 'IN-SOUTH', 'US-CENTRAL', 'EU-WEST') |
+| `currency` | VARCHAR(10) | NOT NULL | Currency code (e.g., 'USD', 'INR', 'EUR') |
+| `billing_interval` | VARCHAR(20) | NOT NULL | Billing interval: 'monthly' or 'yearly' |
+| `price` | INTEGER | NOT NULL | Price in smallest currency unit (e.g., cents for USD, paise for INR) |
+| `is_active` | BOOLEAN | NOT NULL, DEFAULT true | Enable/disable this price |
+| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
+| `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
+
+### Notes
+- Supports different prices for different regions/countries
+- Supports both monthly and yearly billing
+- Price stored as integer in smallest currency unit (avoids floating-point issues)
+- `is_active` allows disabling prices without deleting records
+
+---
+
+## 📊 `app_settings` Table
+
+Stores global configuration and landing page content. These settings are **global**, not per-tenant. Only platform admins can create or modify entries.
+
+### Complete Table Structure
+
+| Column Name | Type | Constraints | Description |
+|------------|------|-------------|-------------|
+| `key` | VARCHAR(255) | PRIMARY KEY, NOT NULL, INDEXED | Namespaced key (e.g., 'landing.hero_title', 'brand.app_name', 'support.email') |
+| `value` | JSONB | NOT NULL | Any JSON value (string, number, object, array, etc.) |
+| `description` | TEXT | NULLABLE | Admin description of what this setting controls |
+| `is_public` | BOOLEAN | NOT NULL, DEFAULT false | If true, this setting can be exposed via public API (e.g., landing page content) |
+| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
+| `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
+
+### Notes
+- Key-value store with namespaced keys (e.g., `landing.hero_title`, `brand.app_name`)
+- JSONB values can store any JSON type (string, number, object, array)
+- `is_public` flag controls which settings can be exposed via public API
+- Only platform admins can create or modify app settings
+- Landing page loads only keys with `is_public = true`
+- Sensitive keys must have `is_public = false`
+
 ---
 
 ## 🔗 Relationships
@@ -410,9 +603,13 @@ CREATE INDEX idx_documents_source_type ON documents(source_type);
 1. **Users → Bots**: One-to-Many (one user can have many bots)
 2. **Users → Installation Snippets**: One-to-Many (one user can have many snippets)
 3. **Bots → Installation Snippets**: One-to-Many (one bot can have one snippet, enforced by system)
-4. **Cascade Delete**: 
-   - Deleting a user deletes all their bots and snippets
-   - Deleting a bot deletes all its snippets
+4. **Users → Documents**: One-to-Many (one user can have many documents)
+5. **Bots → Documents**: One-to-Many (one bot can have many documents)
+6. **Pricing Plans → Pricing Plan Country Prices**: One-to-Many (one plan can have many country prices)
+7. **Cascade Delete**: 
+   - Deleting a user deletes all their bots, snippets, and documents
+   - Deleting a bot deletes all its snippets and documents
+   - Deleting a pricing plan deletes all its country prices
 
 ---
 

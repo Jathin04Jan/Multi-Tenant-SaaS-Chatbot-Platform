@@ -91,6 +91,15 @@ SELECT * FROM bots;
 -- View installation_snippets table
 SELECT * FROM installation_snippets;
 
+-- View pricing_plans table
+SELECT * FROM pricing_plans;
+
+-- View pricing_plan_country_prices table
+SELECT * FROM pricing_plan_country_prices;
+
+-- View app_settings table
+SELECT * FROM app_settings;
+
 -- Exit
 \q
 ```
@@ -140,6 +149,28 @@ SELECT
     s.last_used_at
 FROM bots b
 LEFT JOIN installation_snippets s ON b.id = s.bot_id;
+
+-- View pricing plans with country prices
+SELECT 
+    p.name as plan_name,
+    p.is_highlighted,
+    pp.country_code,
+    pp.currency,
+    pp.billing_interval,
+    pp.price,
+    pp.is_active
+FROM pricing_plans p
+LEFT JOIN pricing_plan_country_prices pp ON p.id = pp.plan_id
+WHERE pp.is_active = true;
+
+-- View public app settings (for landing page)
+SELECT key, value, description
+FROM app_settings
+WHERE is_public = true;
+
+-- View all app settings (admin only)
+SELECT key, value, description, is_public
+FROM app_settings;
 
 -- View all data in a table (example: users)
 SELECT * FROM users;

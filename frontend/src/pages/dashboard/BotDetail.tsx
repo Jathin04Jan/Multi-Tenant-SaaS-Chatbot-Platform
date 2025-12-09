@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getBot, type BotDTO, updateBot, getSnippetsForBot, createSnippet, updateSnippet, deleteSnippet, type InstallationSnippetDTO, uploadBotDocument, listBotDocuments, deleteBotDocument, downloadBotDocument, type BotDocumentDTO, createCrawlDocument } from '@/lib/api';
+import { getBot, type BotDTO, updateBot, getSnippetsForBot, createSnippet, updateSnippet, deleteSnippet, type InstallationSnippetDTO, uploadBotDocument, listBotDocuments, deleteBotDocument, downloadBotDocument, type BotDocumentDTO, createCrawlDocument, deleteBot } from '@/lib/api';
 import { colorCombinations } from '@/lib/constants';
 import { styleOptions } from '@/components/bot-config';
 import {
@@ -409,10 +409,28 @@ const BotDetail = () => {
     }
   };
 
-  const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this bot? This action cannot be undone.')) {
+  const handleDelete = async () => {
+    if (!botId) {
+      toast.error('Bot ID is missing');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this bot? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await deleteBot(botId);
+      if (response.error) {
+        toast.error(response.error || 'Failed to delete bot');
+        return;
+      }
+
       toast.success('Bot deleted successfully');
       navigate('/dashboard/onboarding');
+    } catch (error) {
+      console.error('Error deleting bot:', error);
+      toast.error('Failed to delete bot. Please try again.');
     }
   };
 

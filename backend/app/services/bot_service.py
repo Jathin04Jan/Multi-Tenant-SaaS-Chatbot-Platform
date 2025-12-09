@@ -13,6 +13,62 @@ class BotService:
     """Service for bot-related business logic."""
     
     @staticmethod
+    def get_user_draft_bot(db: Session, user_id: UUID) -> Optional[Bot]:
+        """Return the current draft bot for a user, if any."""
+        return (
+            db.query(Bot)
+            .filter(Bot.user_id == user_id, Bot.status == BotStatus.DRAFT)
+            .order_by(Bot.updated_at.desc())
+            .first()
+        )
+
+    @staticmethod
+    def create_draft_bot(
+        db: Session,
+        user: User,
+        bot_data: Optional[Dict[str, Any]] = None,
+    ) -> Bot:
+        """
+        Create a draft bot for a user. Only one draft is allowed per user.
+        """
+        existing_draft = BotService.get_user_draft_bot(db, user.id)
+        if existing_draft:
+            raise ValueError("Finish or reset your existing draft before creating a new bot.")
+
+        payload = bot_data or {}
+        name = payload.get("name") or "Untitled Bot"
+
+        branding = payload.get("branding") or {}
+        branding.setdefault("position", "bottom-right")
+        branding.setdefault("height", 600)
+        branding.setdefault("width", 400)
+        branding.setdefault("background_color", "#ffffff")
+
+        bot = Bot(
+            user_id=user.id,
+            name=name,
+            description=payload.get("description"),
+            status=BotStatus.DRAFT,
+            branding=branding,
+            llm_config=payload.get("llm_config"),
+            guardrails=payload.get("guardrails"),
+            retrieval_config=payload.get("retrieval_config"),
+        )
+
+        db.add(bot)
+        db.commit()
+        db.refresh(bot)
+        return bot
+
+    @staticmethod
+    def clear_draft_bot(db: Session, user_id: UUID) -> bool:
+        """Delete the user's draft bot (if any), including assets."""
+        draft = BotService.get_user_draft_bot(db, user_id)
+        if not draft:
+            return False
+        return BotService.delete_bot(db=db, bot_id=draft.id, user_id=user_id)
+
+    @staticmethod
     def create_bot(
         db: Session,
         user: User,
@@ -41,6 +97,10 @@ class BotService:
         if not name:
             raise ValueError("Bot name is required")
         
+        existing_draft = BotService.get_user_draft_bot(db, user.id)
+        if existing_draft:
+            raise ValueError("Finish or reset your existing draft before creating a new bot.")
+
         # Enhance branding with UI positioning defaults if not provided
         branding = bot_data.get("branding") or {}
         if "position" not in branding:
@@ -102,11 +162,15 @@ class BotService:
         
         # Update only provided fields
         update_data = bot_update.model_dump(exclude_unset=True)
+        print(f"DEBUG: Updating bot {bot_id} with fields: {list(update_data.keys())}")
+        if 'name' in update_data:
+            print(f"DEBUG: Setting bot name to: '{update_data['name']}'")
         for field, value in update_data.items():
             setattr(bot, field, value)
         
         db.commit()
         db.refresh(bot)
+        print(f"DEBUG: Bot name after update: '{bot.name}'")
         
         return bot
     

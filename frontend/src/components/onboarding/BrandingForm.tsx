@@ -15,11 +15,12 @@ import { toast } from 'sonner';
 import type { BrandLogoMetadata } from '@/store/wizard';
 
 interface BrandingFormProps {
-  onComplete: () => void;
+  onComplete: () => Promise<void> | void;
+  botId?: string | null;
 }
 
-export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
-  const { branding, updateBranding, updatePersona } = useWizardStore();
+export const BrandingForm = ({ onComplete, botId }: BrandingFormProps) => {
+  const { branding, updateBranding, updatePersona, persona } = useWizardStore();
   const [selectedColor, setSelectedColor] = useState<string>(
     branding.primaryColor || colorCombinations[0].primary
   );
@@ -28,6 +29,7 @@ export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
     branding.logoMetadata || null
   );
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [logoZoom, setLogoZoom] = useState(branding.logoZoom ?? 1);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const {
@@ -42,16 +44,41 @@ export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
       ...branding,
       logoZoom: branding.logoZoom ?? 1,
       primaryColor: branding.primaryColor || colorCombinations[0].primary,
+      // Start empty so placeholder shows - only populate if there's a real saved value
+      botName: (persona.botName && persona.botName.trim() && persona.botName.trim() !== 'Assistant') 
+        ? persona.botName.trim() 
+        : '',
     },
     mode: 'onChange',
   });
 
   const logoZoomValue = watch('logoZoom', branding.logoZoom ?? 1);
+  // Use local state for immediate preview updates
+  const logoScale = logoZoom;
+  
+  // Sync local state with store when store changes
+  useEffect(() => {
+    setLogoZoom(branding.logoZoom ?? 1);
+  }, [branding.logoZoom]);
 
   useEffect(() => {
     setLogoPreview(branding.logo);
     setLogoMetadata(branding.logoMetadata || null);
   }, [branding.logo, branding.logoMetadata]);
+
+  // Sync botName from store to form field whenever it changes
+  // This ensures the field is populated when navigating back to step 1
+  // But only if there's a real saved value (not empty or default "Assistant")
+  useEffect(() => {
+    const currentBotName = (persona.botName && persona.botName.trim() && persona.botName.trim() !== 'Assistant')
+      ? persona.botName.trim()
+      : '';
+    // Only update if the form value is different to avoid unnecessary re-renders
+    const currentFormValue = watch('botName') || '';
+    if (currentFormValue !== currentBotName) {
+      setValue('botName', currentBotName, { shouldValidate: true, shouldDirty: false });
+    }
+  }, [persona.botName, setValue, watch]);
 
   const resolvedLogo = resolveAssetUrl(logoPreview);
   const hasLogo = Boolean(resolvedLogo);
@@ -79,8 +106,13 @@ export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
       return;
     }
 
+    if (!botId) {
+      toast.error('Draft bot is not ready yet. Please wait and try again.');
+      return;
+    }
+
     setIsUploadingLogo(true);
-    const response = await uploadBrandLogo(file);
+    const response = await uploadBrandLogo(file, { botId });
     setIsUploadingLogo(false);
 
     if (response.error || !response.data?.logo_url) {
@@ -124,11 +156,12 @@ export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
   };
 
   const handleLogoZoomChange = (value: number) => {
+    setLogoZoom(value); // Update local state immediately for preview
     setValue('logoZoom', value, { shouldValidate: true });
     updateBranding({ logoZoom: value });
   };
 
-  const onSubmit = (data: BrandingInput) => {
+  const onSubmit = async (data: BrandingInput) => {
     // Update branding (excluding botName)
     const { botName, ...brandingData } = data;
     updateBranding(brandingData);
@@ -138,7 +171,7 @@ export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
       updatePersona({ botName });
     }
     
-    onComplete();
+    await onComplete();
   };
 
   return (
@@ -197,7 +230,7 @@ export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
                   src={resolvedLogo}
                   alt="Uploaded logo preview"
                   className="h-full w-full object-cover transition-transform duration-300"
-                  style={{ transform: `scale(${logoZoomValue ?? 1})` }}
+                  style={{ transform: `scale(${logoScale})` }}
                 />
             ) : isUploadingLogo ? (
               <Loader2 className="w-8 h-8 animate-spin text-primary" />

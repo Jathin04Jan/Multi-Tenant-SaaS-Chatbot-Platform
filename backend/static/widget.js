@@ -665,14 +665,18 @@
   // Fetch config from API
   async function fetchConfig() {
     try {
+      // Get current page's hostname for domain validation
+      // Use hostname (without port) to match how domains are typically stored
+      const currentHost = window.location.hostname || '';
+      
       let url;
       if (snippetId) {
         // Production flow: use snippet_id
-        url = `${apiBaseUrl}/public/embed-config?snippet_id=${encodeURIComponent(snippetId)}`;
+        url = `${apiBaseUrl}/public/embed-config?snippet_id=${encodeURIComponent(snippetId)}&origin=${encodeURIComponent(currentHost)}`;
       } else if (botId) {
         // Legacy flow: use bot_id (deprecated)
         console.warn('YourBot Widget: Using deprecated bot_id flow. Migrate to snippet_id.');
-        url = `${apiBaseUrl}/public/embed-config?bot_id=${encodeURIComponent(botId)}`;
+        url = `${apiBaseUrl}/public/embed-config?bot_id=${encodeURIComponent(botId)}&origin=${encodeURIComponent(currentHost)}`;
       } else {
         throw new Error('Neither snippet_id nor bot_id provided');
       }

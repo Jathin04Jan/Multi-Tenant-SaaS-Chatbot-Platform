@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from uuid import UUID
 from app.api.dependencies import get_current_user
 from app.core.database import get_db
@@ -10,6 +10,7 @@ from app.models.user import User
 from app.services.bot_service import BotService
 
 router = APIRouter(prefix="/bots", tags=["bots"])
+
 
 
 @router.post("", response_model=BotResponse, status_code=status.HTTP_201_CREATED)
@@ -30,6 +31,13 @@ async def create_bot(
     - retrieval_config: Retrieval/RAG configuration (JSONB)
     """
     try:
+        user_uuid = UUID(str(current_user.id))
+        existing_draft = BotService.get_user_draft_bot(db, user_uuid)
+        if existing_draft:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Finish or reset your existing draft before creating a new bot."
+            )
         bot = BotService.create_bot(db, current_user, bot_data)
         return BotResponse.from_orm(bot)
     except ValueError as e:
@@ -72,6 +80,60 @@ async def get_user_bots(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while fetching bots: {str(e)}"
         )
+
+
+@router.get("/draft", response_model=BotResponse)
+async def get_draft_bot(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Return the current draft bot for the authenticated user."""
+    user_uuid = UUID(str(current_user.id))
+    draft = BotService.get_user_draft_bot(db, user_uuid)
+    if not draft:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No draft bot found."
+        )
+    return BotResponse.from_orm(draft)
+
+
+@router.post("/draft", response_model=BotResponse, status_code=status.HTTP_201_CREATED)
+async def create_draft_bot(
+    bot_data: Optional[Dict[str, Any]] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Create a draft bot (one per user)."""
+    try:
+        draft = BotService.create_draft_bot(db, current_user, bot_data)
+        return BotResponse.from_orm(draft)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc)
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create draft bot: {exc}"
+        )
+
+
+@router.delete("/draft", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_draft_bot(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Reset and delete the user's current draft bot (including assets)."""
+    user_uuid = UUID(str(current_user.id))
+    deleted = BotService.clear_draft_bot(db, user_uuid)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No draft bot found."
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/{bot_id}", response_model=BotResponse)
@@ -185,4 +247,5 @@ async def delete_bot(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred while deleting bot: {str(e)}"
         )
+
 

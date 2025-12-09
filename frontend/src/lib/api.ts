@@ -4,6 +4,7 @@
 export interface ApiResponse<T> {
   data: T;
   error?: string;
+  status?: number;
 }
 
 // Common entities (placeholders for backend integration)
@@ -138,18 +139,20 @@ export async function apiRequest<T>(
       return {
         data: (parsedBody ?? ({} as T)) as T,
         error: errorMessage,
+        status: response.status,
       };
     }
 
     if (parsedBody === null) {
-      return { data: {} as T };
+      return { data: {} as T, status: response.status };
     }
 
-    return { data: parsedBody as T };
+    return { data: parsedBody as T, status: response.status };
   } catch (error) {
     return {
       data: {} as T,
       error: error instanceof Error ? error.message : 'Network error',
+      status: undefined,
     };
   }
 }
@@ -642,6 +645,32 @@ export const getBots = async (): Promise<ApiResponse<BotDTO[]>> => {
 export const getBot = async (botId: string): Promise<ApiResponse<BotDTO>> => {
   return apiRequest<BotDTO>(`/api/v1/bots/${botId}`, {
     method: 'GET',
+  });
+};
+
+export const getDraftBot = async (): Promise<ApiResponse<BotDTO>> => {
+  return apiRequest<BotDTO>('/api/v1/bots/draft', {
+    method: 'GET',
+  });
+};
+
+export const createDraftBot = async (botData?: {
+  name?: string;
+  description?: string;
+  branding?: Record<string, unknown>;
+  llm_config?: Record<string, unknown>;
+  guardrails?: Record<string, unknown>;
+  retrieval_config?: Record<string, unknown>;
+}): Promise<ApiResponse<BotDTO>> => {
+  return apiRequest<BotDTO>('/api/v1/bots/draft', {
+    method: 'POST',
+    body: botData ? JSON.stringify(botData) : undefined,
+  });
+};
+
+export const resetDraftBot = async (): Promise<ApiResponse<Record<string, never>>> => {
+  return apiRequest<Record<string, never>>('/api/v1/bots/draft', {
+    method: 'DELETE',
   });
 };
 

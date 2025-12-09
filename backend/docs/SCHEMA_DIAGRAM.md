@@ -6,14 +6,14 @@
 
 ```mermaid
 erDiagram
-    users ||--o{ bots : "user_id"
-    users ||--o{ installation_snippets : "user_id"
-    users ||--o{ documents : "tenant_id"
+    users ||--o{ bots : user_id
+    users ||--o{ installation_snippets : user_id
+    users ||--o{ documents : tenant_id
 
-    bots ||--o{ installation_snippets : "bot_id"
-    bots ||--o{ documents : "bot_id"
+    bots ||--o{ installation_snippets : bot_id
+    bots ||--o{ documents : bot_id
 
-    pricing_plans ||--o{ pricing_plan_country_prices : "plan_id"
+    pricing_plans ||--o{ pricing_plan_country_prices : plan_id
 
     users {
         uuid id PK
@@ -30,7 +30,7 @@ erDiagram
 
     bots {
         uuid id PK
-        uuid user_id FK -> users.id
+        uuid user_id
         varchar name
         text description
         enum status
@@ -44,8 +44,8 @@ erDiagram
 
     installation_snippets {
         uuid id PK
-        uuid user_id FK -> users.id
-        uuid bot_id FK -> bots.id
+        uuid user_id
+        uuid bot_id
         text script_url
         text embed_code
         varchar status
@@ -59,8 +59,8 @@ erDiagram
 
     documents {
         uuid id PK
-        uuid tenant_id FK -> users.id
-        uuid bot_id FK -> bots.id
+        uuid tenant_id
+        uuid bot_id
         enum source_type
         varchar source_url
         varchar filename
@@ -87,7 +87,7 @@ erDiagram
 
     pricing_plan_country_prices {
         uuid id PK
-        uuid plan_id FK -> pricing_plans.id
+        uuid plan_id
         varchar country_code
         varchar currency
         varchar billing_interval
@@ -114,3 +114,4 @@ erDiagram
 - **Status enums:** `users.status`, `bots.status`, `documents.status` use enums as defined in the models.
 - For full column details and SQL, see `FINAL_SCHEMA.md` and `DATABASE_SCHEMA.md`.
 
+git 

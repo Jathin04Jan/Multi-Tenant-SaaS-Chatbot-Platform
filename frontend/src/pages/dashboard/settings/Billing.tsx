@@ -46,6 +46,7 @@ const vectorLimits: Record<SubscriptionDTO['plan'], number> = {
 };
 
 const Billing = () => {
+  console.log("Billing component RENDERED - DEBUG_BILLING_LIVE");
   const [sub, setSub] = useState<SubscriptionDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [billingCycle, setBillingCycle] = useState<BillingFrequency>('monthly');
@@ -83,102 +84,101 @@ const Billing = () => {
 
   const planAnalytics = sub
     ? (() => {
-        const usage = sub.usage;
-        const totalRequests = usage.messages;
-        const tokensRemaining = Math.max(
-          0,
-          (usage.messagesLimit - usage.messages) * TOKENS_PER_MESSAGE,
-        );
-        const storageRemainingGb = Math.max(0, (usage.storageLimitMb - usage.storageMb) / 1024);
-        const storageLimitGb = usage.storageLimitMb / 1024;
-        const storageUsedGb = usage.storageMb / 1024;
-        const botsRemaining =
-          usage.botsLimit === 999 ? Infinity : Math.max(0, usage.botsLimit - usage.bots);
-        const sevenDayVolume = Math.min(totalRequests, 150);
-        const avgRpm = Math.max(0, Math.round(totalRequests / 60));
-        const medianRpm = Math.max(0, Math.floor(avgRpm * 0.8));
-        const p90Rpm = Math.max(0, Math.round(avgRpm * 1.4));
-        const p99Rpm = Math.max(0, Math.round(avgRpm * 1.8));
-        const minRpm = avgRpm > 0 ? Math.max(0, avgRpm - 3) : 0;
-        const maxRpm = Math.max(avgRpm * 2, 1);
-        const uptime = '99.9%';
+      const usage = sub.usage;
+      const totalRequests = usage.messages;
+      const tokensRemaining = Math.max(
+        0,
+        (usage.messagesLimit - usage.messages) * TOKENS_PER_MESSAGE,
+      );
+      const storageRemainingGb = Math.max(0, (usage.storageLimitMb - usage.storageMb) / 1024);
+      const storageLimitGb = usage.storageLimitMb / 1024;
+      const storageUsedGb = usage.storageMb / 1024;
+      const botsRemaining =
+        usage.botsLimit === 999 ? Infinity : Math.max(0, usage.botsLimit - usage.bots);
+      const sevenDayVolume = Math.min(totalRequests, 150);
+      const avgRpm = Math.max(0, Math.round(totalRequests / 60));
+      const medianRpm = Math.max(0, Math.floor(avgRpm * 0.8));
+      const p90Rpm = Math.max(0, Math.round(avgRpm * 1.4));
+      const p99Rpm = Math.max(0, Math.round(avgRpm * 1.8));
+      const minRpm = avgRpm > 0 ? Math.max(0, avgRpm - 3) : 0;
+      const maxRpm = Math.max(avgRpm * 2, 1);
+      const uptime = '99.9%';
 
-        const totalTokens = usage.messagesLimit * TOKENS_PER_MESSAGE;
-        const vectorLimit = vectorLimits[sub.plan];
-        const vectorUsage = Math.round(
-          vectorLimit *
-            (usage.storageLimitMb > 0 ? Math.min(1, usage.storageMb / usage.storageLimitMb) : 0.25)
-        );
+      const totalTokens = usage.messagesLimit * TOKENS_PER_MESSAGE;
+      const vectorLimit = vectorLimits[sub.plan];
+      const vectorUsage = Math.round(
+        vectorLimit *
+        (usage.storageLimitMb > 0 ? Math.min(1, usage.storageMb / usage.storageLimitMb) : 0.25)
+      );
 
-        const apiLimit = usage.messagesLimit * 3;
-        const apiUsed = Math.min(apiLimit, usage.messages * 2);
-        const apiRemaining = Math.max(0, apiLimit - apiUsed);
+      const apiLimit = usage.messagesLimit * 3;
+      const apiUsed = Math.min(apiLimit, usage.messages * 2);
+      const apiRemaining = Math.max(0, apiLimit - apiUsed);
 
-        const billingMetrics: BillingMetric[] = [
-          {
-            label: 'Tokens remaining this cycle',
-            value: `${formatCompact(tokensRemaining)} / ${formatCompact(totalTokens)}`,
-            hint: `Estimated at ${TOKENS_PER_MESSAGE} tokens per message.`,
-            detail: `Of ~${formatCompact(totalTokens)} tokens included in your ${sub.plan} plan.`,
-          },
-          {
-            label: 'Upload capacity remaining',
-            value: `${formatCompact(storageRemainingGb, 2)} / ${formatCompact(storageLimitGb, 2)} GB`,
-            hint: `${formatCompact(storageUsedGb, 2)} GB currently in use.`,
-            detail: `Document storage left from ${formatCompact(storageLimitGb, 2)} GB included.`,
-          },
-          {
-            label: 'Bot slots available',
-            value:
-              botsRemaining === Infinity
+      const billingMetrics: BillingMetric[] = [
+        {
+          label: 'Tokens remaining this cycle',
+          value: `${formatCompact(tokensRemaining)} / ${formatCompact(totalTokens)}`,
+          hint: `Estimated at ${TOKENS_PER_MESSAGE} tokens per message.`,
+          detail: `Of ~${formatCompact(totalTokens)} tokens included in your ${sub.plan} plan.`,
+        },
+        {
+          label: 'Upload capacity remaining',
+          value: `${formatCompact(storageRemainingGb, 2)} / ${formatCompact(storageLimitGb, 2)} GB`,
+          hint: `${formatCompact(storageUsedGb, 2)} GB currently in use.`,
+          detail: `Document storage left from ${formatCompact(storageLimitGb, 2)} GB included.`,
+        },
+        {
+          label: 'Bot slots available',
+          value:
+            botsRemaining === Infinity
+              ? `${formatCompact(usage.bots)} / ∞`
+              : usage.botsLimit === 999
                 ? `${formatCompact(usage.bots)} / ∞`
-                : usage.botsLimit === 999
-                  ? `${formatCompact(usage.bots)} / ∞`
-                  : `${formatCompact(botsRemaining)} / ${formatCompact(usage.botsLimit)}`,
-            hint: `${formatCompact(usage.bots)} active bots in this workspace.`,
-            detail:
-              usage.botsLimit === 999
-                ? 'Bots are effectively unmetered on this plan.'
-                : `Of ${formatCompact(usage.botsLimit)} total bots allowed on this plan.`,
-          },
-        ];
-        const vectorBreakdown = {
-          limit: vectorLimit,
-          used: vectorUsage,
-          remaining: Math.max(0, vectorLimit - vectorUsage),
-          documents: Math.max(1, Math.round(vectorUsage / 2400)),
-          words: vectorUsage * 5,
-        };
+                : `${formatCompact(botsRemaining)} / ${formatCompact(usage.botsLimit)}`,
+          hint: `${formatCompact(usage.bots)} active bots in this workspace.`,
+          detail:
+            usage.botsLimit === 999
+              ? 'Bots are effectively unmetered on this plan.'
+              : `Of ${formatCompact(usage.botsLimit)} total bots allowed on this plan.`,
+        },
+      ];
+      const vectorBreakdown = {
+        limit: vectorLimit,
+        used: vectorUsage,
+        remaining: Math.max(0, vectorLimit - vectorUsage),
+        documents: Math.max(1, Math.round(vectorUsage / 2400)),
+        words: vectorUsage * 5,
+      };
 
-        const apiBreakdown = {
-          apiRemaining,
-          apiLimit,
-          apiUsed,
-          avgPerDay: Math.max(1, Math.round(apiUsed / 30)),
-          estDays: Math.max(1, Math.round(apiRemaining / Math.max(1, apiUsed / 30))),
-        };
+      const apiBreakdown = {
+        apiRemaining,
+        apiLimit,
+        apiUsed,
+        avgPerDay: Math.max(1, Math.round(apiUsed / 30)),
+        estDays: Math.max(1, Math.round(apiRemaining / Math.max(1, apiUsed / 30))),
+      };
 
-        return { billingMetrics, vectorBreakdown, apiBreakdown };
-      })()
+      return { billingMetrics, vectorBreakdown, apiBreakdown };
+    })()
     : null;
 
   const summaryCards = sub
     ? [
-        {
-          label: 'Storage',
-          value: `${formatCompact(sub.usage.storageMb / 1024, 2)} / ${formatCompact(sub.usage.storageLimitMb / 1024, 2)} GB`,
-          hint: 'Document storage currently consumed.',
-          detail: `${formatCompact(sub.usage.storageMb / 1024, 2)} GB in use`,
-        },
-        {
-          label: 'Chatbots',
-          value: `${formatCompact(sub.usage.bots)} / ${
-            sub.usage.botsLimit === 999 ? '∞' : formatCompact(sub.usage.botsLimit)
+      {
+        label: 'Storage',
+        value: `${formatCompact(sub.usage.storageMb / 1024, 2)} / ${formatCompact(sub.usage.storageLimitMb / 1024, 2)} GB`,
+        hint: 'Document storage currently consumed.',
+        detail: `${formatCompact(sub.usage.storageMb / 1024, 2)} GB in use`,
+      },
+      {
+        label: 'Chatbots',
+        value: `${formatCompact(sub.usage.bots)} / ${sub.usage.botsLimit === 999 ? '∞' : formatCompact(sub.usage.botsLimit)
           }`,
-          hint: 'Bots live in this workspace.',
-          detail: sub.usage.botsLimit === 999 ? 'Unlimited bots on this plan' : 'Upgrade to add more bots',
-        },
-      ]
+        hint: 'Bots live in this workspace.',
+        detail: sub.usage.botsLimit === 999 ? 'Unlimited bots on this plan' : 'Upgrade to add more bots',
+      },
+    ]
     : [];
 
   return (
@@ -188,140 +188,183 @@ const Billing = () => {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <h1 className="text-4xl font-bold mb-2">Billing & Subscription</h1>
+        <h1 className="text-4xl font-bold mb-2">
+          Billing & Subscription
+          <span className="ml-2 text-xs text-red-500 font-mono">
+            DEBUG_BILLING_LIVE
+          </span>
+        </h1>
         <p className="text-muted-foreground">Manage your plan, usage, and payment methods</p>
       </motion.div>
 
       {/* Current Plan & Usage */}
-      {!loading && sub && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-          className="glass-card p-8"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-            <div className="space-y-1">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h2 className="text-2xl font-bold capitalize">{sub.plan} Plan</h2>
-                <Badge variant={sub.status === 'active' ? 'default' : 'secondary'} className="capitalize">
-                  {sub.status}
-                </Badge>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-1"
-                    onClick={() => navigate('/dashboard/settings/topup')}
-                  >
-                    <ShoppingCart className="w-3.5 h-3.5" />
-                    <Plus className="w-3 h-3" />
-                    Top Up
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-1"
-                    onClick={() => navigate('/dashboard/settings/usage')}
-                  >
-                    <Activity className="w-3.5 h-3.5" />
-                    Usage
-                  </Button>
+      {
+        !loading && sub && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+            className="glass-card p-8"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+              <div className="space-y-1">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h2 className="text-2xl font-bold capitalize">{sub.plan} Plan</h2>
+                  <Badge variant={sub.status === 'active' ? 'default' : 'secondary'} className="capitalize">
+                    {sub.status}
+                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-1"
+                      onClick={() => navigate('/dashboard/settings/topup')}
+                    >
+                      <ShoppingCart className="w-3.5 h-3.5" />
+                      <Plus className="w-3 h-3" />
+                      Top Up
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-1"
+                      onClick={() => navigate('/dashboard/settings/usage')}
+                    >
+                      <Activity className="w-3.5 h-3.5" />
+                      Usage
+                    </Button>
+                  </div>
                 </div>
+                <p className="text-muted-foreground">
+                  {sub.renewsAt ? `Renews on ${new Date(sub.renewsAt).toLocaleDateString()}` : 'No renewal date'}
+                </p>
               </div>
-              <p className="text-muted-foreground">
-                {sub.renewsAt ? `Renews on ${new Date(sub.renewsAt).toLocaleDateString()}` : 'No renewal date'}
-              </p>
             </div>
-          </div>
 
-          {planAnalytics && (
-            <>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                {summaryCards.map((card) => (
-                  <div key={card.label} className="p-4 rounded-2xl border border-border/60 bg-muted/20">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                      {card.label}
-                    </p>
-                    <p className="text-2xl font-bold">{card.value}</p>
-                    {card.detail && <p className="text-xs text-muted-foreground mt-1">{card.detail}</p>}
-                    <p className="text-xs text-muted-foreground mt-1">{card.hint}</p>
-                  </div>
-                ))}
-              </div>
+            {planAnalytics && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+                  {/* Unified Grid Layout - Forced Refresh */}
+                  {/* 1. Storage */}
+                  {summaryCards.map((card) => {
+                    if (card.label !== 'Storage') return null;
+                    return (
+                      <div key={card.label} className="p-6 rounded-2xl border border-primary/20 bg-secondary/50 shadow-sm relative overflow-hidden group hover:border-primary/40 transition-colors dark:bg-white/5 dark:border-white/20">
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2 font-semibold">
+                          {card.label}
+                        </p>
+                        <p className="text-3xl font-bold mb-1">{card.value}</p>
+                        {card.detail && <p className="text-sm text-primary/80 font-medium">{card.detail}</p>}
+                        <p className="text-xs text-muted-foreground mt-2">{card.hint}</p>
+                      </div>
+                    );
+                  })}
 
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                {planAnalytics.billingMetrics.map((item) => (
-                  <div key={item.label} className="p-4 rounded-2xl border border-border/60 bg-muted/20">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-                      {item.label}
-                    </p>
-                    <p className="text-2xl font-bold">{item.value}</p>
-                    {item.detail && (
-                      <p className="text-xs text-muted-foreground mt-1">{item.detail}</p>
-                    )}
-                    <p className="text-xs text-muted-foreground mt-1">{item.hint}</p>
-                  </div>
-                ))}
+                  {/* 2. Chatbots */}
+                  {summaryCards.map((card) => {
+                    if (card.label !== 'Chatbots') return null;
+                    return (
+                      <div key={card.label} className="p-6 rounded-2xl border border-primary/20 bg-secondary/50 shadow-sm relative overflow-hidden group hover:border-primary/40 transition-colors dark:bg-white/5 dark:border-white/20">
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2 font-semibold">
+                          {card.label}
+                        </p>
+                        <p className="text-3xl font-bold mb-1">{card.value}</p>
+                        {card.detail && <p className="text-sm text-primary/80 font-medium">{card.detail}</p>}
+                        <p className="text-xs text-muted-foreground mt-2">{card.hint}</p>
+                      </div>
+                    );
+                  })}
 
-                <div
-                  className="p-4 rounded-2xl border border-border/60 bg-muted/20 cursor-pointer"
-                  onClick={() => setVectorDialogOpen(true)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                  {/* 3. Tokens, 4. Upload, 5. Bot Slots */}
+                  {planAnalytics.billingMetrics.map((item) => (
+                    <div key={item.label} className="p-6 rounded-2xl border border-primary/20 bg-secondary/50 shadow-sm relative overflow-hidden hover:border-primary/40 transition-colors dark:bg-white/5 dark:border-white/20">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2 font-semibold">
+                        {item.label}
+                      </p>
+                      <p className="text-3xl font-bold mb-1">{item.value}</p>
+                      {item.detail && (
+                        <p className="text-sm text-primary/80 font-medium">{item.detail}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-2">{item.hint}</p>
+                    </div>
+                  ))}
+
+                  {/* 6. Vector Memory */}
+                  <div
+                    className="p-6 rounded-2xl border border-primary/20 bg-secondary/50 shadow-sm cursor-pointer hover:border-primary/40 transition-colors relative overflow-hidden group dark:bg-white/5 dark:border-white/20"
+                    onClick={() => setVectorDialogOpen(true)}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="flex items-start justify-between mb-2">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
                         Vector memory
                       </p>
-                      <p className="text-2xl font-bold">
-                        {formatCompact(planAnalytics.vectorBreakdown.used)} /{' '}
-                        {formatCompact(planAnalytics.vectorBreakdown.limit)}
-                      </p>
+                      <DatabaseZap className="w-5 h-5 text-primary" />
                     </div>
-                    <DatabaseZap className="w-5 h-5 text-primary" />
+                    <p className="text-3xl font-bold mb-1">
+                      {formatCompact(planAnalytics.vectorBreakdown.used)} /{' '}
+                      {formatCompact(planAnalytics.vectorBreakdown.limit)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Tap to inspect embeddings utilisation.
+                    </p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Tap to inspect embeddings utilisation.
-                  </p>
-                </div>
 
-                <div className="p-4 rounded-2xl border border-border/60 bg-muted/20">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                  {/* 7. API Requests */}
+                  <div className="p-6 rounded-2xl border border-primary/20 bg-secondary/50 shadow-sm relative overflow-hidden hover:border-primary/40 transition-colors dark:bg-white/5 dark:border-white/20">
+                    <div className="flex items-start justify-between mb-2">
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
                         API requests remaining
                       </p>
-                      <p className="text-2xl font-bold">
-                        {formatCompact(planAnalytics.apiBreakdown.apiRemaining)} /{' '}
-                        {formatCompact(planAnalytics.apiBreakdown.apiLimit)}
+                      <Wifi className="w-5 h-5 text-primary" />
+                    </div>
+                    <p className="text-3xl font-bold mb-1">
+                      {formatCompact(planAnalytics.apiBreakdown.apiRemaining)} /{' '}
+                      {formatCompact(planAnalytics.apiBreakdown.apiLimit)}
+                    </p>
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-xs text-muted-foreground">
+                        Monthly allocation for chat + retrieval APIs.
                       </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto py-0 px-2 text-xs text-primary hover:text-primary/80 hover:bg-primary/10 -mr-2"
+                        onClick={() => setApiDetailsOpen((prev) => !prev)}
+                      >
+                        {apiDetailsOpen ? 'Hide' : 'Details'}
+                      </Button>
                     </div>
-                    <Wifi className="w-5 h-5 text-primary" />
+
+                    {apiDetailsOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="text-xs text-muted-foreground space-y-1 mt-3 pt-3 border-t border-primary/10"
+                      >
+                        <div className="flex justify-between">
+                          <span>Used this cycle:</span>
+                          <span className="font-medium text-foreground">{formatCompact(planAnalytics.apiBreakdown.apiUsed)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Avg per day:</span>
+                          <span className="font-medium text-foreground">{formatCompact(planAnalytics.apiBreakdown.avgPerDay)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Est renewal:</span>
+                          <span className="font-medium text-foreground">{planAnalytics.apiBreakdown.estDays} days</span>
+                        </div>
+                      </motion.div>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Monthly allocation for chat + retrieval APIs.
-                  </p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="px-0 text-primary mt-2"
-                    onClick={() => setApiDetailsOpen((prev) => !prev)}
-                  >
-                    {apiDetailsOpen ? 'Hide breakdown' : 'View breakdown'}
-                  </Button>
-                  {apiDetailsOpen && (
-                    <div className="text-xs text-muted-foreground space-y-1 mt-2">
-                      <p>Requests used this cycle: {formatCompact(planAnalytics.apiBreakdown.apiUsed)}</p>
-                      <p>Average per day: {formatCompact(planAnalytics.apiBreakdown.avgPerDay)}</p>
-                      <p>Estimated days until renewal: {planAnalytics.apiBreakdown.estDays}</p>
-                    </div>
-                  )}
                 </div>
-              </div>
-            </>
-          )}
-        </motion.div>
-      )}
+              </>
+            )}
+          </motion.div>
+        )
+      }
 
       {/* Plan Comparison */}
       <motion.div
@@ -338,9 +381,8 @@ const Billing = () => {
               <button
                 key={cycle}
                 onClick={() => setBillingCycle(cycle)}
-                className={`relative px-6 py-2 text-sm font-semibold rounded-full transition ${
-                  billingCycle === cycle ? 'bg-background text-foreground shadow' : 'text-muted-foreground'
-                }`}
+                className={`relative px-6 py-2 text-sm font-semibold rounded-full transition ${billingCycle === cycle ? 'bg-background text-foreground shadow' : 'text-muted-foreground'
+                  }`}
               >
                 {cycle === 'monthly' ? 'Monthly' : 'Yearly'}
                 {cycle === 'yearly' && (
@@ -361,9 +403,8 @@ const Billing = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.1 * index }}
-                className={`relative flex flex-col rounded-3xl border border-white/10 bg-card/60 p-6 text-left shadow-lg ${
-                  plan.recommended ? 'ring-2 ring-primary/50' : ''
-                }`}
+                className={`relative flex flex-col rounded-3xl border border-white/10 bg-card/60 p-6 text-left shadow-lg ${plan.recommended ? 'ring-2 ring-primary/50' : ''
+                  }`}
               >
                 {plan.badge && (
                   <span className="absolute -top-3 right-4 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
@@ -402,34 +443,36 @@ const Billing = () => {
         </div>
       </motion.div>
 
-      {planAnalytics && (
-        <Dialog open={vectorDialogOpen} onOpenChange={setVectorDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Vector memory</DialogTitle>
-              <DialogDescription>Detailed breakdown of your embeddings capacity.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2 text-sm">
-              <p>
-                <span className="font-semibold">Embeddings generated:</span>{' '}
-                {formatCompact(planAnalytics.vectorBreakdown.used)}
-              </p>
-              <p>
-                <span className="font-semibold">Remaining capacity:</span>{' '}
-                {formatCompact(planAnalytics.vectorBreakdown.remaining)}
-              </p>
-              <p>
-                <span className="font-semibold">Documents indexed:</span>{' '}
-                {planAnalytics.vectorBreakdown.documents}
-              </p>
-              <p>
-                <span className="font-semibold">Total text processed:</span>{' '}
-                {formatCompact(planAnalytics.vectorBreakdown.words)} words
-              </p>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      {
+        planAnalytics && (
+          <Dialog open={vectorDialogOpen} onOpenChange={setVectorDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Vector memory</DialogTitle>
+                <DialogDescription>Detailed breakdown of your embeddings capacity.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2 text-sm">
+                <p>
+                  <span className="font-semibold">Embeddings generated:</span>{' '}
+                  {formatCompact(planAnalytics.vectorBreakdown.used)}
+                </p>
+                <p>
+                  <span className="font-semibold">Remaining capacity:</span>{' '}
+                  {formatCompact(planAnalytics.vectorBreakdown.remaining)}
+                </p>
+                <p>
+                  <span className="font-semibold">Documents indexed:</span>{' '}
+                  {planAnalytics.vectorBreakdown.documents}
+                </p>
+                <p>
+                  <span className="font-semibold">Total text processed:</span>{' '}
+                  {formatCompact(planAnalytics.vectorBreakdown.words)} words
+                </p>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )
+      }
 
       {/* Payment Method */}
       <motion.div
@@ -457,7 +500,7 @@ const Billing = () => {
           </Button>
         </div>
       </motion.div>
-    </div>
+    </div >
   );
 };
 

@@ -83,8 +83,8 @@ export interface GuardrailsDTO {
   escalationRules: Record<string, unknown>;
 }
 
-// API Base URL - use environment variable or default to localhost
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// API Base URL - use environment variable
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 // Helper function for API calls
 export async function apiRequest<T>(

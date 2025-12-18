@@ -29,7 +29,7 @@ const Overview = () => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const response = await apiRequest<UserData>('/api/v1/auth/me', {
+        const response = await apiRequest<UserData>('/auth/me', {
           method: 'GET',
         });
         

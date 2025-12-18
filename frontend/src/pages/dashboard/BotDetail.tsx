@@ -533,8 +533,7 @@ const BotDetail = () => {
       toast.error('No snippet found. Please create a snippet first.');
       return;
     }
-    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    const embedCode = `<!-- Add this before closing </body> tag -->\n<script \n  src="${apiBase}/static/widget.js"\n  data-snippet-id="${snippet.id}"\n  async>\n</script>`;
+    const embedCode = `<!-- Add this before closing </body> tag -->\n<script \n  src="/static/widget.js"\n  data-snippet-id="${snippet.id}"\n  async>\n</script>`;
 
     try {
       await navigator.clipboard.writeText(embedCode);
@@ -1731,10 +1730,9 @@ const BotDetail = () => {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
-                                  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
                                   const embedCode = `<!-- Add this before closing </body> tag -->
 <script 
-  src="${apiBase}/static/widget.js"
+  src="/static/widget.js"
   data-snippet-id="${snippet.id}"
   async>
 </script>`;
@@ -2043,7 +2041,7 @@ const BotDetail = () => {
                 <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto border border-border/50">
 {`<!-- Add this before closing </body> tag -->
 <script 
-  src="${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/static/widget.js"
+  src="/static/widget.js"
   data-snippet-id="${snippets[0].id}"
   async>
 </script>`}

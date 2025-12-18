@@ -55,7 +55,7 @@ export const FirstTimeWelcome = ({ onStartSetup, onSkip }: FirstTimeWelcomeProps
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const response = await apiRequest<UserData>('/api/v1/auth/me', { method: 'GET' });
+        const response = await apiRequest<UserData>('/auth/me', { method: 'GET' });
         if (response.data) {
           setUserData(response.data);
           setUserName(response.data.full_name);

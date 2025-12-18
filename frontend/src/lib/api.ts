@@ -83,15 +83,16 @@ export interface GuardrailsDTO {
   escalationRules: Record<string, unknown>;
 }
 
-// API Base URL - use environment variable
-const API_BASE_URL = import.meta.env.VITE_API_URL;
-
+// API Base URL - relative path for same-origin requests
+const API_BASE_URL = "/api/v1";
 // Helper function for API calls
 export async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
-  const url = `${API_BASE_URL}${endpoint}`;
+  // Ensure endpoint starts with / and normalize
+  const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const url = `${API_BASE_URL}${normalizedEndpoint}`;
   const token = localStorage.getItem('access_token');
   const isFormData =
     typeof FormData !== 'undefined' && options.body instanceof FormData;
@@ -163,7 +164,7 @@ export const mockSignUp = async (
   domain?: string
 ): Promise<ApiResponse<{ userId: string }>> => {
   return apiRequest<{ access_token: string; token_type: string; user: any }>(
-    '/api/v1/auth/signup',
+    '/auth/signup',
     {
       method: 'POST',
       body: JSON.stringify({ 
@@ -192,7 +193,7 @@ export const mockSignUp = async (
 
 export const mockSignIn = async (email: string, password: string): Promise<ApiResponse<{ token: string; user: any }>> => {
   return apiRequest<{ access_token: string; token_type: string; user: any }>(
-    '/api/v1/auth/signin',
+    '/auth/signin',
     {
       method: 'POST',
       body: JSON.stringify({ email, password }),
@@ -360,7 +361,7 @@ export const uploadBotDocument = async (
   const formData = new FormData();
   formData.append('file', file);
 
-  return apiRequest<BotDocumentDTO>(`/api/v1/bots/${botId}/documents`, {
+  return apiRequest<BotDocumentDTO>(`/bots/${botId}/documents`, {
     method: 'POST',
     body: formData,
   });
@@ -375,7 +376,7 @@ export const uploadBrandLogo = async (
 
   const query = options?.botId ? `?bot_id=${options.botId}` : '';
 
-  return apiRequest<LogoUploadResponse>(`/api/v1/uploads/logo${query}`, {
+  return apiRequest<LogoUploadResponse>(`/uploads/logo${query}`, {
     method: 'POST',
     body: formData,
   });
@@ -384,14 +385,14 @@ export const uploadBrandLogo = async (
 export const listBotDocuments = async (
   botId: string
 ): Promise<ApiResponse<BotDocumentDTO[]>> => {
-  return apiRequest<BotDocumentDTO[]>(`/api/v1/bots/${botId}/documents`);
+  return apiRequest<BotDocumentDTO[]>(`/bots/${botId}/documents`);
 };
 
 export const createCrawlDocument = async (
   botId: string,
   payload: CrawlDocumentPayload
 ): Promise<ApiResponse<BotDocumentDTO>> => {
-  return apiRequest<BotDocumentDTO>(`/api/v1/bots/${botId}/documents/crawl`, {
+  return apiRequest<BotDocumentDTO>(`/bots/${botId}/documents/crawl`, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -400,7 +401,7 @@ export const createCrawlDocument = async (
 export const deleteBotDocument = async (
   documentId: string
 ): Promise<ApiResponse<Record<string, never>>> => {
-  return apiRequest(`/api/v1/documents/${documentId}`, {
+  return apiRequest(`/documents/${documentId}`, {
     method: 'DELETE',
   });
 };
@@ -414,7 +415,7 @@ export const downloadBotDocument = async (
 
   try {
     const response = await fetch(
-      `${API_BASE_URL}/api/v1/documents/${documentId}`,
+      `${API_BASE_URL}/documents/${documentId}`,
       {
         headers: token
           ? {
@@ -589,7 +590,7 @@ export type UiConfigPayload = {
 export const createUiConfig = async (
   payload: UiConfigPayload
 ): Promise<ApiResponse<UiConfigDTO>> => {
-  return apiRequest<UiConfigDTO>('/api/v1/ui-configs', {
+  return apiRequest<UiConfigDTO>('/ui-configs', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -599,7 +600,7 @@ export const updateUiConfig = async (
   uiConfigId: string,
   payload: UiConfigPayload
 ): Promise<ApiResponse<UiConfigDTO>> => {
-  return apiRequest<UiConfigDTO>(`/api/v1/ui-configs/${uiConfigId}`, {
+  return apiRequest<UiConfigDTO>(`/ui-configs/${uiConfigId}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
   });
@@ -608,7 +609,7 @@ export const updateUiConfig = async (
 export const getUiConfig = async (
   uiConfigId: string
 ): Promise<ApiResponse<UiConfigDTO>> => {
-  return apiRequest<UiConfigDTO>(`/api/v1/ui-configs/${uiConfigId}`, {
+  return apiRequest<UiConfigDTO>(`/ui-configs/${uiConfigId}`, {
     method: 'GET',
   });
 };
@@ -634,13 +635,13 @@ export interface BotDTO {
 }
 
 export const getBots = async (): Promise<ApiResponse<BotDTO[]>> => {
-  return apiRequest<BotDTO[]>('/api/v1/bots', {
+  return apiRequest<BotDTO[]>('/bots', {
     method: 'GET',
   });
 };
 
 export const getBot = async (botId: string): Promise<ApiResponse<BotDTO>> => {
-  return apiRequest<BotDTO>(`/api/v1/bots/${botId}`, {
+  return apiRequest<BotDTO>(`/bots/${botId}`, {
     method: 'GET',
   });
 };
@@ -654,7 +655,7 @@ export const createBot = async (botData: {
   retrieval_config?: Record<string, unknown>;
   ui_config_id?: string | null;
 }): Promise<ApiResponse<BotDTO>> => {
-  return apiRequest<BotDTO>('/api/v1/bots', {
+  return apiRequest<BotDTO>('/bots', {
     method: 'POST',
     body: JSON.stringify(botData),
   });
@@ -673,14 +674,14 @@ export const updateBot = async (
     ui_config_id?: string | null;
   }
 ): Promise<ApiResponse<BotDTO>> => {
-  return apiRequest<BotDTO>(`/api/v1/bots/${botId}`, {
+  return apiRequest<BotDTO>(`/bots/${botId}`, {
     method: 'PATCH',
     body: JSON.stringify(botData),
   });
 };
 
 export const deleteBot = async (botId: string): Promise<ApiResponse<{ success: boolean }>> => {
-  return apiRequest<{ success: boolean }>(`/api/v1/bots/${botId}`, {
+  return apiRequest<{ success: boolean }>(`/bots/${botId}`, {
     method: 'DELETE',
   });
 };
@@ -718,7 +719,7 @@ export const createSnippet = async (
   botId: string,
   snippetData: InstallationSnippetCreate
 ): Promise<ApiResponse<InstallationSnippetDTO>> => {
-  return apiRequest<InstallationSnippetDTO>(`/api/v1/snippets/bots/${botId}/snippets`, {
+  return apiRequest<InstallationSnippetDTO>(`/snippets/bots/${botId}/snippets`, {
     method: 'POST',
     body: JSON.stringify(snippetData),
   });
@@ -726,14 +727,14 @@ export const createSnippet = async (
 
 // Get all snippets for a bot
 export const getSnippetsForBot = async (botId: string): Promise<ApiResponse<InstallationSnippetDTO[]>> => {
-  return apiRequest<InstallationSnippetDTO[]>(`/api/v1/snippets/bots/${botId}/snippets`, {
+  return apiRequest<InstallationSnippetDTO[]>(`/snippets/bots/${botId}/snippets`, {
     method: 'GET',
   });
 };
 
 // Get a specific snippet
 export const getSnippet = async (snippetId: string): Promise<ApiResponse<InstallationSnippetDTO>> => {
-  return apiRequest<InstallationSnippetDTO>(`/api/v1/snippets/${snippetId}`, {
+  return apiRequest<InstallationSnippetDTO>(`/snippets/${snippetId}`, {
     method: 'GET',
   });
 };
@@ -743,7 +744,7 @@ export const updateSnippet = async (
   snippetId: string,
   updateData: InstallationSnippetUpdate
 ): Promise<ApiResponse<InstallationSnippetDTO>> => {
-  return apiRequest<InstallationSnippetDTO>(`/api/v1/snippets/${snippetId}`, {
+  return apiRequest<InstallationSnippetDTO>(`/snippets/${snippetId}`, {
     method: 'PATCH',
     body: JSON.stringify(updateData),
   });
@@ -751,7 +752,7 @@ export const updateSnippet = async (
 
 // Delete a snippet
 export const deleteSnippet = async (snippetId: string): Promise<ApiResponse<{ success: boolean }>> => {
-  return apiRequest<{ success: boolean }>(`/api/v1/snippets/${snippetId}`, {
+  return apiRequest<{ success: boolean }>(`/snippets/${snippetId}`, {
     method: 'DELETE',
   });
 };

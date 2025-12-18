@@ -886,7 +886,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                         <code className="text-xs whitespace-pre">
                           {createdSnippetId ? `<!-- Add this before closing </body> tag -->
 <script 
-  src="${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/static/widget.js"
+  src="/static/widget.js"
   data-snippet-id="${createdSnippetId}"
   async>
 </script>` : `<!-- Snippet is being created... -->
@@ -899,10 +899,9 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                           size="sm"
                           className="absolute top-2 right-2 h-7 px-3 text-xs"
                           onClick={() => {
-                            const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8000';
                             const embedCode = `<!-- Add this before closing </body> tag -->
 <script 
-  src="${apiBase}/static/widget.js"
+  src="/static/widget.js"
   data-snippet-id="${createdSnippetId}"
   async>
 </script>`;

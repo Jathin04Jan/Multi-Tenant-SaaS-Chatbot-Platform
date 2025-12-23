@@ -444,6 +444,10 @@ CREATE INDEX idx_installation_snippets_user_bot ON installation_snippets(user_id
 
 ### Documents Table
 ```sql
+-- Create enum types for document source type and status
+CREATE TYPE document_source_type AS ENUM ('file', 'url', 'integration');
+CREATE TYPE document_status AS ENUM ('pending', 'processing', 'indexed', 'error');
+
 CREATE TABLE documents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -616,7 +620,7 @@ Stores global configuration and landing page content. These settings are **globa
 ## 🎯 Summary
 
 - **7 Tables**: `users`, `bots`, `documents`, `installation_snippets`, `pricing_plans`, `pricing_plan_country_prices`, `app_settings`
-- **2 Enums**: `user_status`, `bot_status`
+- **4 Enums**: `user_status`, `bot_status`, `document_source_type`, `document_status`
 - **All relationships** properly configured with foreign keys and CASCADE DELETE
 - **All indexes** optimized for common query patterns
 - **UI Configuration**: Stored directly in `branding` JSONB field (no separate table needed)

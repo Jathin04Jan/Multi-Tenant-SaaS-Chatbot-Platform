@@ -56,3 +56,35 @@ The frontend then updates its local state with the document ID and status, ensur
 - Extend ingestion pipeline to populate `status` transitions (`pending → processing → indexed/error`) automatically.
 - Surface metadata such as page counts, vectorization stats, and crawl summaries in the UI.
 
+---
+
+## 📝 SQL CREATE Statement
+
+```sql
+-- Create enum types for document source type and status
+CREATE TYPE document_source_type AS ENUM ('file', 'url', 'integration');
+CREATE TYPE document_status AS ENUM ('pending', 'processing', 'indexed', 'error');
+
+CREATE TABLE documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    bot_id UUID NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+    source_type document_source_type NOT NULL DEFAULT 'file',
+    source_url VARCHAR(512),
+    filename VARCHAR(255),
+    content_type VARCHAR(128),
+    size INTEGER,
+    status document_status NOT NULL DEFAULT 'pending',
+    metadata JSONB,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_documents_tenant_id ON documents(tenant_id);
+CREATE INDEX idx_documents_bot_id ON documents(bot_id);
+CREATE INDEX idx_documents_status ON documents(status);
+CREATE INDEX idx_documents_source_type ON documents(source_type);
+```
+
+**Note**: The Python model uses `metadata_payload` as the attribute name, but the database column is named `metadata`. This is handled via SQLAlchemy's `Column` definition with the `name` parameter.
+

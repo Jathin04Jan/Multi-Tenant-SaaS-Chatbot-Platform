@@ -218,6 +218,10 @@ Stores tenant-uploaded knowledge sources that live in MinIO. The backend control
 
 ### Documents Table
 ```sql
+-- Create enum types for document source type and status
+CREATE TYPE document_source_type AS ENUM ('file', 'url', 'integration');
+CREATE TYPE document_status AS ENUM ('pending', 'processing', 'indexed', 'error');
+
 CREATE TABLE documents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

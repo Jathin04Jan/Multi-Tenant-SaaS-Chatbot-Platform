@@ -111,7 +111,10 @@ erDiagram
 - **Global tables (admin-only):** `pricing_plans`, `pricing_plan_country_prices`, `app_settings`.
 - **Tenant data:** `users` (tenants), `bots`, `documents`, `installation_snippets`.
 - **Cascade deletes:** FKs are configured with `ON DELETE CASCADE` in the models for dependent rows.
-- **Status enums:** `users.status`, `bots.status`, `documents.status` use enums as defined in the models.
+- **Enums:** 
+  - `user_status` - used by `users.status` (active, pending_verification, suspended)
+  - `bot_status` - used by `bots.status` (draft, active, paused, archived)
+  - `document_source_type` - used by `documents.source_type` (file, url, integration)
+  - `document_status` - used by `documents.status` (pending, processing, indexed, error)
 - For full column details and SQL, see `FINAL_SCHEMA.md` and `DATABASE_SCHEMA.md`.
 
-git 

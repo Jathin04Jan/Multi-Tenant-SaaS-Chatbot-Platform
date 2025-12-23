@@ -6,7 +6,7 @@
 
 This document describes the three global configuration tables added to the platform:
 
-1. **`pricing_plans`** - Subscription plans (Free, Pro, Enterprise, etc.)
+1. **`subscriptions`** - Subscription plans (Free, Pro, Enterprise, etc.)
 2. **`pricing_plan_country_prices`** - Country/region-specific pricing for each plan
 3. **`app_settings`** - Global application settings and landing page content
 
@@ -21,7 +21,7 @@ These tables are **global** (not per-tenant) and are **admin-only** (only platfo
 **Purpose**: Manage subscription plans that can be offered to tenants.
 
 **Tables**:
-- `pricing_plans` - Stores plan definitions (name, description, limits, features, etc.)
+- `subscriptions` - Stores plan definitions (name, description, limits, features, etc.)
 - `pricing_plan_country_prices` - Stores country/region-specific pricing for each plan
 
 **Key Features**:
@@ -62,7 +62,7 @@ These tables are **global** (not per-tenant) and are **admin-only** (only platfo
 ### Files Created
 
 1. **Models**:
-   - `backend/app/models/pricing_plan.py` - PricingPlan model
+   - `backend/app/models/subscription.py` - Subscription model
    - `backend/app/models/pricing_plan_country_price.py` - PricingPlanCountryPrice model
    - `backend/app/models/app_setting.py` - AppSetting model
 
@@ -87,9 +87,9 @@ These tables are **global** (not per-tenant) and are **admin-only** (only platfo
 
 ## Database Schema
 
-### Pricing Plans Table
+### Subscriptions Table
 ```sql
-CREATE TABLE pricing_plans (
+CREATE TABLE subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     description TEXT,
@@ -107,7 +107,7 @@ CREATE TABLE pricing_plans (
 ```sql
 CREATE TABLE pricing_plan_country_prices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    plan_id UUID NOT NULL REFERENCES pricing_plans(id) ON DELETE CASCADE,
+    plan_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
     country_code VARCHAR(10) NOT NULL,
     currency VARCHAR(10) NOT NULL,
     billing_interval VARCHAR(20) NOT NULL,
@@ -136,7 +136,7 @@ CREATE TABLE app_settings (
 
 ### Admin-Only Access
 
-- **Pricing Plans**: Only platform admins can create or modify pricing plans
+- **Subscriptions**: Only platform admins can create or modify subscription plans
 - **App Settings**: Only platform admins can create or modify app settings
 - **Tenants**: Can only read/reference plans and public settings (cannot modify)
 

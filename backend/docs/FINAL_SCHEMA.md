@@ -10,7 +10,7 @@ This document provides the complete database schema for the Multi-Tenant SaaS Ch
 2. **`bots`** - Bot/Agent configurations
 3. **`documents`** - Uploaded knowledge sources stored in MinIO
 4. **`installation_snippets`** - Embed codes and installation scripts
-5. **`pricing_plans`** - Global subscription plans (Free, Pro, Enterprise, etc.) - **Admin-only**
+5. **`subscriptions`** - Global subscription plans (Free, Pro, Enterprise, etc.) - **Admin-only**
 6. **`pricing_plan_country_prices`** - Country/region-specific pricing for each plan - **Admin-only**
 7. **`app_settings`** - Global application settings and landing page content - **Admin-only**
 
@@ -220,7 +220,7 @@ CREATE INDEX idx_users_id ON users(id);
 - **Email**: Unique constraint prevents duplicate accounts
 - **Status**: Controls account access (active, pending, suspended)
 - **Settings**: JSONB allows flexible configuration storage
-- **Global Configuration**: `pricing_plans`, `pricing_plan_country_prices`, and `app_settings` are admin-only (only platform admins can create/modify)
+- **Global Configuration**: `subscriptions`, `pricing_plan_country_prices`, and `app_settings` are admin-only (only platform admins can create/modify)
 - **Public Settings**: Only `app_settings` with `is_public = true` can be exposed via public API
 
 ---
@@ -232,7 +232,7 @@ CREATE INDEX idx_users_id ON users(id);
 3. **Status Control**: Enum-based status for account management
 4. **Flexible Settings**: JSONB for miscellaneous configuration
 5. **Multi-tenant Ready**: Each user is their own tenant
-6. **Global Configuration**: `pricing_plans`, `pricing_plan_country_prices`, and `app_settings` are global (admin-only) tables for platform-wide configuration
+6. **Global Configuration**: `subscriptions`, `pricing_plan_country_prices`, and `app_settings` are global (admin-only) tables for platform-wide configuration
 7. **Country-Based Pricing**: Supports different prices for different regions/countries via `pricing_plan_country_prices`
 8. **Public/Private Settings**: `app_settings.is_public` flag controls which settings can be exposed via public API
 
@@ -469,9 +469,9 @@ CREATE INDEX idx_documents_status ON documents(status);
 CREATE INDEX idx_documents_source_type ON documents(source_type);
 ```
 
-### Pricing Plans Table
+### Subscriptions Table
 ```sql
-CREATE TABLE pricing_plans (
+CREATE TABLE subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     description TEXT,
@@ -484,15 +484,15 @@ CREATE TABLE pricing_plans (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_pricing_plans_id ON pricing_plans(id);
-CREATE INDEX idx_pricing_plans_is_highlighted ON pricing_plans(is_highlighted);
+CREATE INDEX idx_subscriptions_id ON subscriptions(id);
+CREATE INDEX idx_subscriptions_is_highlighted ON subscriptions(is_highlighted);
 ```
 
 ### Pricing Plan Country Prices Table
 ```sql
 CREATE TABLE pricing_plan_country_prices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    plan_id UUID NOT NULL REFERENCES pricing_plans(id) ON DELETE CASCADE,
+    plan_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
     country_code VARCHAR(10) NOT NULL,
     currency VARCHAR(10) NOT NULL,
     billing_interval VARCHAR(20) NOT NULL,
@@ -524,7 +524,7 @@ CREATE INDEX idx_app_settings_is_public ON app_settings(is_public);
 
 ---
 
-## 📊 `pricing_plans` Table
+## 📊 `subscriptions` Table
 
 Stores all subscription plans that can be offered to tenants (Free, Pro, Enterprise, etc.). These are **global** plans, not per-tenant. Only platform admins can create or modify entries.
 
@@ -560,7 +560,7 @@ Stores pricing per country/region for each plan. Allows different pricing for di
 | Column Name | Type | Constraints | Description |
 |------------|------|-------------|-------------|
 | `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique row ID |
-| `plan_id` | UUID | FOREIGN KEY → pricing_plans.id, NOT NULL, INDEXED, CASCADE DELETE | Maps price to plan |
+| `plan_id` | UUID | FOREIGN KEY → subscriptions.id, NOT NULL, INDEXED, CASCADE DELETE | Maps price to plan |
 | `country_code` | VARCHAR(10) | NOT NULL, INDEXED | Country/region code (e.g., 'IN-SOUTH', 'US-CENTRAL', 'EU-WEST') |
 | `currency` | VARCHAR(10) | NOT NULL | Currency code (e.g., 'USD', 'INR', 'EUR') |
 | `billing_interval` | VARCHAR(20) | NOT NULL | Billing interval: 'monthly' or 'yearly' |
@@ -609,20 +609,20 @@ Stores global configuration and landing page content. These settings are **globa
 3. **Bots → Installation Snippets**: One-to-Many (one bot can have one snippet, enforced by system)
 4. **Users → Documents**: One-to-Many (one user can have many documents)
 5. **Bots → Documents**: One-to-Many (one bot can have many documents)
-6. **Pricing Plans → Pricing Plan Country Prices**: One-to-Many (one plan can have many country prices)
+6. **Subscriptions → Pricing Plan Country Prices**: One-to-Many (one plan can have many country prices)
 7. **Cascade Delete**: 
    - Deleting a user deletes all their bots, snippets, and documents
    - Deleting a bot deletes all its snippets and documents
-   - Deleting a pricing plan deletes all its country prices
+   - Deleting a subscription plan deletes all its country prices
 
 ---
 
 ## 🎯 Summary
 
-- **7 Tables**: `users`, `bots`, `documents`, `installation_snippets`, `pricing_plans`, `pricing_plan_country_prices`, `app_settings`
+- **7 Tables**: `users`, `bots`, `documents`, `installation_snippets`, `subscriptions`, `pricing_plan_country_prices`, `app_settings`
 - **4 Enums**: `user_status`, `bot_status`, `document_source_type`, `document_status`
 - **All relationships** properly configured with foreign keys and CASCADE DELETE
 - **All indexes** optimized for common query patterns
 - **UI Configuration**: Stored directly in `branding` JSONB field (no separate table needed)
 - **One Snippet Per Bot**: System enforces one snippet per bot (existing snippets are updated, not duplicated)
-- **Global Configuration**: `pricing_plans`, `pricing_plan_country_prices`, and `app_settings` are global (admin-only) tables for platform-wide configuration
+- **Global Configuration**: `subscriptions`, `pricing_plan_country_prices`, and `app_settings` are global (admin-only) tables for platform-wide configuration

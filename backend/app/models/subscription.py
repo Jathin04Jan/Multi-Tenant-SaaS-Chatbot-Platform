@@ -6,10 +6,10 @@ import uuid
 from app.core.database import Base
 
 
-class PricingPlan(Base):
-    """Pricing plan model - stores subscription plans (Free, Pro, Enterprise, etc.)."""
+class Subscription(Base):
+    """Subscription plan model - stores subscription plans (Free, Pro, Enterprise, etc.)."""
     
-    __tablename__ = "pricing_plans"
+    __tablename__ = "subscriptions"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(Text, nullable=False, comment="Display name (e.g., 'Free', 'Pro', 'Enterprise')")
@@ -42,5 +42,5 @@ class PricingPlan(Base):
     )
     
     def __repr__(self):
-        return f"<PricingPlan(id={self.id}, name={self.name}, is_highlighted={self.is_highlighted})>"
+        return f"<Subscription(id={self.id}, name={self.name}, is_highlighted={self.is_highlighted})>"
 

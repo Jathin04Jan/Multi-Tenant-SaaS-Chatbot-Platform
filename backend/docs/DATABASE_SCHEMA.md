@@ -8,7 +8,7 @@
 2. **`bots`** - Bot/Agent configurations
 3. **`documents`** - Knowledge sources uploaded by tenants (stored in MinIO)
 4. **`installation_snippets`** - Embed codes and installation scripts
-5. **`pricing_plans`** - Global subscription plans (Free, Pro, Enterprise, etc.)
+5. **`subscriptions`** - Global subscription plans (Free, Pro, Enterprise, etc.)
 6. **`pricing_plan_country_prices`** - Country/region-specific pricing for each plan
 7. **`app_settings`** - Global application settings and landing page content
 
@@ -342,7 +342,7 @@ CREATE INDEX idx_documents_source_type ON documents(source_type);
 
 ---
 
-### `pricing_plans` Table
+### `subscriptions` Table
 
 Stores all subscription plans that can be offered to tenants (Free, Pro, Enterprise, etc.). These are **global** plans, not per-tenant. Only platform admins can create or modify entries.
 
@@ -378,7 +378,7 @@ Stores pricing per country/region for each plan. Allows different pricing for di
 | Column Name | Type | Constraints | Description |
 |------------|------|-------------|-------------|
 | `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique row ID |
-| `plan_id` | UUID | FOREIGN KEY → pricing_plans.id, NOT NULL, INDEXED, CASCADE DELETE | Maps price to plan |
+| `plan_id` | UUID | FOREIGN KEY → subscriptions.id, NOT NULL, INDEXED, CASCADE DELETE | Maps price to plan |
 | `country_code` | VARCHAR(10) | NOT NULL, INDEXED | Country/region code (e.g., 'IN-SOUTH', 'US-CENTRAL', 'EU-WEST') |
 | `currency` | VARCHAR(10) | NOT NULL | Currency code (e.g., 'USD', 'INR', 'EUR') |
 | `billing_interval` | VARCHAR(20) | NOT NULL | Billing interval: 'monthly' or 'yearly' |
@@ -422,9 +422,9 @@ Stores global configuration and landing page content. These settings are **globa
 
 ## SQL Equivalent
 
-### Pricing Plans Table
+### Subscriptions Table
 ```sql
-CREATE TABLE pricing_plans (
+CREATE TABLE subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     description TEXT,
@@ -437,15 +437,15 @@ CREATE TABLE pricing_plans (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_pricing_plans_id ON pricing_plans(id);
-CREATE INDEX idx_pricing_plans_is_highlighted ON pricing_plans(is_highlighted);
+CREATE INDEX idx_subscriptions_id ON subscriptions(id);
+CREATE INDEX idx_subscriptions_is_highlighted ON subscriptions(is_highlighted);
 ```
 
 ### Pricing Plan Country Prices Table
 ```sql
 CREATE TABLE pricing_plan_country_prices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    plan_id UUID NOT NULL REFERENCES pricing_plans(id) ON DELETE CASCADE,
+    plan_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
     country_code VARCHAR(10) NOT NULL,
     currency VARCHAR(10) NOT NULL,
     billing_interval VARCHAR(20) NOT NULL,
@@ -508,9 +508,9 @@ CREATE INDEX idx_app_settings_is_public ON app_settings(is_public);
 8. ✅ **`expires_at`** - Optional expiry for time-limited access
 9. ✅ **One snippet per bot** - System enforces one snippet per bot (existing snippets are updated, not duplicated)
 
-### Pricing Plans Table:
+### Subscriptions Table:
 1. ✅ **Global Plans** - Plans are global, not per-tenant
-2. ✅ **Admin-Only** - Only platform admins can create or modify pricing plans
+2. ✅ **Admin-Only** - Only platform admins can create or modify subscription plans
 3. ✅ **Flexible Limits** - `limits` JSONB allows for flexible plan configurations
 4. ✅ **Feature Lists** - `features` JSONB stores an array of feature strings
 5. ✅ **Country Pricing** - Related `pricing_plan_country_prices` table supports country-based pricing
@@ -658,5 +658,5 @@ CREATE INDEX idx_app_settings_is_public ON app_settings(is_public);
 - **Email**: Unique constraint prevents duplicate accounts
 - **Status**: Controls account access (active, pending, suspended)
 - **Settings**: JSONB allows flexible configuration storage
-- **Global Configuration**: `pricing_plans`, `pricing_plan_country_prices`, and `app_settings` are admin-only (only platform admins can create/modify)
+- **Global Configuration**: `subscriptions`, `pricing_plan_country_prices`, and `app_settings` are admin-only (only platform admins can create/modify)
 - **Public Settings**: Only `app_settings` with `is_public = true` can be exposed via public API

@@ -14,10 +14,10 @@ class PricingPlanCountryPrice(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     plan_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("pricing_plans.id", ondelete="CASCADE"),
+        ForeignKey("subscriptions.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="Foreign key to pricing_plans.id"
+        comment="Foreign key to subscriptions.id"
     )
     country_code = Column(
         String(10),
@@ -49,8 +49,8 @@ class PricingPlanCountryPrice(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     
-    # Relationship to pricing plan
-    plan = relationship("PricingPlan", back_populates="country_prices")
+    # Relationship to subscription plan
+    plan = relationship("Subscription", back_populates="country_prices")
     
     def __repr__(self):
         return f"<PricingPlanCountryPrice(id={self.id}, plan_id={self.plan_id}, country_code={self.country_code}, price={self.price} {self.currency})>"

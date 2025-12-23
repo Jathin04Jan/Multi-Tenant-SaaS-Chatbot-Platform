@@ -13,7 +13,7 @@ erDiagram
     bots ||--o{ installation_snippets : bot_id
     bots ||--o{ documents : bot_id
 
-    pricing_plans ||--o{ pricing_plan_country_prices : plan_id
+    subscriptions ||--o{ pricing_plan_country_prices : plan_id
 
     users {
         uuid id PK
@@ -72,7 +72,7 @@ erDiagram
         timestamptz updated_at
     }
 
-    pricing_plans {
+    subscriptions {
         uuid id PK
         text name
         text description
@@ -108,7 +108,7 @@ erDiagram
 ```
 
 ## Notes
-- **Global tables (admin-only):** `pricing_plans`, `pricing_plan_country_prices`, `app_settings`.
+- **Global tables (admin-only):** `subscriptions`, `pricing_plan_country_prices`, `app_settings`.
 - **Tenant data:** `users` (tenants), `bots`, `documents`, `installation_snippets`.
 - **Cascade deletes:** FKs are configured with `ON DELETE CASCADE` in the models for dependent rows.
 - **Enums:** 

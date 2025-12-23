@@ -91,8 +91,8 @@ SELECT * FROM bots;
 -- View installation_snippets table
 SELECT * FROM installation_snippets;
 
--- View pricing_plans table
-SELECT * FROM pricing_plans;
+-- View subscriptions table
+SELECT * FROM subscriptions;
 
 -- View pricing_plan_country_prices table
 SELECT * FROM pricing_plan_country_prices;
@@ -159,7 +159,7 @@ SELECT
     pp.billing_interval,
     pp.price,
     pp.is_active
-FROM pricing_plans p
+FROM subscriptions p
 LEFT JOIN pricing_plan_country_prices pp ON p.id = pp.plan_id
 WHERE pp.is_active = true;
 

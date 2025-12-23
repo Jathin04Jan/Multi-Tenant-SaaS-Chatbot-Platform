@@ -2,7 +2,7 @@
 
 [← Docs Index](./README.md) · [Backend Quick Start](../README.md) · [Project Overview](../../README.md)
 
-## 📊 `pricing_plans` Table
+## 📊 `subscriptions` Table
 
 Stores all subscription plans that can be offered to tenants (Free, Pro, Enterprise, custom, etc.). These are **global** plans, not per-tenant. Only platform admins can create or modify entries.
 
@@ -69,7 +69,7 @@ Stores pricing per country/region for each plan. Allows different pricing for di
 | Column Name | Type | Constraints | Description |
 |------------|------|-------------|-------------|
 | `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique row ID |
-| `plan_id` | UUID | FOREIGN KEY → pricing_plans.id, NOT NULL, INDEXED, CASCADE DELETE | Maps price to plan |
+| `plan_id` | UUID | FOREIGN KEY → subscriptions.id, NOT NULL, INDEXED, CASCADE DELETE | Maps price to plan |
 | `country_code` | VARCHAR(10) | NOT NULL, INDEXED | Country/region code (e.g., 'IN-SOUTH', 'US-CENTRAL', 'EU-WEST') |
 | `currency` | VARCHAR(10) | NOT NULL | Currency code (e.g., 'USD', 'INR', 'EUR') |
 | `billing_interval` | VARCHAR(20) | NOT NULL | Billing interval: 'monthly' or 'yearly' |
@@ -95,9 +95,9 @@ Stores pricing per country/region for each plan. Allows different pricing for di
 
 ## 📝 SQL CREATE Statements
 
-### Pricing Plans Table
+### Subscriptions Table
 ```sql
-CREATE TABLE pricing_plans (
+CREATE TABLE subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     description TEXT,
@@ -110,15 +110,15 @@ CREATE TABLE pricing_plans (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_pricing_plans_id ON pricing_plans(id);
-CREATE INDEX idx_pricing_plans_is_highlighted ON pricing_plans(is_highlighted);
+CREATE INDEX idx_subscriptions_id ON subscriptions(id);
+CREATE INDEX idx_subscriptions_is_highlighted ON subscriptions(is_highlighted);
 ```
 
 ### Pricing Plan Country Prices Table
 ```sql
 CREATE TABLE pricing_plan_country_prices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    plan_id UUID NOT NULL REFERENCES pricing_plans(id) ON DELETE CASCADE,
+    plan_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
     country_code VARCHAR(10) NOT NULL,
     currency VARCHAR(10) NOT NULL,
     billing_interval VARCHAR(20) NOT NULL,
@@ -196,12 +196,12 @@ CREATE INDEX idx_pricing_plan_country_prices_country_code ON pricing_plan_countr
 
 ## 🔗 Relationships & Usage
 
-### Pricing Plans ↔ Tenants / Subscriptions
+### Subscriptions ↔ Tenants
 - Plans are global
-- Tenants reference a plan (e.g., via `users.plan` field or a future `subscriptions` table)
+- Tenants reference a plan (e.g., via `users.plan` field)
 - Backend enforces limits via `plan.limits` when tenants create bots, upload documents, etc.
 
-### Pricing Plans ↔ Country Prices
+### Subscriptions ↔ Country Prices
 - One pricing plan can have multiple country prices (one per country/region)
 - Country prices are filtered by `country_code` and `billing_interval` when displaying pricing
 - Only active prices (`is_active = true`) are shown to users

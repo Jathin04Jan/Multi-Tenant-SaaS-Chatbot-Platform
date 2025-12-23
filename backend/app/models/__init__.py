@@ -5,6 +5,7 @@ from app.models.document import Document
 from app.models.subscription import Subscription
 from app.models.pricing_plan_country_price import PricingPlanCountryPrice
 from app.models.app_setting import AppSetting
+from app.models.entitlement import Entitlement, EntitlementCategory
 
 __all__ = [
     "User",
@@ -16,5 +17,7 @@ __all__ = [
     "Subscription",
     "PricingPlanCountryPrice",
     "AppSetting",
+    "Entitlement",
+    "EntitlementCategory",
 ]
 

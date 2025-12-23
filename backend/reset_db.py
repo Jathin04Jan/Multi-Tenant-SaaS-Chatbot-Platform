@@ -21,6 +21,7 @@ from app.models import (
     Subscription,
     PricingPlanCountryPrice,
     AppSetting,
+    Entitlement,
 )  # Import all models to register them
 
 

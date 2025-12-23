@@ -12,7 +12,8 @@ This document provides the complete database schema for the Multi-Tenant SaaS Ch
 4. **`installation_snippets`** - Embed codes and installation scripts
 5. **`subscriptions`** - Global subscription plans (Free, Pro, Enterprise, etc.) - **Admin-only**
 6. **`pricing_plan_country_prices`** - Country/region-specific pricing for each plan - **Admin-only**
-7. **`app_settings`** - Global application settings and landing page content - **Admin-only**
+7. **`entitlements`** - Subscription plan entitlements/limits (file storage, chat tokens, etc.) - **Admin-only**
+8. **`app_settings`** - Global application settings and landing page content - **Admin-only**
 
 ---
 
@@ -507,6 +508,27 @@ CREATE INDEX idx_pricing_plan_country_prices_plan_id ON pricing_plan_country_pri
 CREATE INDEX idx_pricing_plan_country_prices_country_code ON pricing_plan_country_prices(country_code);
 ```
 
+### Entitlements Table
+```sql
+-- Create enum type for entitlement category
+CREATE TYPE entitlement_category AS ENUM ('file', 'chat', 'other');
+
+CREATE TABLE entitlements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    category entitlement_category NOT NULL,
+    entitlement VARCHAR(100) NOT NULL,
+    unit VARCHAR(20) NOT NULL,
+    quota INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_entitlements_id ON entitlements(id);
+CREATE INDEX idx_entitlements_subscription_id ON entitlements(subscription_id);
+CREATE INDEX idx_entitlements_category ON entitlements(category);
+```
+
 ### App Settings Table
 ```sql
 CREATE TABLE app_settings (
@@ -577,6 +599,40 @@ Stores pricing per country/region for each plan. Allows different pricing for di
 
 ---
 
+## 📊 `entitlements` Table
+
+Stores subscription plan entitlements/limits. Defines what resources and limits each subscription plan provides (e.g., file storage, chat tokens, API calls, etc.). These are **global** entitlements, not per-tenant. Only platform admins can create or modify entries.
+
+### Complete Table Structure
+
+| Column Name | Type | Constraints | Description |
+|------------|------|-------------|-------------|
+| `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique entitlement identifier |
+| `subscription_id` | UUID | FOREIGN KEY → subscriptions.id, NOT NULL, INDEXED, CASCADE DELETE | Maps entitlement to subscription plan |
+| `category` | ENUM | NOT NULL, INDEXED | Entitlement category: file, chat, or other |
+| `entitlement` | VARCHAR(100) | NOT NULL | Entitlement type (e.g., 'storagefile_count', 'tokens', 'api_calls', 'storage_size', etc.) |
+| `unit` | VARCHAR(20) | NOT NULL | Unit of measurement (e.g., 'MB', 'count', 'GB', 'hours', etc.) |
+| `quota` | INTEGER | NOT NULL | Quota/limit value (e.g., 1000 for 1000 MB, 10000 for 10000 tokens, etc.) |
+| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
+| `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
+
+### Category Enum Values
+- **`file`** - File-related entitlements (storage size, file count, etc.)
+- **`chat`** - Chat-related entitlements (tokens, messages, conversations, etc.)
+- **`other`** - Other entitlements (API calls, integrations, etc.)
+
+### Notes
+- One subscription can have multiple entitlements (one-to-many relationship)
+- Entitlements are used by the backend to enforce plan limits when tenants use the system
+- Flexible design allows adding new entitlement types without schema changes
+- Common examples:
+  - `category='file'`, `entitlement='storage_size'`, `unit='GB'`, `quota=100` (100 GB storage)
+  - `category='file'`, `entitlement='file_count'`, `unit='count'`, `quota=1000` (1000 files)
+  - `category='chat'`, `entitlement='tokens'`, `unit='count'`, `quota=100000` (100k tokens/month)
+  - `category='chat'`, `entitlement='messages'`, `unit='count'`, `quota=10000` (10k messages/month)
+
+---
+
 ## 📊 `app_settings` Table
 
 Stores global configuration and landing page content. These settings are **global**, not per-tenant. Only platform admins can create or modify entries.
@@ -610,19 +666,20 @@ Stores global configuration and landing page content. These settings are **globa
 4. **Users → Documents**: One-to-Many (one user can have many documents)
 5. **Bots → Documents**: One-to-Many (one bot can have many documents)
 6. **Subscriptions → Pricing Plan Country Prices**: One-to-Many (one plan can have many country prices)
-7. **Cascade Delete**: 
+7. **Subscriptions → Entitlements**: One-to-Many (one plan can have many entitlements)
+8. **Cascade Delete**: 
    - Deleting a user deletes all their bots, snippets, and documents
    - Deleting a bot deletes all its snippets and documents
-   - Deleting a subscription plan deletes all its country prices
+   - Deleting a subscription plan deletes all its country prices and entitlements
 
 ---
 
 ## 🎯 Summary
 
-- **7 Tables**: `users`, `bots`, `documents`, `installation_snippets`, `subscriptions`, `pricing_plan_country_prices`, `app_settings`
-- **4 Enums**: `user_status`, `bot_status`, `document_source_type`, `document_status`
+- **8 Tables**: `users`, `bots`, `documents`, `installation_snippets`, `subscriptions`, `pricing_plan_country_prices`, `entitlements`, `app_settings`
+- **5 Enums**: `user_status`, `bot_status`, `document_source_type`, `document_status`, `entitlement_category`
 - **All relationships** properly configured with foreign keys and CASCADE DELETE
 - **All indexes** optimized for common query patterns
 - **UI Configuration**: Stored directly in `branding` JSONB field (no separate table needed)
 - **One Snippet Per Bot**: System enforces one snippet per bot (existing snippets are updated, not duplicated)
-- **Global Configuration**: `subscriptions`, `pricing_plan_country_prices`, and `app_settings` are global (admin-only) tables for platform-wide configuration
+- **Global Configuration**: `subscriptions`, `pricing_plan_country_prices`, `entitlements`, and `app_settings` are global (admin-only) tables for platform-wide configuration

@@ -10,7 +10,8 @@
 4. **`installation_snippets`** - Embed codes and installation scripts
 5. **`subscriptions`** - Global subscription plans (Free, Pro, Enterprise, etc.)
 6. **`pricing_plan_country_prices`** - Country/region-specific pricing for each plan
-7. **`app_settings`** - Global application settings and landing page content
+7. **`entitlements`** - Subscription plan entitlements/limits (file storage, chat tokens, etc.)
+8. **`app_settings`** - Global application settings and landing page content
 
 ---
 
@@ -395,6 +396,40 @@ Stores pricing per country/region for each plan. Allows different pricing for di
 
 ---
 
+### `entitlements` Table
+
+Stores subscription plan entitlements/limits. Defines what resources and limits each subscription plan provides (e.g., file storage, chat tokens, API calls, etc.). These are **global** entitlements, not per-tenant. Only platform admins can create or modify entries.
+
+#### Columns
+
+| Column Name | Type | Constraints | Description |
+|------------|------|-------------|-------------|
+| `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique entitlement identifier |
+| `subscription_id` | UUID | FOREIGN KEY → subscriptions.id, NOT NULL, INDEXED, CASCADE DELETE | Maps entitlement to subscription plan |
+| `category` | ENUM | NOT NULL, INDEXED | Entitlement category: file, chat, or other |
+| `entitlement` | VARCHAR(100) | NOT NULL | Entitlement type (e.g., 'storagefile_count', 'tokens', 'api_calls', 'storage_size', etc.) |
+| `unit` | VARCHAR(20) | NOT NULL | Unit of measurement (e.g., 'MB', 'count', 'GB', 'hours', etc.) |
+| `quota` | INTEGER | NOT NULL | Quota/limit value (e.g., 1000 for 1000 MB, 10000 for 10000 tokens, etc.) |
+| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
+| `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
+
+#### Category Enum Values
+- **`file`** - File-related entitlements (storage size, file count, etc.)
+- **`chat`** - Chat-related entitlements (tokens, messages, conversations, etc.)
+- **`other`** - Other entitlements (API calls, integrations, etc.)
+
+#### Notes
+- One subscription can have multiple entitlements (one-to-many relationship)
+- Entitlements are used by the backend to enforce plan limits when tenants use the system
+- Flexible design allows adding new entitlement types without schema changes
+- Common examples:
+  - `category='file'`, `entitlement='storage_size'`, `unit='GB'`, `quota=100` (100 GB storage)
+  - `category='file'`, `entitlement='file_count'`, `unit='count'`, `quota=1000` (1000 files)
+  - `category='chat'`, `entitlement='tokens'`, `unit='count'`, `quota=100000` (100k tokens/month)
+  - `category='chat'`, `entitlement='messages'`, `unit='count'`, `quota=10000` (10k messages/month)
+
+---
+
 ### `app_settings` Table
 
 Stores global configuration and landing page content. These settings are **global**, not per-tenant. Only platform admins can create or modify entries.
@@ -458,6 +493,27 @@ CREATE TABLE pricing_plan_country_prices (
 CREATE INDEX idx_pricing_plan_country_prices_id ON pricing_plan_country_prices(id);
 CREATE INDEX idx_pricing_plan_country_prices_plan_id ON pricing_plan_country_prices(plan_id);
 CREATE INDEX idx_pricing_plan_country_prices_country_code ON pricing_plan_country_prices(country_code);
+```
+
+### Entitlements Table
+```sql
+-- Create enum type for entitlement category
+CREATE TYPE entitlement_category AS ENUM ('file', 'chat', 'other');
+
+CREATE TABLE entitlements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    category entitlement_category NOT NULL,
+    entitlement VARCHAR(100) NOT NULL,
+    unit VARCHAR(20) NOT NULL,
+    quota INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_entitlements_id ON entitlements(id);
+CREATE INDEX idx_entitlements_subscription_id ON entitlements(subscription_id);
+CREATE INDEX idx_entitlements_category ON entitlements(category);
 ```
 
 ### App Settings Table
@@ -640,6 +696,22 @@ CREATE INDEX idx_app_settings_is_public ON app_settings(is_public);
 ```
 **Note**: `price: 2999` represents $29.99 (stored in cents).
 
+### Entitlement Example
+```json
+{
+  "id": "e1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "subscription_id": "p1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "category": "file",
+  "entitlement": "storage_size",
+  "unit": "GB",
+  "quota": 100,
+  "created_at": "2024-01-01T12:00:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+
+**Note**: This entitlement grants 100 GB of file storage for the subscription plan.
+
 ### App Setting Example
 ```json
 {
@@ -658,5 +730,5 @@ CREATE INDEX idx_app_settings_is_public ON app_settings(is_public);
 - **Email**: Unique constraint prevents duplicate accounts
 - **Status**: Controls account access (active, pending, suspended)
 - **Settings**: JSONB allows flexible configuration storage
-- **Global Configuration**: `subscriptions`, `pricing_plan_country_prices`, and `app_settings` are admin-only (only platform admins can create/modify)
+- **Global Configuration**: `subscriptions`, `pricing_plan_country_prices`, `entitlements`, and `app_settings` are admin-only (only platform admins can create/modify)
 - **Public Settings**: Only `app_settings` with `is_public = true` can be exposed via public API

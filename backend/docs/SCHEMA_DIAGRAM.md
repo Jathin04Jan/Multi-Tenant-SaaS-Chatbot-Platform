@@ -14,6 +14,7 @@ erDiagram
     bots ||--o{ documents : bot_id
 
     subscriptions ||--o{ pricing_plan_country_prices : plan_id
+    subscriptions ||--o{ entitlements : subscription_id
 
     users {
         uuid id PK
@@ -30,7 +31,7 @@ erDiagram
 
     bots {
         uuid id PK
-        uuid user_id
+        uuid user_id FK
         varchar name
         text description
         enum status
@@ -44,8 +45,8 @@ erDiagram
 
     installation_snippets {
         uuid id PK
-        uuid user_id
-        uuid bot_id
+        uuid user_id FK
+        uuid bot_id FK
         text script_url
         text embed_code
         varchar status
@@ -59,8 +60,8 @@ erDiagram
 
     documents {
         uuid id PK
-        uuid tenant_id
-        uuid bot_id
+        uuid tenant_id FK
+        uuid bot_id FK
         enum source_type
         varchar source_url
         varchar filename
@@ -87,12 +88,23 @@ erDiagram
 
     pricing_plan_country_prices {
         uuid id PK
-        uuid plan_id
+        uuid plan_id FK
         varchar country_code
         varchar currency
         varchar billing_interval
         integer price
         boolean is_active
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    entitlements {
+        uuid id PK
+        uuid subscription_id FK
+        enum category
+        varchar entitlement
+        varchar unit
+        integer quota
         timestamptz created_at
         timestamptz updated_at
     }
@@ -108,7 +120,7 @@ erDiagram
 ```
 
 ## Notes
-- **Global tables (admin-only):** `subscriptions`, `pricing_plan_country_prices`, `app_settings`.
+- **Global tables (admin-only):** `subscriptions`, `pricing_plan_country_prices`, `entitlements`, `app_settings`.
 - **Tenant data:** `users` (tenants), `bots`, `documents`, `installation_snippets`.
 - **Cascade deletes:** FKs are configured with `ON DELETE CASCADE` in the models for dependent rows.
 - **Enums:** 
@@ -116,5 +128,6 @@ erDiagram
   - `bot_status` - used by `bots.status` (draft, active, paused, archived)
   - `document_source_type` - used by `documents.source_type` (file, url, integration)
   - `document_status` - used by `documents.status` (pending, processing, indexed, error)
+  - `entitlement_category` - used by `entitlements.category` (file, chat, other)
 - For full column details and SQL, see `FINAL_SCHEMA.md` and `DATABASE_SCHEMA.md`.
 

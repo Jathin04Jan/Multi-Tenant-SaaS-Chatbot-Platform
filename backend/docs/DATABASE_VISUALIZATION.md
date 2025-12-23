@@ -97,6 +97,9 @@ SELECT * FROM subscriptions;
 -- View pricing_plan_country_prices table
 SELECT * FROM pricing_plan_country_prices;
 
+-- View entitlements table
+SELECT * FROM entitlements;
+
 -- View app_settings table
 SELECT * FROM app_settings;
 
@@ -162,6 +165,28 @@ SELECT
 FROM subscriptions p
 LEFT JOIN pricing_plan_country_prices pp ON p.id = pp.plan_id
 WHERE pp.is_active = true;
+
+-- View subscriptions with their entitlements
+SELECT 
+    s.name as subscription_name,
+    e.category,
+    e.entitlement,
+    e.unit,
+    e.quota
+FROM subscriptions s
+LEFT JOIN entitlements e ON s.id = e.subscription_id
+ORDER BY s.name, e.category, e.entitlement;
+
+-- View file-related entitlements for a subscription
+SELECT 
+    s.name as subscription_name,
+    e.entitlement,
+    e.unit,
+    e.quota
+FROM subscriptions s
+JOIN entitlements e ON s.id = e.subscription_id
+WHERE e.category = 'file'
+ORDER BY s.name, e.entitlement;
 
 -- View public app settings (for landing page)
 SELECT key, value, description

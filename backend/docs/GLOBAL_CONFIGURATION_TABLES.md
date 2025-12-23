@@ -4,11 +4,12 @@
 
 ## Overview
 
-This document describes the three global configuration tables added to the platform:
+This document describes the global configuration tables added to the platform:
 
 1. **`subscriptions`** - Subscription plans (Free, Pro, Enterprise, etc.)
 2. **`pricing_plan_country_prices`** - Country/region-specific pricing for each plan
-3. **`app_settings`** - Global application settings and landing page content
+3. **`entitlements`** - Subscription plan entitlements/limits (file storage, chat tokens, etc.)
+4. **`app_settings`** - Global application settings and landing page content
 
 These tables are **global** (not per-tenant) and are **admin-only** (only platform admins can create or modify entries).
 
@@ -23,6 +24,7 @@ These tables are **global** (not per-tenant) and are **admin-only** (only platfo
 **Tables**:
 - `subscriptions` - Stores plan definitions (name, description, limits, features, etc.)
 - `pricing_plan_country_prices` - Stores country/region-specific pricing for each plan
+- `entitlements` - Stores plan entitlements/limits (storage, tokens, API calls, etc.)
 
 **Key Features**:
 - Global plans (not per-tenant)
@@ -64,10 +66,12 @@ These tables are **global** (not per-tenant) and are **admin-only** (only platfo
 1. **Models**:
    - `backend/app/models/subscription.py` - Subscription model
    - `backend/app/models/pricing_plan_country_price.py` - PricingPlanCountryPrice model
+   - `backend/app/models/entitlement.py` - Entitlement model
    - `backend/app/models/app_setting.py` - AppSetting model
 
 2. **Documentation**:
    - `backend/docs/PRICING_PLANS_SCHEMA.md` - Complete pricing plans schema documentation
+   - `backend/docs/ENTITLEMENTS_SCHEMA.md` - Complete entitlements schema documentation
    - `backend/docs/APP_SETTINGS_SCHEMA.md` - Complete app settings schema documentation
    - `backend/docs/GLOBAL_CONFIGURATION_TABLES.md` - This file (overview)
 
@@ -118,6 +122,26 @@ CREATE TABLE pricing_plan_country_prices (
 );
 ```
 
+### Entitlements Table
+```sql
+CREATE TYPE entitlement_category AS ENUM ('file', 'chat', 'other');
+
+CREATE TABLE entitlements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    category entitlement_category NOT NULL,
+    entitlement VARCHAR(100) NOT NULL,
+    unit VARCHAR(20) NOT NULL,
+    quota INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_entitlements_id ON entitlements(id);
+CREATE INDEX idx_entitlements_subscription_id ON entitlements(subscription_id);
+CREATE INDEX idx_entitlements_category ON entitlements(category);
+```
+
 ### App Settings Table
 ```sql
 CREATE TABLE app_settings (
@@ -137,8 +161,9 @@ CREATE TABLE app_settings (
 ### Admin-Only Access
 
 - **Subscriptions**: Only platform admins can create or modify subscription plans
+- **Entitlements**: Only platform admins can create or modify entitlements
 - **App Settings**: Only platform admins can create or modify app settings
-- **Tenants**: Can only read/reference plans and public settings (cannot modify)
+- **Tenants**: Can only read/reference plans, entitlements, and public settings (cannot modify)
 
 ### Public vs Private Settings
 

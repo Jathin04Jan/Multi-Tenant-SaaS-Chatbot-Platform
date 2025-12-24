@@ -103,6 +103,9 @@ SELECT * FROM entitlements;
 -- View user_subscriptions table
 SELECT * FROM user_subscriptions;
 
+-- View user_subscription_entitlements table
+SELECT * FROM user_subscription_entitlements;
+
 -- View app_settings table
 SELECT * FROM app_settings;
 
@@ -217,6 +220,47 @@ JOIN users u ON us.user_id = u.id
 JOIN subscriptions s ON us.subscription_id = s.id
 WHERE us.status = 'active'
 ORDER BY u.email;
+
+-- View user subscription entitlements with balance
+SELECT 
+    u.email as user_email,
+    s.name as subscription_name,
+    use.category,
+    use.entitlement,
+    use.unit,
+    use.quota,
+    use.consumption,
+    (use.quota - use.consumption) as balance
+FROM user_subscription_entitlements use
+JOIN users u ON use.user_id = u.id
+JOIN subscriptions s ON use.subscription_id = s.id
+ORDER BY u.email, use.category, use.entitlement;
+
+-- View entitlements that are exceeded
+SELECT 
+    u.email as user_email,
+    use.entitlement,
+    use.quota,
+    use.consumption,
+    (use.consumption - use.quota) as overage
+FROM user_subscription_entitlements use
+JOIN users u ON use.user_id = u.id
+WHERE use.consumption > use.quota
+ORDER BY (use.consumption - use.quota) DESC;
+
+-- View entitlements approaching limit (80%+ usage)
+SELECT 
+    u.email as user_email,
+    use.entitlement,
+    use.quota,
+    use.consumption,
+    ROUND((use.consumption::float / use.quota::float) * 100, 2) as usage_percentage
+FROM user_subscription_entitlements use
+JOIN users u ON use.user_id = u.id
+WHERE use.quota > 0
+  AND (use.consumption::float / use.quota::float) >= 0.8
+  AND use.consumption <= use.quota
+ORDER BY (use.consumption::float / use.quota::float) DESC;
 
 -- View public app settings (for landing page)
 SELECT key, value, description

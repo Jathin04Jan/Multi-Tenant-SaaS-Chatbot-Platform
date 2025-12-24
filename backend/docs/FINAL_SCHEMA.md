@@ -234,6 +234,28 @@ CREATE INDEX idx_users_id ON users(id);
 - `is_active`: Returns `True` if `status == 'active'` (computed from `status` column)
 - `is_expired`: Returns `True` if `end_date < today()` (computed from `end_date` column)
 
+### User Subscription Entitlement Example
+```json
+{
+  "id": "e1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "subscription_id": "p1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "category": "file",
+  "entitlement": "storage",
+  "unit": "MB",
+  "quota": 10000,
+  "consumption": 3500,
+  "created_at": "2024-01-01T12:00:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+**Note**: This shows a user's file storage entitlement with 10,000 MB quota and 3,500 MB consumed (6,500 MB remaining).
+
+**Computed Properties Available in Code (Not in Database):**
+- `balance`: Returns `6500` (quota - consumption = 10000 - 3500)
+- `is_exceeded`: Returns `False` (consumption <= quota)
+- `usage_percentage`: Returns `35.0` (3500 / 10000 * 100)
+
 ---
 
 ## 🔐 Security Notes
@@ -577,6 +599,29 @@ CREATE INDEX idx_user_subscriptions_user_status ON user_subscriptions(user_id, s
 CREATE INDEX idx_user_subscriptions_dates ON user_subscriptions(start_date, end_date);
 ```
 
+### User Subscription Entitlements Table
+```sql
+CREATE TABLE user_subscription_entitlements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    category entitlement_category NOT NULL,
+    entitlement VARCHAR(100) NOT NULL,
+    unit VARCHAR(20) NOT NULL,
+    quota INTEGER NOT NULL DEFAULT 0,
+    consumption INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_user_subscription_entitlements_id ON user_subscription_entitlements(id);
+CREATE INDEX idx_user_subscription_entitlements_user_id ON user_subscription_entitlements(user_id);
+CREATE INDEX idx_user_subscription_entitlements_subscription_id ON user_subscription_entitlements(subscription_id);
+CREATE INDEX idx_user_subscription_entitlements_category ON user_subscription_entitlements(category);
+CREATE INDEX idx_user_subscription_entitlements_user_subscription ON user_subscription_entitlements(user_id, subscription_id);
+CREATE INDEX idx_user_subscription_entitlements_user_category ON user_subscription_entitlements(user_id, category);
+```
+
 ### App Settings Table
 ```sql
 CREATE TABLE app_settings (
@@ -736,6 +781,74 @@ The model provides two computed properties for convenience:
 
 ---
 
+## 📊 `user_subscription_entitlements` Table
+
+Tracks per-user entitlement usage and consumption. This table records the actual quota, consumption, and balance for each entitlement type (storage, file_count, tokens, etc.) for a specific user's subscription.
+
+### Complete Table Structure
+
+| Column Name | Type | Constraints | Description |
+|------------|------|-------------|-------------|
+| `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique entitlement instance identifier |
+| `user_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Foreign key to users.id - the user who has this entitlement |
+| `subscription_id` | UUID | FOREIGN KEY → subscriptions.id, NOT NULL, INDEXED, CASCADE DELETE | Foreign key to subscriptions.id - the subscription plan |
+| `category` | ENUM | NOT NULL, INDEXED | Entitlement category: file, chat, or other |
+| `entitlement` | VARCHAR(100) | NOT NULL | Entitlement type (e.g., 'storage', 'file_count', 'tokens', 'api_calls', etc.) |
+| `unit` | VARCHAR(20) | NOT NULL | Unit of measurement (e.g., 'MB', 'count', 'GB', 'hours', etc.) |
+| `quota` | INTEGER | NOT NULL, DEFAULT 0 | Quota/limit value (e.g., 1000 for 1000 MB, 10000 for 10000 tokens, etc.) |
+| `consumption` | INTEGER | NOT NULL, DEFAULT 0 | Current consumption/usage value (e.g., 500 for 500 MB used, 5000 for 5000 tokens used, etc.) |
+| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
+| `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
+
+### Category Enum Values
+- **`file`** - File-related entitlements (storage, file_count, etc.)
+- **`chat`** - Chat-related entitlements (tokens, messages, etc.)
+- **`other`** - Other entitlements (API calls, custom features, etc.)
+
+### Notes
+- Tracks actual usage/consumption for each entitlement type per user subscription
+- One user can have multiple entitlement records (one per entitlement type)
+- `quota` is the limit allocated to the user for this entitlement
+- `consumption` tracks how much has been used
+- Composite indexes on `(user_id, subscription_id)`, `(user_id, category)` for efficient queries
+
+### Computed Properties (Not Database Columns)
+The model provides three computed properties for convenience:
+
+1. **`balance`** - Returns remaining balance = `quota - consumption`
+   ```python
+   # Usage in code:
+   remaining = user_entitlement.balance
+   if remaining > 0:
+       # User has remaining quota
+   ```
+   - **Not stored in database** - computed from `quota` and `consumption` columns
+   - Single source of truth: `quota` and `consumption` columns
+
+2. **`is_exceeded`** - Returns `True` if `consumption > quota`
+   ```python
+   # Usage in code:
+   if user_entitlement.is_exceeded:
+       # User has exceeded their quota
+       block_access()
+   ```
+   - **Not stored in database** - computed from `quota` and `consumption` columns
+
+3. **`usage_percentage`** - Returns percentage of quota used (0-100)
+   ```python
+   # Usage in code:
+   usage = user_entitlement.usage_percentage
+   if usage > 80:
+       # Warn user they're approaching limit
+   ```
+   - **Not stored in database** - computed from `quota` and `consumption` columns
+   - Returns 0.0 if `quota == 0`
+   - Capped at 100.0 (can exceed if consumption > quota)
+
+**Important:** These are Python `@property` methods, not database columns. They provide convenient helpers but the actual data is stored in the `quota` and `consumption` columns.
+
+---
+
 ## 📊 `app_settings` Table
 
 Stores global configuration and landing page content. These settings are **global**, not per-tenant. Only platform admins can create or modify entries.
@@ -772,7 +885,9 @@ Stores global configuration and landing page content. These settings are **globa
 7. **Subscriptions → Entitlements**: One-to-Many (one plan can have many entitlements)
 8. **Users → User Subscriptions**: One-to-Many (one user can have many subscription instances)
 9. **Subscriptions → User Subscriptions**: One-to-Many (one plan can be subscribed to by many users)
-10. **Cascade Delete**: 
+10. **Users → User Subscription Entitlements**: One-to-Many (one user can have many entitlement records)
+11. **Subscriptions → User Subscription Entitlements**: One-to-Many (one plan can have many user entitlement records)
+12. **Cascade Delete**: 
    - Deleting a user deletes all their bots, snippets, documents, and user subscriptions
    - Deleting a bot deletes all its snippets and documents
    - Deleting a subscription plan deletes all its country prices, entitlements, and user subscriptions
@@ -781,7 +896,7 @@ Stores global configuration and landing page content. These settings are **globa
 
 ## 🎯 Summary
 
-- **9 Tables**: `users`, `bots`, `documents`, `installation_snippets`, `subscriptions`, `pricing_plan_country_prices`, `entitlements`, `user_subscriptions`, `app_settings`
+- **10 Tables**: `users`, `bots`, `documents`, `installation_snippets`, `subscriptions`, `pricing_plan_country_prices`, `entitlements`, `user_subscriptions`, `user_subscription_entitlements`, `app_settings`
 - **6 Enums**: `user_status`, `bot_status`, `document_source_type`, `document_status`, `entitlement_category`, `user_subscription_status`
 - **All relationships** properly configured with foreign keys and CASCADE DELETE
 - **All indexes** optimized for common query patterns

@@ -23,6 +23,7 @@ from app.models import (
     AppSetting,
     Entitlement,
     UserSubscription,
+    UserSubscriptionEntitlement,
 )  # Import all models to register them
 
 

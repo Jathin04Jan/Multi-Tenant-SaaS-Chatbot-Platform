@@ -10,9 +10,10 @@ This document describes the global configuration tables added to the platform:
 2. **`pricing_plan_country_prices`** - Country/region-specific pricing for each plan
 3. **`entitlements`** - Subscription plan entitlements/limits (file storage, chat tokens, etc.)
 4. **`user_subscriptions`** - User subscription instances (links users to subscription plans)
-5. **`app_settings`** - Global application settings and landing page content
+5. **`user_subscription_entitlements`** - Per-user entitlement usage and consumption tracking
+6. **`app_settings`** - Global application settings and landing page content
 
-**Note**: `subscriptions`, `pricing_plan_country_prices`, `entitlements`, and `app_settings` are **global** (not per-tenant) and are **admin-only** (only platform admins can create or modify entries). `user_subscriptions` is a **tenant data table** that tracks individual user subscriptions.
+**Note**: `subscriptions`, `pricing_plan_country_prices`, `entitlements`, and `app_settings` are **global** (not per-tenant) and are **admin-only** (only platform admins can create or modify entries). `user_subscriptions` and `user_subscription_entitlements` are **tenant data tables** that track individual user subscriptions and their usage.
 
 ---
 
@@ -27,6 +28,7 @@ This document describes the global configuration tables added to the platform:
 - `pricing_plan_country_prices` - Stores country/region-specific pricing for each plan
 - `entitlements` - Stores plan entitlements/limits (storage, tokens, API calls, etc.)
 - `user_subscriptions` - Tracks user subscription instances (links users to subscription plans with status, dates, auto-renewal)
+- `user_subscription_entitlements` - Tracks per-user entitlement usage and consumption (quota, consumption, balance)
 
 **Key Features**:
 - Global plans (not per-tenant)
@@ -70,12 +72,14 @@ This document describes the global configuration tables added to the platform:
    - `backend/app/models/pricing_plan_country_price.py` - PricingPlanCountryPrice model
    - `backend/app/models/entitlement.py` - Entitlement model
    - `backend/app/models/user_subscription.py` - UserSubscription model (with computed properties: `is_active`, `is_expired`)
+   - `backend/app/models/user_subscription_entitlement.py` - UserSubscriptionEntitlement model (with computed properties: `balance`, `is_exceeded`, `usage_percentage`)
    - `backend/app/models/app_setting.py` - AppSetting model
 
 2. **Documentation**:
    - `backend/docs/PRICING_PLANS_SCHEMA.md` - Complete pricing plans schema documentation
    - `backend/docs/ENTITLEMENTS_SCHEMA.md` - Complete entitlements schema documentation
    - `backend/docs/USER_SUBSCRIPTIONS_SCHEMA.md` - Complete user subscriptions schema documentation (includes computed properties)
+   - `backend/docs/USER_SUBSCRIPTION_ENTITLEMENTS_SCHEMA.md` - Complete user subscription entitlements schema documentation (includes computed properties)
    - `backend/docs/APP_SETTINGS_SCHEMA.md` - Complete app settings schema documentation
    - `backend/docs/GLOBAL_CONFIGURATION_TABLES.md` - This file (overview)
 
@@ -176,6 +180,34 @@ CREATE INDEX idx_user_subscriptions_dates ON user_subscriptions(start_date, end_
 - `is_active` - Returns `True` if `status == 'active'` (computed from `status` column)
 - `is_expired` - Returns `True` if `end_date < today()` (computed from `end_date` column)
 
+### User Subscription Entitlements Table
+```sql
+CREATE TABLE user_subscription_entitlements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    category entitlement_category NOT NULL,
+    entitlement VARCHAR(100) NOT NULL,
+    unit VARCHAR(20) NOT NULL,
+    quota INTEGER NOT NULL DEFAULT 0,
+    consumption INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_user_subscription_entitlements_id ON user_subscription_entitlements(id);
+CREATE INDEX idx_user_subscription_entitlements_user_id ON user_subscription_entitlements(user_id);
+CREATE INDEX idx_user_subscription_entitlements_subscription_id ON user_subscription_entitlements(subscription_id);
+CREATE INDEX idx_user_subscription_entitlements_category ON user_subscription_entitlements(category);
+CREATE INDEX idx_user_subscription_entitlements_user_subscription ON user_subscription_entitlements(user_id, subscription_id);
+CREATE INDEX idx_user_subscription_entitlements_user_category ON user_subscription_entitlements(user_id, category);
+```
+
+**Computed Properties (Not Database Columns):**
+- `balance` - Returns `quota - consumption` (computed from `quota` and `consumption` columns)
+- `is_exceeded` - Returns `True` if `consumption > quota` (computed from `quota` and `consumption` columns)
+- `usage_percentage` - Returns percentage of quota used (0-100) (computed from `quota` and `consumption` columns)
+
 ### App Settings Table
 ```sql
 CREATE TABLE app_settings (
@@ -236,6 +268,7 @@ These tables are now ready for use. To implement the full functionality:
 - [Pricing Plans Schema](./PRICING_PLANS_SCHEMA.md) - Complete pricing plans schema documentation
 - [Entitlements Schema](./ENTITLEMENTS_SCHEMA.md) - Complete entitlements schema documentation
 - [User Subscriptions Schema](./USER_SUBSCRIPTIONS_SCHEMA.md) - Complete user subscriptions schema documentation (includes computed properties)
+- [User Subscription Entitlements Schema](./USER_SUBSCRIPTION_ENTITLEMENTS_SCHEMA.md) - Complete user subscription entitlements schema documentation (includes computed properties)
 - [App Settings Schema](./APP_SETTINGS_SCHEMA.md) - Complete app settings schema documentation
 - [Database Schema](./DATABASE_SCHEMA.md) - Complete database schema overview
 - [Final Schema](./FINAL_SCHEMA.md) - Final database schema reference

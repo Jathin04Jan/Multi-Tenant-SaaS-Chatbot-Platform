@@ -16,8 +16,10 @@ erDiagram
     subscriptions ||--o{ pricing_plan_country_prices : plan_id
     subscriptions ||--o{ entitlements : subscription_id
     subscriptions ||--o{ user_subscriptions : subscription_id
+    subscriptions ||--o{ user_subscription_entitlements : subscription_id
     
     users ||--o{ user_subscriptions : user_id
+    users ||--o{ user_subscription_entitlements : user_id
 
     users {
         uuid id PK
@@ -124,6 +126,19 @@ erDiagram
         timestamptz updated_at
     }
 
+    user_subscription_entitlements {
+        uuid id PK
+        uuid user_id FK
+        uuid subscription_id FK
+        enum category
+        varchar entitlement
+        varchar unit
+        integer quota
+        integer consumption
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
     app_settings {
         varchar key PK
         jsonb value
@@ -136,7 +151,7 @@ erDiagram
 
 ## Notes
 - **Global tables (admin-only):** `subscriptions`, `pricing_plan_country_prices`, `entitlements`, `app_settings`.
-- **Tenant data:** `users` (tenants), `bots`, `documents`, `installation_snippets`, `user_subscriptions`.
+- **Tenant data:** `users` (tenants), `bots`, `documents`, `installation_snippets`, `user_subscriptions`, `user_subscription_entitlements`.
 - **Cascade deletes:** FKs are configured with `ON DELETE CASCADE` in the models for dependent rows.
 - **Enums:** 
   - `user_status` - used by `users.status` (active, pending_verification, suspended)
@@ -151,5 +166,8 @@ erDiagram
   - `InstallationSnippet.is_active` - computed from `installation_snippets.status` (returns `True` if status == 'active')
   - `UserSubscription.is_active` - computed from `user_subscriptions.status` (returns `True` if status == 'active')
   - `UserSubscription.is_expired` - computed from `user_subscriptions.end_date` (returns `True` if end_date < today())
+  - `UserSubscriptionEntitlement.balance` - computed from `user_subscription_entitlements.quota - consumption`
+  - `UserSubscriptionEntitlement.is_exceeded` - computed from `user_subscription_entitlements.consumption > quota`
+  - `UserSubscriptionEntitlement.usage_percentage` - computed from `user_subscription_entitlements.consumption / quota * 100`
 - For full column details and SQL, see `FINAL_SCHEMA.md` and `DATABASE_SCHEMA.md`.
 

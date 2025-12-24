@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, DateTime, Integer, ForeignKey
+from sqlalchemy import Column, String, Text, DateTime, Integer, ForeignKey, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -10,6 +10,9 @@ class InstallationSnippet(Base):
     """Installation snippet model - stores embed codes and script URLs for bot installation."""
     
     __tablename__ = "installation_snippets"
+    __table_args__ = (
+        Index('idx_installation_snippets_user_bot', 'user_id', 'bot_id'),
+    )
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     
@@ -81,7 +84,7 @@ class InstallationSnippet(Base):
     )
     
     # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     expires_at = Column(
         DateTime(timezone=True),

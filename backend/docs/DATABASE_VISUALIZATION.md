@@ -100,6 +100,9 @@ SELECT * FROM pricing_plan_country_prices;
 -- View entitlements table
 SELECT * FROM entitlements;
 
+-- View user_subscriptions table
+SELECT * FROM user_subscriptions;
+
 -- View app_settings table
 SELECT * FROM app_settings;
 
@@ -187,6 +190,33 @@ FROM subscriptions s
 JOIN entitlements e ON s.id = e.subscription_id
 WHERE e.category = 'file'
 ORDER BY s.name, e.entitlement;
+
+-- View user subscriptions with plan details
+SELECT 
+    u.email as user_email,
+    u.company_name,
+    s.name as subscription_name,
+    us.status,
+    us.start_date,
+    us.end_date,
+    us.auto_renew
+FROM user_subscriptions us
+JOIN users u ON us.user_id = u.id
+JOIN subscriptions s ON us.subscription_id = s.id
+ORDER BY u.email, us.start_date DESC;
+
+-- View active user subscriptions
+SELECT 
+    u.email as user_email,
+    s.name as subscription_name,
+    us.start_date,
+    us.end_date,
+    us.auto_renew
+FROM user_subscriptions us
+JOIN users u ON us.user_id = u.id
+JOIN subscriptions s ON us.subscription_id = s.id
+WHERE us.status = 'active'
+ORDER BY u.email;
 
 -- View public app settings (for landing page)
 SELECT key, value, description

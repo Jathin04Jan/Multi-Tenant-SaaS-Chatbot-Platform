@@ -15,6 +15,9 @@ erDiagram
 
     subscriptions ||--o{ pricing_plan_country_prices : plan_id
     subscriptions ||--o{ entitlements : subscription_id
+    subscriptions ||--o{ user_subscriptions : subscription_id
+    
+    users ||--o{ user_subscriptions : user_id
 
     users {
         uuid id PK
@@ -109,6 +112,18 @@ erDiagram
         timestamptz updated_at
     }
 
+    user_subscriptions {
+        uuid id PK
+        uuid user_id FK
+        uuid subscription_id FK
+        enum status
+        date start_date
+        date end_date
+        boolean auto_renew
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
     app_settings {
         varchar key PK
         jsonb value
@@ -121,7 +136,7 @@ erDiagram
 
 ## Notes
 - **Global tables (admin-only):** `subscriptions`, `pricing_plan_country_prices`, `entitlements`, `app_settings`.
-- **Tenant data:** `users` (tenants), `bots`, `documents`, `installation_snippets`.
+- **Tenant data:** `users` (tenants), `bots`, `documents`, `installation_snippets`, `user_subscriptions`.
 - **Cascade deletes:** FKs are configured with `ON DELETE CASCADE` in the models for dependent rows.
 - **Enums:** 
   - `user_status` - used by `users.status` (active, pending_verification, suspended)
@@ -129,5 +144,12 @@ erDiagram
   - `document_source_type` - used by `documents.source_type` (file, url, integration)
   - `document_status` - used by `documents.status` (pending, processing, indexed, error)
   - `entitlement_category` - used by `entitlements.category` (file, chat, other)
+  - `user_subscription_status` - used by `user_subscriptions.status` (active, expired, cancelled)
+- **Computed Properties**: Some models provide computed properties (not database columns):
+  - `User.is_verified` - computed from `users.status` (returns `True` if status == 'active')
+  - `Bot.is_active` - computed from `bots.status` (returns `True` if status == 'active')
+  - `InstallationSnippet.is_active` - computed from `installation_snippets.status` (returns `True` if status == 'active')
+  - `UserSubscription.is_active` - computed from `user_subscriptions.status` (returns `True` if status == 'active')
+  - `UserSubscription.is_expired` - computed from `user_subscriptions.end_date` (returns `True` if end_date < today())
 - For full column details and SQL, see `FINAL_SCHEMA.md` and `DATABASE_SCHEMA.md`.
 

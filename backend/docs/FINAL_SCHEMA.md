@@ -13,7 +13,8 @@ This document provides the complete database schema for the Multi-Tenant SaaS Ch
 5. **`subscriptions`** - Global subscription plans (Free, Pro, Enterprise, etc.) - **Admin-only**
 6. **`pricing_plan_country_prices`** - Country/region-specific pricing for each plan - **Admin-only**
 7. **`entitlements`** - Subscription plan entitlements/limits (file storage, chat tokens, etc.) - **Admin-only**
-8. **`app_settings`** - Global application settings and landing page content - **Admin-only**
+8. **`user_subscriptions`** - User subscription instances (tracks when users subscribe to plans)
+9. **`app_settings`** - Global application settings and landing page content - **Admin-only**
 
 ---
 
@@ -212,6 +213,26 @@ CREATE INDEX idx_users_id ON users(id);
   "updated_at": "2024-01-15T10:30:00Z"
 }
 ```
+
+### User Subscription Example
+```json
+{
+  "id": "u1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "subscription_id": "p1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "status": "active",
+  "start_date": "2024-01-01",
+  "end_date": "2024-12-31",
+  "auto_renew": true,
+  "created_at": "2024-01-01T12:00:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+**Note**: This shows a user's active subscription to the Pro plan, starting Jan 1, 2024 and ending Dec 31, 2024, with auto-renewal enabled.
+
+**Computed Properties Available in Code (Not in Database):**
+- `is_active`: Returns `True` if `status == 'active'` (computed from `status` column)
+- `is_expired`: Returns `True` if `end_date < today()` (computed from `end_date` column)
 
 ---
 
@@ -529,6 +550,33 @@ CREATE INDEX idx_entitlements_subscription_id ON entitlements(subscription_id);
 CREATE INDEX idx_entitlements_category ON entitlements(category);
 ```
 
+### User Subscriptions Table
+```sql
+-- Create enum type for user subscription status
+CREATE TYPE user_subscription_status AS ENUM ('active', 'expired', 'cancelled');
+
+CREATE TABLE user_subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    status user_subscription_status NOT NULL DEFAULT 'active',
+    start_date DATE NOT NULL,
+    end_date DATE,
+    auto_renew BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_user_subscriptions_id ON user_subscriptions(id);
+CREATE INDEX idx_user_subscriptions_user_id ON user_subscriptions(user_id);
+CREATE INDEX idx_user_subscriptions_subscription_id ON user_subscriptions(subscription_id);
+CREATE INDEX idx_user_subscriptions_status ON user_subscriptions(status);
+CREATE INDEX idx_user_subscriptions_start_date ON user_subscriptions(start_date);
+CREATE INDEX idx_user_subscriptions_end_date ON user_subscriptions(end_date);
+CREATE INDEX idx_user_subscriptions_user_status ON user_subscriptions(user_id, status);
+CREATE INDEX idx_user_subscriptions_dates ON user_subscriptions(start_date, end_date);
+```
+
 ### App Settings Table
 ```sql
 CREATE TABLE app_settings (
@@ -633,6 +681,61 @@ Stores subscription plan entitlements/limits. Defines what resources and limits 
 
 ---
 
+## 📊 `user_subscriptions` Table
+
+Tracks user subscription instances - records when users subscribe to subscription plans. This table links users to their active/expired/cancelled subscriptions with start/end dates and auto-renewal settings.
+
+### Complete Table Structure
+
+| Column Name | Type | Constraints | Description |
+|------------|------|-------------|-------------|
+| `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique subscription instance identifier |
+| `user_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Foreign key to users.id - the user who has this subscription |
+| `subscription_id` | UUID | FOREIGN KEY → subscriptions.id, NOT NULL, INDEXED, CASCADE DELETE | Foreign key to subscriptions.id - the subscription plan |
+| `status` | ENUM | NOT NULL, DEFAULT 'active', INDEXED | Subscription status: active, expired, or cancelled |
+| `start_date` | DATE | NOT NULL, INDEXED | Subscription start date |
+| `end_date` | DATE | NULLABLE, INDEXED | Subscription end date (null for lifetime subscriptions) |
+| `auto_renew` | BOOLEAN | NOT NULL, DEFAULT true | Whether subscription auto-renews at end_date |
+| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
+| `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
+
+### Status Enum Values
+- **`active`** - Subscription is currently active (default)
+- **`expired`** - Subscription has expired (end_date has passed)
+- **`cancelled`** - Subscription was cancelled before expiration
+
+### Notes
+- One user can have multiple subscription records (subscription history)
+- One subscription plan can be used by many users
+- `end_date` can be NULL for lifetime subscriptions
+- `auto_renew` controls whether subscription automatically renews at `end_date`
+- Composite indexes on `(user_id, status)` and `(start_date, end_date)` for efficient queries
+
+### Computed Properties (Not Database Columns)
+The model provides two computed properties for convenience:
+
+1. **`is_active`** - Returns `True` if `status == 'active'`
+   ```python
+   # Usage in code:
+   if user_subscription.is_active:
+       # Subscription is active
+   ```
+   - **Not stored in database** - computed from `status` column
+   - Single source of truth: `status` column
+
+2. **`is_expired`** - Returns `True` if `end_date < today()` (and `end_date` is not NULL)
+   ```python
+   # Usage in code:
+   if user_subscription.is_expired:
+       # Subscription has expired
+   ```
+   - **Not stored in database** - computed from `end_date` column
+   - Returns `False` for lifetime subscriptions (`end_date` is NULL)
+
+**Important:** These are Python `@property` methods, not database columns. They provide convenient helpers but the actual data is stored in the `status` and `end_date` columns.
+
+---
+
 ## 📊 `app_settings` Table
 
 Stores global configuration and landing page content. These settings are **global**, not per-tenant. Only platform admins can create or modify entries.
@@ -667,17 +770,19 @@ Stores global configuration and landing page content. These settings are **globa
 5. **Bots → Documents**: One-to-Many (one bot can have many documents)
 6. **Subscriptions → Pricing Plan Country Prices**: One-to-Many (one plan can have many country prices)
 7. **Subscriptions → Entitlements**: One-to-Many (one plan can have many entitlements)
-8. **Cascade Delete**: 
-   - Deleting a user deletes all their bots, snippets, and documents
+8. **Users → User Subscriptions**: One-to-Many (one user can have many subscription instances)
+9. **Subscriptions → User Subscriptions**: One-to-Many (one plan can be subscribed to by many users)
+10. **Cascade Delete**: 
+   - Deleting a user deletes all their bots, snippets, documents, and user subscriptions
    - Deleting a bot deletes all its snippets and documents
-   - Deleting a subscription plan deletes all its country prices and entitlements
+   - Deleting a subscription plan deletes all its country prices, entitlements, and user subscriptions
 
 ---
 
 ## 🎯 Summary
 
-- **8 Tables**: `users`, `bots`, `documents`, `installation_snippets`, `subscriptions`, `pricing_plan_country_prices`, `entitlements`, `app_settings`
-- **5 Enums**: `user_status`, `bot_status`, `document_source_type`, `document_status`, `entitlement_category`
+- **9 Tables**: `users`, `bots`, `documents`, `installation_snippets`, `subscriptions`, `pricing_plan_country_prices`, `entitlements`, `user_subscriptions`, `app_settings`
+- **6 Enums**: `user_status`, `bot_status`, `document_source_type`, `document_status`, `entitlement_category`, `user_subscription_status`
 - **All relationships** properly configured with foreign keys and CASCADE DELETE
 - **All indexes** optimized for common query patterns
 - **UI Configuration**: Stored directly in `branding` JSONB field (no separate table needed)

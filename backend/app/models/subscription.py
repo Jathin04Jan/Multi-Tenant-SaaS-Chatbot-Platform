@@ -14,7 +14,7 @@ class Subscription(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     name = Column(Text, nullable=False, comment="Display name (e.g., 'Free', 'Pro', 'Enterprise')")
     description = Column(Text, nullable=True, comment="Short tagline/description")
-    is_highlighted = Column(Boolean, nullable=False, default=False, comment="Mark as 'Most Popular' in UI")
+    is_highlighted = Column(Boolean, nullable=False, default=False, index=True, comment="Mark as 'Most Popular' in UI")
     sort_order = Column(JSONB, nullable=True, comment="Ordering configuration for UI display")
     limits = Column(
         JSONB,

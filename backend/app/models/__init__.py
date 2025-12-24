@@ -6,6 +6,7 @@ from app.models.subscription import Subscription
 from app.models.pricing_plan_country_price import PricingPlanCountryPrice
 from app.models.app_setting import AppSetting
 from app.models.entitlement import Entitlement, EntitlementCategory
+from app.models.user_subscription import UserSubscription, UserSubscriptionStatus
 
 __all__ = [
     "User",
@@ -19,5 +20,7 @@ __all__ = [
     "AppSetting",
     "Entitlement",
     "EntitlementCategory",
+    "UserSubscription",
+    "UserSubscriptionStatus",
 ]
 

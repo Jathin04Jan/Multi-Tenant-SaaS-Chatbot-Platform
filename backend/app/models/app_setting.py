@@ -29,6 +29,7 @@ class AppSetting(Base):
         Boolean,
         nullable=False,
         default=False,
+        index=True,
         comment="If true, this setting can be exposed via public API (e.g., landing page content)"
     )
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

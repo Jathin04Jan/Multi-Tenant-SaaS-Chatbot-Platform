@@ -20,6 +20,10 @@ erDiagram
     
     users ||--o{ user_subscriptions : user_id
     users ||--o{ user_subscription_entitlements : user_id
+    users ||--o{ ingestion_jobs : user_id
+
+    bots ||--o{ ingestion_jobs : bot_id
+    documents ||--o{ ingestion_jobs : document_id
 
     users {
         uuid id PK
@@ -139,6 +143,23 @@ erDiagram
         timestamptz updated_at
     }
 
+    ingestion_jobs {
+        uuid id PK
+        uuid user_id FK
+        uuid bot_id FK
+        uuid document_id FK
+        enum job_type
+        enum status
+        enum stage
+        integer attempts
+        integer max_attempts
+        jsonb logs
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz started_at
+        timestamptz finished_at
+    }
+
     app_settings {
         varchar key PK
         jsonb value
@@ -151,7 +172,7 @@ erDiagram
 
 ## Notes
 - **Global tables (admin-only):** `subscriptions`, `pricing_plan_country_prices`, `entitlements`, `app_settings`.
-- **Tenant data:** `users` (tenants), `bots`, `documents`, `installation_snippets`, `user_subscriptions`, `user_subscription_entitlements`.
+- **Tenant data:** `users` (tenants), `bots`, `documents`, `installation_snippets`, `user_subscriptions`, `user_subscription_entitlements`, `ingestion_jobs`.
 - **Cascade deletes:** FKs are configured with `ON DELETE CASCADE` in the models for dependent rows.
 - **Enums:** 
   - `user_status` - used by `users.status` (active, pending_verification, suspended)
@@ -160,6 +181,9 @@ erDiagram
   - `document_status` - used by `documents.status` (pending, processing, indexed, error)
   - `entitlement_category` - used by `entitlements.category` (file, chat, other)
   - `user_subscription_status` - used by `user_subscriptions.status` (active, expired, cancelled)
+  - `ingestion_job_type` - used by `ingestion_jobs.job_type` (ingest_upload, ingest_url, reindex_document, delete_document_vectors_reindex_bot)
+  - `ingestion_job_status` - used by `ingestion_jobs.status` (queued, processing, succeeded, failed, cancelled)
+  - `ingestion_job_stage` - used by `ingestion_jobs.stage` (download, parse, chunk, embed, index)
 - **Computed Properties**: Some models provide computed properties (not database columns):
   - `User.is_verified` - computed from `users.status` (returns `True` if status == 'active')
   - `Bot.is_active` - computed from `bots.status` (returns `True` if status == 'active')
@@ -169,5 +193,9 @@ erDiagram
   - `UserSubscriptionEntitlement.balance` - computed from `user_subscription_entitlements.quota - consumption`
   - `UserSubscriptionEntitlement.is_exceeded` - computed from `user_subscription_entitlements.consumption > quota`
   - `UserSubscriptionEntitlement.usage_percentage` - computed from `user_subscription_entitlements.consumption / quota * 100`
+  - `IngestionJob.is_completed` - computed from `ingestion_jobs.status` (returns `True` if status is succeeded, failed, or cancelled)
+  - `IngestionJob.is_active` - computed from `ingestion_jobs.status` (returns `True` if status is queued or processing)
+  - `IngestionJob.can_retry` - computed from `ingestion_jobs.status`, `attempts`, and `max_attempts` (returns `True` if failed and attempts < max_attempts)
+  - `IngestionJob.duration_seconds` - computed from `ingestion_jobs.started_at` and `finished_at` (returns duration in seconds)
 - For full column details and SQL, see `FINAL_SCHEMA.md` and `DATABASE_SCHEMA.md`.
 

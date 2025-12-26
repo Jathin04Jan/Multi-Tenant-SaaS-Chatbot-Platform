@@ -27,6 +27,7 @@ This directory contains detailed documentation for the backend API.
 - **[ENTITLEMENTS_SCHEMA.md](./ENTITLEMENTS_SCHEMA.md)** – Subscription plan entitlements/limits schema (global, admin-only)
 - **[USER_SUBSCRIPTIONS_SCHEMA.md](./USER_SUBSCRIPTIONS_SCHEMA.md)** – User subscription instances schema (includes computed properties: `is_active`, `is_expired`)
 - **[USER_SUBSCRIPTION_ENTITLEMENTS_SCHEMA.md](./USER_SUBSCRIPTION_ENTITLEMENTS_SCHEMA.md)** – Per-user entitlement usage and consumption tracking schema (includes computed properties: `balance`, `is_exceeded`, `usage_percentage`)
+- **[INGESTION_JOBS_SCHEMA.md](./INGESTION_JOBS_SCHEMA.md)** – RAG pipeline jobs for document processing schema (includes computed properties: `is_completed`, `is_active`, `can_retry`, `duration_seconds`)
 - **[APP_SETTINGS_SCHEMA.md](./APP_SETTINGS_SCHEMA.md)** – Global application settings and landing page content schema (admin-only)
 - **[GLOBAL_CONFIGURATION_TABLES.md](./GLOBAL_CONFIGURATION_TABLES.md)** – Overview of global configuration tables (pricing plans, entitlements, user subscriptions, app settings)
 - **[MIGRATIONS_VS_CREATE_ALL.md](./MIGRATIONS_VS_CREATE_ALL.md)** – Explanation of Alembic migrations vs `create_all()`

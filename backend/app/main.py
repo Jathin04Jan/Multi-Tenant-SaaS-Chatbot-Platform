@@ -10,7 +10,8 @@ from app.api.public import embed_config
 # Import all models to register them with Base
 from app.models import (
     User, Bot, InstallationSnippet, Document,
-    Subscription, PricingPlanCountryPrice, AppSetting, Entitlement, UserSubscription, UserSubscriptionEntitlement
+    Subscription, PricingPlanCountryPrice, AppSetting, Entitlement, UserSubscription, UserSubscriptionEntitlement,
+    IngestionJob
 )  # noqa: F401
 from app.core.minio_client import ensure_bucket_exists
 

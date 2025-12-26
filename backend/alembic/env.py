@@ -13,7 +13,8 @@ from app.core.config import settings
 from app.models import (
     User, Bot, InstallationSnippet, Document,
     Subscription, PricingPlanCountryPrice, AppSetting,
-    Entitlement, UserSubscription, UserSubscriptionEntitlement
+    Entitlement, UserSubscription, UserSubscriptionEntitlement,
+    IngestionJob
 )  # Import all models here
 
 # this is the Alembic Config object, which provides

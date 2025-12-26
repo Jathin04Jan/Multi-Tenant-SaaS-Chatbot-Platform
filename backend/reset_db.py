@@ -24,6 +24,7 @@ from app.models import (
     Entitlement,
     UserSubscription,
     UserSubscriptionEntitlement,
+    IngestionJob,
 )  # Import all models to register them
 
 

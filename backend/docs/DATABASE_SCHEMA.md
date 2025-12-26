@@ -554,6 +554,96 @@ The model provides three computed properties for convenience:
 
 ---
 
+### `ingestion_jobs` Table
+
+Tracks RAG pipeline jobs for document processing. This table manages the lifecycle of ingestion jobs including document uploads, URL crawls, reindexing, and vector deletion operations.
+
+#### Columns
+
+| Column Name | Type | Constraints | Description |
+|------------|------|-------------|-------------|
+| `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique job identifier |
+| `user_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Foreign key to users.id - the user/tenant who owns this job |
+| `bot_id` | UUID | FOREIGN KEY → bots.id, NOT NULL, INDEXED, CASCADE DELETE | Foreign key to bots.id - the bot this job is for |
+| `document_id` | UUID | FOREIGN KEY → documents.id, NULLABLE, INDEXED, CASCADE DELETE | Foreign key to documents.id - the document being processed (nullable for bot-level jobs) |
+| `job_type` | ENUM | NOT NULL, INDEXED | Job type: ingest_upload, ingest_url, reindex_document, delete_document_vectors_reindex_bot |
+| `status` | ENUM | NOT NULL, DEFAULT 'queued', INDEXED | Job status: queued, processing, succeeded, failed, cancelled |
+| `stage` | ENUM | NULLABLE, INDEXED | Current processing stage: download, parse, chunk, embed, index |
+| `attempts` | INTEGER | NOT NULL, DEFAULT 0 | Number of processing attempts made |
+| `max_attempts` | INTEGER | NOT NULL, DEFAULT 5 | Maximum number of retry attempts allowed |
+| `logs` | JSONB | NULLABLE | Job execution logs and error details (stored as JSON array of log entries) |
+| `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), INDEXED | Creation timestamp |
+| `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
+| `started_at` | TIMESTAMP WITH TIME ZONE | NULLABLE | Timestamp when job processing started |
+| `finished_at` | TIMESTAMP WITH TIME ZONE | NULLABLE | Timestamp when job processing finished (succeeded or failed) |
+
+#### Job Type Enum Values
+- **`ingest_upload`** - Process an uploaded file document
+- **`ingest_url`** - Process a URL/crawled document
+- **`reindex_document`** - Reindex an existing document
+- **`delete_document_vectors_reindex_bot`** - Delete document vectors and reindex entire bot
+
+#### Status Enum Values
+- **`queued`** - Job is queued for processing (default)
+- **`processing`** - Job is currently being processed
+- **`succeeded`** - Job completed successfully
+- **`failed`** - Job failed (can be retried if attempts < max_attempts)
+- **`cancelled`** - Job was cancelled
+
+#### Stage Enum Values
+- **`download`** - Downloading document from source
+- **`parse`** - Parsing document content
+- **`chunk`** - Chunking document into segments
+- **`embed`** - Generating embeddings for chunks
+- **`index`** - Indexing embeddings in vector database
+
+#### Notes
+- Tracks RAG pipeline job lifecycle for document processing
+- Supports retry mechanism with `attempts` and `max_attempts`
+- `document_id` is nullable for bot-level jobs (e.g., `delete_document_vectors_reindex_bot`)
+- `stage` tracks current processing stage within the pipeline
+- `logs` stores detailed execution logs and error information as JSONB
+- Composite indexes on `(user_id, bot_id)`, `status`, `stage` for efficient queries
+
+#### Computed Properties (Not Database Columns)
+The model provides four computed properties for convenience:
+
+1. **`is_completed`** - Returns `True` if job is completed (succeeded, failed, or cancelled)
+   ```python
+   # Usage in code:
+   if ingestion_job.is_completed:
+       # Job is finished
+   ```
+   - **Not stored in database** - computed from `status` column
+
+2. **`is_active`** - Returns `True` if job is currently active (queued or processing)
+   ```python
+   # Usage in code:
+   if ingestion_job.is_active:
+       # Job is still running
+   ```
+   - **Not stored in database** - computed from `status` column
+
+3. **`can_retry`** - Returns `True` if job can be retried (failed and attempts < max_attempts)
+   ```python
+   # Usage in code:
+   if ingestion_job.can_retry:
+       # Retry the job
+   ```
+   - **Not stored in database** - computed from `status`, `attempts`, and `max_attempts` columns
+
+4. **`duration_seconds`** - Returns job duration in seconds (if finished)
+   ```python
+   # Usage in code:
+   duration = ingestion_job.duration_seconds
+   # Returns 0.0 if not finished
+   ```
+   - **Not stored in database** - computed from `started_at` and `finished_at` columns
+
+**Important:** These are Python `@property` methods, not database columns. They provide convenient helpers but the actual data is stored in the respective columns.
+
+---
+
 ### `app_settings` Table
 
 Stores global configuration and landing page content. These settings are **global**, not per-tenant. Only platform admins can create or modify entries.
@@ -703,6 +793,40 @@ CREATE TABLE app_settings (
 
 CREATE INDEX idx_app_settings_key ON app_settings(key);
 CREATE INDEX idx_app_settings_is_public ON app_settings(is_public);
+```
+
+### Ingestion Jobs Table
+```sql
+CREATE TYPE ingestion_job_type AS ENUM ('ingest_upload', 'ingest_url', 'reindex_document', 'delete_document_vectors_reindex_bot');
+CREATE TYPE ingestion_job_status AS ENUM ('queued', 'processing', 'succeeded', 'failed', 'cancelled');
+CREATE TYPE ingestion_job_stage AS ENUM ('download', 'parse', 'chunk', 'embed', 'index');
+
+CREATE TABLE ingestion_jobs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    bot_id UUID NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+    document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+    job_type ingestion_job_type NOT NULL,
+    status ingestion_job_status NOT NULL DEFAULT 'queued',
+    stage ingestion_job_stage,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL DEFAULT 5,
+    logs JSONB,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMP WITH TIME ZONE,
+    finished_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX idx_ingestion_jobs_id ON ingestion_jobs(id);
+CREATE INDEX idx_ingestion_jobs_user_id ON ingestion_jobs(user_id);
+CREATE INDEX idx_ingestion_jobs_bot_id ON ingestion_jobs(bot_id);
+CREATE INDEX idx_ingestion_jobs_document_id ON ingestion_jobs(document_id);
+CREATE INDEX idx_ingestion_jobs_job_type ON ingestion_jobs(job_type);
+CREATE INDEX idx_ingestion_jobs_status ON ingestion_jobs(status);
+CREATE INDEX idx_ingestion_jobs_stage ON ingestion_jobs(stage);
+CREATE INDEX idx_ingestion_jobs_created_at ON ingestion_jobs(created_at);
+CREATE INDEX idx_ingestion_jobs_user_bot ON ingestion_jobs(user_id, bot_id);
 ```
 
 ---
@@ -927,6 +1051,38 @@ CREATE INDEX idx_app_settings_is_public ON app_settings(is_public);
 - `balance`: Returns `6500` (quota - consumption = 10000 - 3500)
 - `is_exceeded`: Returns `False` (consumption <= quota)
 - `usage_percentage`: Returns `35.0` (3500 / 10000 * 100)
+
+### Ingestion Job Example
+```json
+{
+  "id": "j1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "bot_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "document_id": "d1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "job_type": "ingest_upload",
+  "status": "processing",
+  "stage": "embed",
+  "attempts": 0,
+  "max_attempts": 5,
+  "logs": [
+    {"timestamp": "2024-01-15T10:00:00Z", "level": "info", "message": "Job started"},
+    {"timestamp": "2024-01-15T10:01:00Z", "level": "info", "message": "Document downloaded"},
+    {"timestamp": "2024-01-15T10:02:00Z", "level": "info", "message": "Document parsed into 150 chunks"},
+    {"timestamp": "2024-01-15T10:03:00Z", "level": "info", "message": "Generating embeddings..."}
+  ],
+  "created_at": "2024-01-15T10:00:00Z",
+  "updated_at": "2024-01-15T10:03:00Z",
+  "started_at": "2024-01-15T10:00:00Z",
+  "finished_at": null
+}
+```
+**Note**: This shows an active ingestion job processing an uploaded document. The job is currently in the "embed" stage, generating embeddings for document chunks.
+
+**Computed Properties Available in Code (Not in Database):**
+- `is_completed`: Returns `False` (status is 'processing', not completed)
+- `is_active`: Returns `True` (status is 'processing')
+- `can_retry`: Returns `False` (job hasn't failed yet)
+- `duration_seconds`: Returns `180.0` (3 minutes elapsed since started_at)
 
 ### App Setting Example
 ```json

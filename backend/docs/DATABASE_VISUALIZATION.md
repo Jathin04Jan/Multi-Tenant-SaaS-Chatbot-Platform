@@ -106,6 +106,9 @@ SELECT * FROM user_subscriptions;
 -- View user_subscription_entitlements table
 SELECT * FROM user_subscription_entitlements;
 
+-- View ingestion_jobs table
+SELECT * FROM ingestion_jobs;
+
 -- View app_settings table
 SELECT * FROM app_settings;
 
@@ -270,6 +273,32 @@ WHERE is_public = true;
 -- View all app settings (admin only)
 SELECT key, value, description, is_public
 FROM app_settings;
+
+-- View active ingestion jobs for a bot
+SELECT 
+    ij.id,
+    ij.job_type,
+    ij.status,
+    ij.stage,
+    ij.attempts,
+    d.filename as document_name,
+    ij.created_at,
+    ij.started_at
+FROM ingestion_jobs ij
+LEFT JOIN documents d ON ij.document_id = d.id
+WHERE ij.bot_id = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+  AND ij.status IN ('queued', 'processing')
+ORDER BY ij.created_at ASC;
+
+-- View ingestion job statistics
+SELECT 
+    status,
+    COUNT(*) as count,
+    AVG(EXTRACT(EPOCH FROM (finished_at - started_at))) as avg_duration_seconds
+FROM ingestion_jobs
+WHERE bot_id = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+  AND finished_at IS NOT NULL
+GROUP BY status;
 
 -- View all data in a table (example: users)
 SELECT * FROM users;

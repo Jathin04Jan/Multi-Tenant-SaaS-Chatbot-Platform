@@ -8,6 +8,12 @@ from app.models.app_setting import AppSetting
 from app.models.entitlement import Entitlement, EntitlementCategory
 from app.models.user_subscription import UserSubscription, UserSubscriptionStatus
 from app.models.user_subscription_entitlement import UserSubscriptionEntitlement
+from app.models.ingestion_job import (
+    IngestionJob,
+    IngestionJobType,
+    IngestionJobStatus,
+    IngestionJobStage,
+)
 
 __all__ = [
     "User",
@@ -24,5 +30,9 @@ __all__ = [
     "UserSubscription",
     "UserSubscriptionStatus",
     "UserSubscriptionEntitlement",
+    "IngestionJob",
+    "IngestionJobType",
+    "IngestionJobStatus",
+    "IngestionJobStage",
 ]
 

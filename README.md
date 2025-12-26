@@ -437,6 +437,6 @@ VITE_ENVIRONMENT=production
 - **RAG Integration**: Detailed vectorization and embedding process visualization
 - **Knowledge Base**: Document and data source management with upload and crawl capabilities
 
-## 🙏 Credits
+## Credits
 
 Built with ❤️ using React and modern web technologies.

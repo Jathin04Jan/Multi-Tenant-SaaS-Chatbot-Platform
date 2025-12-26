@@ -37,6 +37,9 @@ This directory contains detailed documentation for the backend API.
 - **[EMBED_SECURITY_AND_SNIPPETS.md](./EMBED_SECURITY_AND_SNIPPETS.md)** - Comprehensive guide to embed security, code snippets, domain allow-list, and usage tracking
 - **[APPLICATION_SECURITY.md](./APPLICATION_SECURITY.md)** - Holistic security overview covering auth, embed tokens, avatars, storage, and hardening backlog
 
+### Admin & Management
+- **[ADMIN_DEVELOPER_MODE.md](./ADMIN_DEVELOPER_MODE.md)** - Admin authentication, Developer Mode UI, and master table management guide
+
 ### Technical Explanations
 - **[EXPLANATIONS.md](./EXPLANATIONS.md)** - Technical concepts (SQLAlchemy, Alembic, etc.)
 - **[SQLALCHEMY_VS_RAW_SQL.md](./SQLALCHEMY_VS_RAW_SQL.md)** - SQLAlchemy vs raw SQL comparison

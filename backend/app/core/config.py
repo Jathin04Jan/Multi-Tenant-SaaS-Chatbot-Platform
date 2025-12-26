@@ -45,6 +45,20 @@ class Settings(BaseSettings):
     MINIO_SECURE: bool = Field(default=False, description="Use HTTPS for MinIO")
     MINIO_BUCKET_NAME: str = Field(default="yourbot-documents", description="MinIO bucket name")
     
+    # Admin Configuration
+    ADMIN_EMAIL: str = Field(
+        default="admin@example.com",
+        description="Admin email for authentication (can be any email for now)"
+    )
+    ADMIN_PASSWORD: str = Field(
+        default="admin123",
+        description="Admin password for authentication (change in production!)"
+    )
+    ADMIN_ALLOW_ANY_CREDENTIALS: bool = Field(
+        default=True,
+        description="Allow any credentials for admin login (development mode). Set to False in production!"
+    )
+    
     # Embed Token Configuration (for widget authentication)
     EMBED_TOKEN_SECRET: str = Field(
         default="your-embed-token-secret-change-in-production",

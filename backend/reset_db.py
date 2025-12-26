@@ -79,36 +79,74 @@ def reset_database():
     print("🔄 Resetting database...")
     
     try:
-        # First, manually clean up old ui_configs table and its foreign key constraint
-        # This handles the case where the database still has the old schema
-        print("  → Cleaning up old ui_configs table and constraints...")
-        with engine.begin() as conn:
-            # Drop the foreign key constraint from bots table if it exists
+        # First, close any existing connections
+        print("  → Closing existing connections...")
+        engine.dispose()
+        
+        # Use a fresh connection with timeout
+        print("  → Establishing new connection...")
+        with engine.connect() as conn:
+            # Terminate any active connections to the database (except our own)
+            print("  → Terminating active database connections...")
             conn.execute(text("""
-                ALTER TABLE bots 
+                SELECT pg_terminate_backend(pg_stat_activity.pid)
+                FROM pg_stat_activity
+                WHERE pg_stat_activity.datname = current_database()
+                  AND pid <> pg_backend_pid();
+            """))
+            conn.commit()
+        
+        # Now proceed with the reset
+        with engine.begin() as conn:
+            # First, manually clean up old ui_configs table and its foreign key constraint
+            print("  → Cleaning up old ui_configs table and constraints...")
+            conn.execute(text("""
+                ALTER TABLE IF EXISTS bots 
                 DROP CONSTRAINT IF EXISTS bots_ui_config_id_fkey;
             """))
             
-            # Drop the ui_config_id column from bots table if it exists
             conn.execute(text("""
-                ALTER TABLE bots 
+                ALTER TABLE IF EXISTS bots 
                 DROP COLUMN IF EXISTS ui_config_id;
             """))
             
-            # Drop the ui_configs table if it exists (CASCADE will drop dependent objects)
             conn.execute(text("DROP TABLE IF EXISTS ui_configs CASCADE;"))
+            print("  → Old ui_configs table and constraints removed")
         
-        print("  → Old ui_configs table and constraints removed")
-        
-        # Now drop all remaining tables using SQLAlchemy
+        # Drop all tables (outside transaction for better performance)
         print("  → Dropping all tables...")
         Base.metadata.drop_all(bind=engine, checkfirst=True)
+        print("  → All tables dropped")
         
-        # Recreate all tables
-        print("  → Creating all tables...")
+        # Drop all enum types
+        print("  → Dropping enum types...")
+        with engine.begin() as conn:
+            enum_types = [
+                'user_status',
+                'bot_status',
+                'document_source_type',
+                'document_status',
+                'entitlement_category',
+                'user_subscription_status',
+                'ingestion_job_type',
+                'ingestion_job_status',
+                'ingestion_job_stage',
+            ]
+            
+            for enum_type in enum_types:
+                try:
+                    conn.execute(text(f"DROP TYPE IF EXISTS {enum_type} CASCADE;"))
+                except Exception as e:
+                    print(f"    ⚠️  Could not drop {enum_type}: {e}")
+            
+            print(f"  → Dropped {len(enum_types)} enum type(s)")
+        
+        # Recreate all tables (this will also recreate enum types)
+        print("  → Creating all tables and enum types...")
         Base.metadata.create_all(bind=engine)
         
         print("✅ Database reset complete!")
+        print(f"   Created {len(Base.metadata.tables)} table(s) with all relationships and indexes")
         
     except Exception as e:
         print(f"❌ Error resetting database: {e}")
@@ -116,6 +154,9 @@ def reset_database():
         import traceback
         traceback.print_exc()
         sys.exit(1)
+    finally:
+        # Always dispose of connections
+        engine.dispose()
 
 
 if __name__ == "__main__":

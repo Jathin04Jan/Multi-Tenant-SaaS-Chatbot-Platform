@@ -6,13 +6,39 @@ export default function AdminSignIn() {
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    localStorage.setItem(
-      "adminSession",
-      JSON.stringify({ email, role: "superadmin" })
-    );
-    navigate("/admin/overview");
+    
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/admin/signin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Invalid credentials' }));
+        alert(error.detail || 'Invalid credentials');
+        return;
+      }
+
+      const data = await response.json();
+      
+      // Store token
+      localStorage.setItem('access_token', data.access_token);
+      
+      // Store admin session
+      localStorage.setItem(
+        "adminSession",
+        JSON.stringify({ email, role: "superadmin" })
+      );
+      
+      navigate("/admin/overview");
+    } catch (error) {
+      console.error('Admin signin error:', error);
+      alert('Failed to sign in. Please try again.');
+    }
   }
 
   return (

@@ -49,6 +49,11 @@ EMBED_TOKEN_TTL_MINUTES=10
 
 # API Base URL (for embed code generation)
 API_BASE_URL=http://localhost:8000
+
+# Admin Configuration
+ADMIN_EMAIL=admin@example.com
+ADMIN_PASSWORD=admin123
+ADMIN_ALLOW_ANY_CREDENTIALS=True  # Set to False in production
 ```
 
 ### 3. Generate a Strong Secret Key
@@ -93,6 +98,9 @@ It should show `.env` in the ignore list.
 | `EMBED_TOKEN_SECRET` | Secret key for embed JWT tokens | `your-embed-token-secret` | ✅ Yes (production) |
 | `EMBED_TOKEN_TTL_MINUTES` | Embed token expiration (minutes) | `10` | No |
 | `API_BASE_URL` | Base URL for API (used in embed code) | `http://localhost:8000` | ✅ Yes |
+| `ADMIN_EMAIL` | Admin email for authentication | `admin@example.com` | ❌ No |
+| `ADMIN_PASSWORD` | Admin password for authentication | `admin123` | ❌ No |
+| `ADMIN_ALLOW_ANY_CREDENTIALS` | Allow any credentials for admin login (development mode) | `True` | ❌ No |
 
 ## Database URL Format
 

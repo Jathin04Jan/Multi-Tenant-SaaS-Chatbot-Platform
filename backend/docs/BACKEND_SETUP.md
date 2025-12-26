@@ -76,7 +76,17 @@ CORS_ORIGINS=http://localhost:5173,http://localhost:8080
 
 - **POST** `/api/v1/auth/signup` - Register new user
 - **POST** `/api/v1/auth/signin` - Login user
+- **POST** `/api/v1/auth/admin/signin` - Admin signin (returns JWT token)
 - **GET** `/api/v1/auth/me` - Get current user (requires auth token)
+
+### Admin Endpoints
+
+Admin endpoints require authentication via JWT token. See [ADMIN_DEVELOPER_MODE.md](./docs/ADMIN_DEVELOPER_MODE.md) for details.
+
+- **GET** `/api/v1/admin/subscriptions` - List subscription plans
+- **POST** `/api/v1/admin/subscriptions` - Create subscription plan
+- **GET** `/api/v1/admin/app-settings` - List app settings
+- And more... (see admin documentation)
 
 ### Health Check
 

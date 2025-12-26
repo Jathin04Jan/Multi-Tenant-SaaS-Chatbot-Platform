@@ -238,24 +238,33 @@ CREATE TABLE app_settings (
 
 ---
 
-## Next Steps
+## Implementation Status
 
-These tables are now ready for use. To implement the full functionality:
+✅ **Admin API Endpoints** - Fully implemented:
+   - `GET /api/v1/admin/subscriptions` - List all subscription plans
+   - `POST /api/v1/admin/subscriptions` - Create subscription plan
+   - `PATCH /api/v1/admin/subscriptions/{id}` - Update plan
+   - `DELETE /api/v1/admin/subscriptions/{id}` - Delete plan
+   - `GET /api/v1/admin/subscriptions/{id}/entitlements` - List entitlements
+   - `POST /api/v1/admin/subscriptions/{id}/entitlements` - Create entitlement
+   - `GET /api/v1/admin/subscriptions/{id}/country-prices` - List country prices
+   - `POST /api/v1/admin/subscriptions/{id}/country-prices` - Create country price
+   - `GET /api/v1/admin/app-settings` - List all settings
+   - `POST /api/v1/admin/app-settings` - Create setting
+   - `PATCH /api/v1/admin/app-settings/{key}` - Update setting
+   - See [ADMIN_DEVELOPER_MODE.md](./ADMIN_DEVELOPER_MODE.md) for complete API documentation
 
-1. **Create Admin API Endpoints** (future):
-   - `POST /api/v1/admin/pricing-plans` - Create pricing plan
-   - `GET /api/v1/admin/pricing-plans` - List all plans
-   - `PATCH /api/v1/admin/pricing-plans/{plan_id}` - Update plan
-   - `POST /api/v1/admin/pricing-plans/{plan_id}/prices` - Add country price
+✅ **Developer Mode UI** - Fully implemented:
+   - User-friendly web interface for managing all master tables
+   - Accessible at `/admin/developer-mode` after admin signin
+   - No JSON knowledge required - form-based interface
+   - See [ADMIN_DEVELOPER_MODE.md](./ADMIN_DEVELOPER_MODE.md) for usage guide
+
+📋 **Future Enhancements**:
    - `GET /api/v1/public/pricing-plans` - Public endpoint for landing page
    - `GET /api/v1/public/settings` - Public endpoint for landing page settings
-   - `GET /api/v1/admin/settings` - Admin endpoint for all settings
-   - `PUT /api/v1/admin/settings/{key}` - Update setting
-
-2. **Frontend Integration** (future):
    - Display pricing plans on landing page
    - Load landing page content from app settings
-   - Admin dashboard for managing plans and settings
 
 3. **Backend Enforcement** (future):
    - Check plan limits when tenants create bots, upload documents, etc.

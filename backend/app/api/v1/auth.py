@@ -101,17 +101,18 @@ async def admin_signin(
     
     Returns a JWT token that can be used for admin API endpoints.
     """
-    # Development mode: allow any credentials
+    # Development mode: allow any credentials, but use a single admin user
     if settings.ADMIN_ALLOW_ANY_CREDENTIALS:
-        # Get or create admin user with the provided email
-        admin_user = db.query(User).filter(User.email == credentials.email).first()
+        # Get or create a single admin user (use ADMIN_EMAIL from config)
+        # This prevents creating new users for every random credential test
+        admin_user = db.query(User).filter(User.email == settings.ADMIN_EMAIL).first()
         if not admin_user:
-            # Create admin user if it doesn't exist
+            # Create admin user once if it doesn't exist
             from app.models.user import UserStatus
             from app.core.security import get_password_hash
             admin_user = User(
-                email=credentials.email,
-                hashed_password=get_password_hash(credentials.password),
+                email=settings.ADMIN_EMAIL,
+                hashed_password=get_password_hash(settings.ADMIN_PASSWORD),
                 full_name="Admin User",
                 company_name="System",
                 status=UserStatus.ACTIVE,
@@ -120,7 +121,8 @@ async def admin_signin(
             db.commit()
             db.refresh(admin_user)
         
-        # Create token
+        # Accept any credentials in dev mode, but always use the same admin user
+        # Create token for the admin user
         token_data = AuthService.create_user_token(admin_user)
         return token_data
     

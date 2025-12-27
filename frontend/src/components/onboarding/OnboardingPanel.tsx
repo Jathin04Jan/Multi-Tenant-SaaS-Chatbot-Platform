@@ -561,7 +561,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
             </div>
 
             {/* File Upload */}
-            <div className="glass-card p-6 space-y-4">
+            <div className="glass-card p-6 space-y-4" data-tour="knowledge-source">
               <h3 className="font-semibold text-base">Upload Files</h3>
               <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-primary/30 rounded-xl cursor-pointer hover:border-primary/50 transition-colors">
                 <Upload className="w-8 h-8 text-primary mb-2" />
@@ -960,7 +960,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
                   Finish <CheckCircle2 className="ml-2 h-4 w-4" />
                 </Button>
               ) : (
-                <Button onClick={handleFinish} size="default" className="flex-1">
+                <Button onClick={handleFinish} data-tour="finish-create" size="default" className="flex-1">
                   Complete Setup <CheckCircle2 className="ml-2 h-4 w-4" />
                 </Button>
               )}

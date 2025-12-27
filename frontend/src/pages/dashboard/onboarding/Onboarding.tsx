@@ -103,6 +103,7 @@ const Onboarding = () => {
             transition={{ duration: 0.4 }}
           >
             <Card
+              data-tour="create-bot"
               className="glass-card border-2 border-dashed border-primary/30 hover:border-primary/50 transition-all cursor-pointer h-full flex items-center justify-center min-h-[280px]"
               onClick={() => setIsPanelOpen(true)}
             >

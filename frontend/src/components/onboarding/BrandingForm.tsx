@@ -149,6 +149,7 @@ export const BrandingForm = ({ onComplete }: BrandingFormProps) => {
         </label>
         <Input
           id="botName"
+          data-tour="bot-name"
           placeholder="Assistant"
           className="rounded-xl"
           {...register('botName')}

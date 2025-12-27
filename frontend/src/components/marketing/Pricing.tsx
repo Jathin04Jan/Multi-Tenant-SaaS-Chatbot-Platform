@@ -2,50 +2,12 @@ import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-
-const plans = [
-  {
-    name: 'Trial',
-    price: 'Free',
-    period: '14 days',
-    features: [
-      '50 MB upload limit',
-      '100 messages/month',
-      '1 chatbot',
-      'Community support',
-    ],
-  },
-  {
-    name: 'Pro',
-    price: '$49',
-    period: 'per month',
-    features: [
-      '5 GB upload limit',
-      'Unlimited messages',
-      '10 chatbots',
-      'Priority support',
-      'Custom branding',
-      'Analytics dashboard',
-    ],
-    popular: true,
-  },
-  {
-    name: 'Enterprise',
-    price: 'Custom',
-    period: 'contact sales',
-    features: [
-      'Unlimited uploads',
-      'Unlimited messages',
-      'Unlimited chatbots',
-      'Dedicated support',
-      'SSO & SAML',
-      'SLA guarantee',
-      'On-premise option',
-    ],
-  },
-];
+import { pricingPlans, getPlanPrice, type BillingFrequency } from '@/constants/pricingPlans';
+import { useState } from 'react';
 
 export const Pricing = () => {
+  const [billingCycle] = useState<BillingFrequency>('monthly');
+
   return (
     <section className="py-24 px-4">
       <div className="container max-w-6xl">
@@ -64,48 +26,60 @@ export const Pricing = () => {
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-8">
-          {plans.map((plan, index) => (
-            <motion.div
-              key={plan.name}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              className={`glass-card p-8 relative ${
-                plan.popular ? 'ring-2 ring-primary' : ''
-              }`}
-            >
-              {plan.popular && (
-                <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-1 rounded-full text-sm font-medium">
-                  Most Popular
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {pricingPlans.map((plan, index) => {
+            const price = getPlanPrice(plan, billingCycle);
+            return (
+              <motion.div
+                key={plan.id}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                className={`relative flex flex-col rounded-3xl border border-white/10 bg-card/60 p-6 text-left shadow-lg ${
+                  plan.recommended ? 'ring-2 ring-primary/50' : ''
+                }`}
+              >
+                {plan.badge && (
+                  <span className="absolute -top-3 right-4 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
+                    {plan.badge}
+                  </span>
+                )}
+
+                <div className="space-y-2 mb-4">
+                  <h3 className="text-xl font-semibold">{plan.title}</h3>
+                  <p className="text-sm text-muted-foreground">{plan.description}</p>
+                  <div className="text-3xl font-bold">
+                    {price === 0 ? 'Free' : `$${price}`}
+                    {price !== 0 && (
+                      <span className="text-base font-normal text-muted-foreground">
+                        /{billingCycle === 'monthly' ? 'mo' : 'mo (annual)'}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              )}
 
-              <div className="mb-6">
-                <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-bold">{plan.price}</span>
-                  <span className="text-muted-foreground">/ {plan.period}</span>
+                <div className="space-y-3 flex-1">
+                  {plan.features.map((feature) => (
+                    <div key={feature} className="flex items-start gap-2 text-sm">
+                      <Check className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                      <span>{feature}</span>
+                    </div>
+                  ))}
                 </div>
-              </div>
 
-              <ul className="space-y-3 mb-8">
-                {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-start gap-3">
-                    <Check className="w-5 h-5 text-success shrink-0 mt-0.5" />
-                    <span className="text-sm">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <Button asChild className="w-full rounded-xl" size="lg">
-                <Link to="/signup">
-                  {plan.name === 'Enterprise' ? 'Contact Sales' : 'Get Started'}
-                </Link>
-              </Button>
-            </motion.div>
-          ))}
+                <Button
+                  asChild
+                  className="w-full rounded-xl mt-6"
+                  variant={plan.recommended ? 'default' : 'secondary'}
+                >
+                  <Link to="/signup">
+                    {plan.ctaLabel}
+                  </Link>
+                </Button>
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </section>

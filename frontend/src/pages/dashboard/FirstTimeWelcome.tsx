@@ -8,15 +8,18 @@ import {
   ShieldCheck,
   MessageCircle,
   Rocket,
+  PlayCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useUserStore } from '@/store/user';
 import { apiRequest } from '@/lib/api';
+import { restartTour } from '@/components/onboarding/GuidedTour';
 
 interface FirstTimeWelcomeProps {
   onStartSetup: () => void;
   onSkip: () => void;
+  onRestartTour?: () => void;
 }
 
 interface UserData {
@@ -47,10 +50,18 @@ const steps = [
   },
 ];
 
-export const FirstTimeWelcome = ({ onStartSetup, onSkip }: FirstTimeWelcomeProps) => {
+export const FirstTimeWelcome = ({ onStartSetup, onSkip, onRestartTour }: FirstTimeWelcomeProps) => {
   const storedName = useUserStore((state) => state.userName);
+  const userEmail = useUserStore((state) => state.userEmail);
   const setUserName = useUserStore((state) => state.setUserName);
   const [userData, setUserData] = useState<UserData | null>(null);
+
+  const handleRestartTour = () => {
+    if (userEmail) {
+      restartTour(userEmail);
+      onRestartTour?.();
+    }
+  };
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -123,7 +134,7 @@ export const FirstTimeWelcome = ({ onStartSetup, onSkip }: FirstTimeWelcomeProps
             <div className="space-y-2">
               <h2 className="text-2xl font-semibold">Ready for a quick tour?</h2>
               <p className="text-muted-foreground">
-                We’ll help you create a bot, connect data sources, set guardrails, and test
+                We'll help you create a bot, connect data sources, set guardrails, and test
                 responses before deployment. It takes just a few minutes.
               </p>
             </div>
@@ -143,6 +154,32 @@ export const FirstTimeWelcome = ({ onStartSetup, onSkip }: FirstTimeWelcomeProps
                 onClick={onSkip}
               >
                 Skip & explore later
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="glass-card">
+          <CardContent className="py-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <PlayCircle className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Take the interactive tour</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Follow step-by-step guidance to create your first bot
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                className="rounded-xl"
+                onClick={handleRestartTour}
+              >
+                <PlayCircle className="w-4 h-4 mr-2" />
+                Restart tour
               </Button>
             </div>
           </CardContent>

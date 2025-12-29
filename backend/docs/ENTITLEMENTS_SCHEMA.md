@@ -13,7 +13,7 @@ Stores subscription plan entitlements/limits. Defines what resources and limits 
 | `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique entitlement identifier |
 | `subscription_id` | UUID | FOREIGN KEY → subscriptions.id, NOT NULL, INDEXED, CASCADE DELETE | Maps entitlement to subscription plan |
 | `category` | ENUM | NOT NULL, INDEXED | Entitlement category: file, chat, or other |
-| `entitlement` | VARCHAR(100) | NOT NULL | Entitlement type (e.g., 'storagefile_count', 'tokens', 'api_calls', 'storage_size', etc.) |
+| `entitlement` | VARCHAR(100) | NOT NULL | Entitlement type (e.g., 'storage_size', 'file_count', 'tokens', 'api_calls', etc.) |
 | `unit` | VARCHAR(20) | NOT NULL | Unit of measurement (e.g., 'MB', 'count', 'GB', 'hours', etc.) |
 | `quota` | INTEGER | NOT NULL | Quota/limit value (e.g., 1000 for 1000 MB, 10000 for 10000 tokens, etc.) |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |

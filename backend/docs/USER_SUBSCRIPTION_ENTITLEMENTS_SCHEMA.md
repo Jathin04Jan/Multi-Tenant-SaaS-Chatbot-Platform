@@ -173,7 +173,7 @@ CREATE INDEX idx_user_subscription_entitlements_user_category ON user_subscripti
 {
   "id": "e1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "user_id": "550e8400-e29b-41d4-a716-446655440000",
-  "subscription_id": "p1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "user_subscription_id": "u1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "category": "file",
   "entitlement": "storage",
   "unit": "MB",
@@ -193,7 +193,7 @@ CREATE INDEX idx_user_subscription_entitlements_user_category ON user_subscripti
 {
   "id": "e2b3c4d5-e6f7-8901-bcde-f12345678901",
   "user_id": "550e8400-e29b-41d4-a716-446655440000",
-  "subscription_id": "p1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "user_subscription_id": "u1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "category": "file",
   "entitlement": "file_count",
   "unit": "count",
@@ -213,7 +213,7 @@ CREATE INDEX idx_user_subscription_entitlements_user_category ON user_subscripti
 {
   "id": "e3b4c5d6-e7f8-9012-cdef-123456789012",
   "user_id": "550e8400-e29b-41d4-a716-446655440000",
-  "subscription_id": "p1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "user_subscription_id": "u1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "category": "chat",
   "entitlement": "tokens",
   "unit": "count",

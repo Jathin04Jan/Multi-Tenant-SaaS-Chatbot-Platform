@@ -31,9 +31,9 @@ erDiagram
         varchar hashed_password
         varchar full_name
         varchar company_name
-        varchar domain
+        varchar domain "nullable"
         varchar status "ENUM"
-        jsonb settings
+        jsonb settings "nullable"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -42,12 +42,12 @@ erDiagram
         uuid id PK
         uuid user_id FK
         varchar name
-        text description
+        text description "nullable"
         varchar status "ENUM"
-        jsonb llm_config
-        jsonb retrieval_config
-        jsonb guardrails
-        jsonb branding
+        jsonb llm_config "nullable"
+        jsonb retrieval_config "nullable"
+        jsonb guardrails "nullable"
+        jsonb branding "nullable"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -56,15 +56,15 @@ erDiagram
         uuid id PK
         uuid user_id FK
         uuid bot_id FK UK
-        text script_url
+        text script_url "nullable"
         text embed_code
         varchar status
-        jsonb domain_whitelist
+        jsonb domain_whitelist "nullable"
         integer usage_count
-        timestamptz last_used_at
+        timestamptz last_used_at "nullable"
         timestamptz created_at
         timestamptz updated_at
-        timestamptz expires_at
+        timestamptz expires_at "nullable"
     }
 
     documents {
@@ -72,12 +72,12 @@ erDiagram
         uuid user_id FK
         uuid bot_id FK
         varchar source_type "ENUM"
-        varchar source_url
-        varchar filename
-        varchar content_type
-        integer size
+        varchar source_url "nullable"
+        varchar filename "nullable"
+        varchar content_type "nullable"
+        integer size "nullable"
         varchar status "ENUM"
-        jsonb metadata
+        jsonb metadata "nullable"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -85,11 +85,11 @@ erDiagram
     subscriptions {
         uuid id PK
         text name
-        text description
+        text description "nullable"
         boolean is_highlighted
-        jsonb sort_order
-        varchar support_level
-        jsonb features
+        jsonb sort_order "nullable"
+        varchar support_level "nullable"
+        jsonb features "nullable"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -123,7 +123,7 @@ erDiagram
         uuid subscription_id FK
         varchar status "ENUM"
         date start_date
-        date end_date
+        date end_date "nullable"
         boolean auto_renew
         timestamptz created_at
         timestamptz updated_at
@@ -146,23 +146,23 @@ erDiagram
         uuid id PK
         uuid user_id FK
         uuid bot_id FK
-        uuid document_id FK
+        uuid document_id FK "nullable"
         varchar job_type "ENUM"
         varchar status "ENUM"
-        varchar stage "ENUM"
+        varchar stage "ENUM" "nullable"
         integer attempts
         integer max_attempts
-        jsonb logs
+        jsonb logs "nullable"
         timestamptz created_at
         timestamptz updated_at
-        timestamptz started_at
-        timestamptz finished_at
+        timestamptz started_at "nullable"
+        timestamptz finished_at "nullable"
     }
 
     app_settings {
         varchar key PK
         jsonb value
-        text description
+        text description "nullable"
         boolean is_public
         timestamptz created_at
         timestamptz updated_at
@@ -175,6 +175,7 @@ erDiagram
 - **FK** = Foreign Key (with CASCADE DELETE)
 - **UK** = Unique Key/Constraint
 - **"ENUM"** = Fields marked with "ENUM" are database ENUM types (not VARCHAR). See Enum Details section below for all possible values.
+- **"nullable"** = Fields marked with "nullable" can be NULL in the database
 - **varchar** = Variable-length string
 - **jsonb** = JSON Binary (PostgreSQL JSON type)
 - **timestamptz** = Timestamp with timezone
@@ -185,6 +186,8 @@ erDiagram
 - **uuid** = UUID (Universally Unique Identifier)
 
 **Note:** Mermaid ER diagrams do not natively support ENUM types, so enum fields are shown as `varchar` with `"ENUM"` annotation to indicate they are actually database ENUM types.
+
+**Note:** The `document_id` foreign key in `ingestion_jobs` is nullable because bot-level jobs (e.g., `delete_document_vectors_reindex_bot`) don't reference a specific document.
 
 **Note:** This diagram shows the basic structure. For detailed information including:
 - Enum values and their options (see Enum Details section below)
@@ -198,6 +201,10 @@ Please refer to the **Enum Details** section below and the full schema documenta
 - **Global tables (admin-only):** `subscriptions`, `pricing_plan_country_prices`, `entitlements`, `app_settings`.
 - **Tenant data:** `users` (tenants), `bots`, `documents`, `installation_snippets`, `user_subscriptions`, `user_subscription_entitlements`, `ingestion_jobs`.
 - **Cascade deletes:** All foreign keys are configured with `ON DELETE CASCADE` in the models for dependent rows.
+- **Unique constraints:**
+  - `installation_snippets.bot_id` - One snippet per bot (enforced by UNIQUE constraint)
+  - `entitlements(subscription_id, category, entitlement)` - One entitlement definition per subscription/category/entitlement combination
+  - `user_subscription_entitlements(user_subscription_id, category, entitlement)` - One entitlement record per user subscription/category/entitlement combination
 
 ## Enum Details
 

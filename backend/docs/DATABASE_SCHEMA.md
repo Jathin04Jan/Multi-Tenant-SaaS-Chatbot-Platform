@@ -8,11 +8,13 @@
 2. **`bots`** - Bot/Agent configurations
 3. **`documents`** - Knowledge sources uploaded by tenants (stored in MinIO)
 4. **`installation_snippets`** - Embed codes and installation scripts
-5. **`subscriptions`** - Global subscription plans (Free, Pro, Enterprise, etc.)
-6. **`pricing_plan_country_prices`** - Country/region-specific pricing for each plan
-7. **`entitlements`** - Subscription plan entitlements/limits (file storage, chat tokens, etc.)
+5. **`subscriptions`** - Global subscription plans (Free, Pro, Enterprise, etc.) - **Admin-only**
+6. **`pricing_plan_country_prices`** - Country/region-specific pricing for each plan - **Admin-only**
+7. **`entitlements`** - Subscription plan entitlements/limits (file storage, chat tokens, etc.) - **Admin-only**
 8. **`user_subscriptions`** - User subscription instances (tracks when users subscribe to plans)
-9. **`app_settings`** - Global application settings and landing page content
+9. **`user_subscription_entitlements`** - Per-user entitlement usage and consumption tracking
+10. **`ingestion_jobs`** - RAG pipeline jobs for document processing
+11. **`app_settings`** - Global application settings and landing page content - **Admin-only**
 
 ---
 
@@ -254,8 +256,8 @@ CREATE INDEX idx_documents_source_type ON documents(source_type);
 2. ✅ **`company_name`** - **NOT NULL** (required) - Organization/Company name
 3. ✅ **`domain`** - Optional tenant domain
 4. ✅ **`status`** - Enum with three states (active, pending_verification, suspended)
-6. ✅ **`settings`** - JSONB for miscellaneous configuration
-7. ✅ **`is_verified`** - Computed property from `status` (not stored in database)
+5. ✅ **`settings`** - JSONB for miscellaneous configuration
+6. ✅ **`is_verified`** - Computed property from `status` (not stored in database)
 
 ### Bots Table:
 1. ✅ **`user_id`** - Foreign key to users (CASCADE DELETE)
@@ -844,8 +846,8 @@ CREATE INDEX idx_ingestion_jobs_user_bot_status ON ingestion_jobs(user_id, bot_i
 2. ✅ **`company_name`** - **NOT NULL** (required) - Organization/Company name
 3. ✅ **`domain`** - Optional tenant domain
 4. ✅ **`status`** - Enum with three states (active, pending_verification, suspended)
-6. ✅ **`settings`** - JSONB for miscellaneous configuration
-7. ✅ **`is_verified`** - Computed property from `status` (not stored in database)
+5. ✅ **`settings`** - JSONB for miscellaneous configuration
+6. ✅ **`is_verified`** - Computed property from `status` (not stored in database)
 
 ### Bots Table:
 1. ✅ **`user_id`** - Foreign key to users (CASCADE DELETE)

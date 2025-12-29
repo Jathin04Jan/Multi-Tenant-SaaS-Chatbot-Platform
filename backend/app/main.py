@@ -8,7 +8,11 @@ from app.core.database import engine, Base
 from app.api.v1 import api_router
 from app.api.public import embed_config
 # Import all models to register them with Base
-from app.models import User, Bot, InstallationSnippet, Document  # noqa: F401
+from app.models import (
+    User, Bot, InstallationSnippet, Document,
+    Subscription, PricingPlanCountryPrice, AppSetting, Entitlement, UserSubscription, UserSubscriptionEntitlement,
+    IngestionJob
+)  # noqa: F401
 from app.core.minio_client import ensure_bucket_exists
 
 # Create database tables (development only - use migrations in production)

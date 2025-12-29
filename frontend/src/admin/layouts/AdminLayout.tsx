@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { Bot, Gauge, Users, Activity, ListChecks, ShieldAlert, CreditCard, Archive, Settings } from "lucide-react";
+import { Bot, Gauge, Users, Activity, ListChecks, ShieldAlert, CreditCard, Archive, Settings, Code } from "lucide-react";
 
 const nav = [
   { to: "/admin/overview", label: "Overview", icon: Gauge },
@@ -10,6 +10,7 @@ const nav = [
   { to: "/admin/plans", label: "Plans", icon: CreditCard },
   { to: "/admin/audit", label: "Audit", icon: Archive },
   { to: "/admin/settings", label: "Settings", icon: Settings },
+  { to: "/admin/developer-mode", label: "Developer Mode", icon: Code },
 ];
 
 const AdminLayout = () => {
@@ -18,6 +19,7 @@ const AdminLayout = () => {
 
   function handleLogout() {
     localStorage.removeItem("adminSession");
+    localStorage.removeItem("access_token");
     navigate("/admin/signin");
   }
   return (

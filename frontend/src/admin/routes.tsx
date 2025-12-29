@@ -8,6 +8,7 @@ import Moderation from "./pages/Moderation";
 import Plans from "./pages/Plans";
 import Audit from "./pages/Audit";
 import Settings from "./pages/Settings";
+import DeveloperMode from "./pages/DeveloperMode";
 import TenantSummary from "./pages/TenantDetail/Summary";
 import TenantBots from "./pages/TenantDetail/Bots";
 import TenantMembers from "./pages/TenantDetail/Members";
@@ -37,6 +38,7 @@ export const AdminRoutes = () => (
       <Route path="plans" element={<Plans />} />
       <Route path="audit" element={<Audit />} />
       <Route path="settings" element={<Settings />} />
+      <Route path="developer-mode" element={<DeveloperMode />} />
 
       <Route path="tenants/:tenantId" element={<TenantDetailLayout />}>
         <Route index element={<TenantSummary />} />

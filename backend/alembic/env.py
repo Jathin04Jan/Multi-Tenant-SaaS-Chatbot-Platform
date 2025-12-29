@@ -10,7 +10,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.core.database import Base
 from app.core.config import settings
-from app.models import User  # Import all models here
+from app.models import (
+    User, Bot, InstallationSnippet, Document,
+    Subscription, PricingPlanCountryPrice, AppSetting,
+    Entitlement, UserSubscription, UserSubscriptionEntitlement,
+    IngestionJob
+)  # Import all models here
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -91,6 +91,27 @@ SELECT * FROM bots;
 -- View installation_snippets table
 SELECT * FROM installation_snippets;
 
+-- View subscriptions table
+SELECT * FROM subscriptions;
+
+-- View pricing_plan_country_prices table
+SELECT * FROM pricing_plan_country_prices;
+
+-- View entitlements table
+SELECT * FROM entitlements;
+
+-- View user_subscriptions table
+SELECT * FROM user_subscriptions;
+
+-- View user_subscription_entitlements table
+SELECT * FROM user_subscription_entitlements;
+
+-- View ingestion_jobs table
+SELECT * FROM ingestion_jobs;
+
+-- View app_settings table
+SELECT * FROM app_settings;
+
 -- Exit
 \q
 ```
@@ -140,6 +161,144 @@ SELECT
     s.last_used_at
 FROM bots b
 LEFT JOIN installation_snippets s ON b.id = s.bot_id;
+
+-- View pricing plans with country prices
+SELECT 
+    p.name as plan_name,
+    p.is_highlighted,
+    pp.country_code,
+    pp.currency,
+    pp.billing_interval,
+    pp.price,
+    pp.is_active
+FROM subscriptions p
+LEFT JOIN pricing_plan_country_prices pp ON p.id = pp.plan_id
+WHERE pp.is_active = true;
+
+-- View subscriptions with their entitlements
+SELECT 
+    s.name as subscription_name,
+    e.category,
+    e.entitlement,
+    e.unit,
+    e.quota
+FROM subscriptions s
+LEFT JOIN entitlements e ON s.id = e.subscription_id
+ORDER BY s.name, e.category, e.entitlement;
+
+-- View file-related entitlements for a subscription
+SELECT 
+    s.name as subscription_name,
+    e.entitlement,
+    e.unit,
+    e.quota
+FROM subscriptions s
+JOIN entitlements e ON s.id = e.subscription_id
+WHERE e.category = 'file'
+ORDER BY s.name, e.entitlement;
+
+-- View user subscriptions with plan details
+SELECT 
+    u.email as user_email,
+    u.company_name,
+    s.name as subscription_name,
+    us.status,
+    us.start_date,
+    us.end_date,
+    us.auto_renew
+FROM user_subscriptions us
+JOIN users u ON us.user_id = u.id
+JOIN subscriptions s ON us.subscription_id = s.id
+ORDER BY u.email, us.start_date DESC;
+
+-- View active user subscriptions
+SELECT 
+    u.email as user_email,
+    s.name as subscription_name,
+    us.start_date,
+    us.end_date,
+    us.auto_renew
+FROM user_subscriptions us
+JOIN users u ON us.user_id = u.id
+JOIN subscriptions s ON us.subscription_id = s.id
+WHERE us.status = 'active'
+ORDER BY u.email;
+
+-- View user subscription entitlements with balance
+SELECT 
+    u.email as user_email,
+    s.name as subscription_name,
+    use.category,
+    use.entitlement,
+    use.unit,
+    use.quota,
+    use.consumption,
+    (use.quota - use.consumption) as balance
+FROM user_subscription_entitlements use
+JOIN users u ON use.user_id = u.id
+JOIN subscriptions s ON use.subscription_id = s.id
+ORDER BY u.email, use.category, use.entitlement;
+
+-- View entitlements that are exceeded
+SELECT 
+    u.email as user_email,
+    use.entitlement,
+    use.quota,
+    use.consumption,
+    (use.consumption - use.quota) as overage
+FROM user_subscription_entitlements use
+JOIN users u ON use.user_id = u.id
+WHERE use.consumption > use.quota
+ORDER BY (use.consumption - use.quota) DESC;
+
+-- View entitlements approaching limit (80%+ usage)
+SELECT 
+    u.email as user_email,
+    use.entitlement,
+    use.quota,
+    use.consumption,
+    ROUND((use.consumption::float / use.quota::float) * 100, 2) as usage_percentage
+FROM user_subscription_entitlements use
+JOIN users u ON use.user_id = u.id
+WHERE use.quota > 0
+  AND (use.consumption::float / use.quota::float) >= 0.8
+  AND use.consumption <= use.quota
+ORDER BY (use.consumption::float / use.quota::float) DESC;
+
+-- View public app settings (for landing page)
+SELECT key, value, description
+FROM app_settings
+WHERE is_public = true;
+
+-- View all app settings (admin only)
+SELECT key, value, description, is_public
+FROM app_settings;
+
+-- View active ingestion jobs for a bot
+SELECT 
+    ij.id,
+    ij.job_type,
+    ij.status,
+    ij.stage,
+    ij.attempts,
+    d.filename as document_name,
+    ij.created_at,
+    ij.started_at
+FROM ingestion_jobs ij
+LEFT JOIN documents d ON ij.document_id = d.id
+WHERE ij.bot_id = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+  AND ij.status IN ('queued', 'processing')
+ORDER BY ij.created_at ASC;
+
+-- View ingestion job statistics
+SELECT 
+    status,
+    COUNT(*) as count,
+    AVG(EXTRACT(EPOCH FROM (finished_at - started_at))) as avg_duration_seconds
+FROM ingestion_jobs
+WHERE bot_id = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+  AND finished_at IS NOT NULL
+GROUP BY status;
 
 -- View all data in a table (example: users)
 SELECT * FROM users;

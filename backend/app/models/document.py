@@ -39,6 +39,7 @@ class Document(Base):
         SourceTypeEnum,
         nullable=False,
         default="file",
+        index=True,
         comment="Source category: file upload, external URL, or integration",
     )
     source_url = Column(
@@ -53,6 +54,7 @@ class Document(Base):
         StatusEnum,
         nullable=False,
         default="pending",
+        index=True,
         comment="Processing status for ingestion/indexing pipeline",
     )
     metadata_payload = Column(

@@ -3,6 +3,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import decode_access_token
+from app.core.config import settings
 from app.models.user import User
 from app.schemas.auth import TokenData
 
@@ -57,3 +58,30 @@ async def get_current_user(
     
     return user
 
+
+async def get_admin_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db)
+) -> User:
+    """
+    Dependency to get the current authenticated admin user.
+    
+    In development mode (ADMIN_ALLOW_ANY_CREDENTIALS=True): Any authenticated user is allowed.
+    In production mode (ADMIN_ALLOW_ANY_CREDENTIALS=False): Only ADMIN_EMAIL is allowed.
+    
+    In production, you should implement proper admin role checking.
+    """
+    user = await get_current_user(token, db)
+    
+    # Development mode: allow any authenticated user
+    if settings.ADMIN_ALLOW_ANY_CREDENTIALS:
+        return user
+    
+    # Production mode: check against configured admin email
+    if user.email != settings.ADMIN_EMAIL:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    
+    return user

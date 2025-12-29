@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, UniqueConstraint, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -7,9 +7,18 @@ from app.core.database import Base
 
 
 class PricingPlanCountryPrice(Base):
-    """Pricing plan country price model - stores pricing per country/region for each plan."""
+    """Pricing plan country price model - stores pricing per country/region for each plan.
+    
+    Note: This table has a unique constraint on (subscription_id, country_code, billing_interval)
+    to prevent duplicate prices for the same subscription plan, country, and billing interval.
+    Also enforces positive prices via check constraint.
+    """
     
     __tablename__ = "pricing_plan_country_prices"
+    __table_args__ = (
+        UniqueConstraint('subscription_id', 'country_code', 'billing_interval', name='uq_pricing_plan_country_prices_subscription_country_interval'),
+        CheckConstraint('price > 0', name='chk_pricing_plan_country_prices_price_positive'),
+    )
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     subscription_id = Column(

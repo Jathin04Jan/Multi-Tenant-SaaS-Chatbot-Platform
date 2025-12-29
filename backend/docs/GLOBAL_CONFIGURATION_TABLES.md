@@ -127,6 +127,12 @@ CREATE TABLE pricing_plan_country_prices (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Unique constraint: one price per subscription/country/billing_interval combination
+ALTER TABLE pricing_plan_country_prices ADD CONSTRAINT uq_pricing_plan_country_prices_subscription_country_interval UNIQUE (subscription_id, country_code, billing_interval);
+
+-- Check constraint: price must be positive
+ALTER TABLE pricing_plan_country_prices ADD CONSTRAINT chk_pricing_plan_country_prices_price_positive CHECK (price > 0);
 ```
 
 ### Entitlements Table
@@ -210,6 +216,39 @@ CREATE TABLE user_subscription_entitlements (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Unique constraint: one entitlement record per user subscription/category/entitlement combination
+ALTER TABLE user_subscription_entitlements ADD CONSTRAINT uq_user_subscription_entitlements_user_subscription_category_entitlement UNIQUE (user_subscription_id, category, entitlement);
+
+-- Check constraints: prevent negative consumption and quota
+ALTER TABLE user_subscription_entitlements ADD CONSTRAINT chk_user_subscription_entitlements_consumption_non_negative CHECK (consumption >= 0);
+ALTER TABLE user_subscription_entitlements ADD CONSTRAINT chk_user_subscription_entitlements_quota_non_negative CHECK (quota >= 0);
+
+-- Trigger function: validates that user_id matches user_subscriptions.user_id
+CREATE OR REPLACE FUNCTION validate_user_subscription_entitlement_user_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Check if the user_id matches the user_id of the referenced user_subscription
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM user_subscriptions 
+        WHERE id = NEW.user_subscription_id 
+        AND user_id = NEW.user_id
+    ) THEN
+        RAISE EXCEPTION 'user_id mismatch: user_id (%) does not match user_subscriptions.user_id for user_subscription_id (%)',
+            NEW.user_id, NEW.user_subscription_id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger: fires before INSERT or UPDATE to validate user_id consistency
+CREATE TRIGGER trg_validate_user_subscription_entitlement_user_id
+BEFORE INSERT OR UPDATE OF user_id, user_subscription_id
+ON user_subscription_entitlements
+FOR EACH ROW
+EXECUTE FUNCTION validate_user_subscription_entitlement_user_id();
+
+-- Create indexes
 CREATE INDEX idx_user_subscription_entitlements_id ON user_subscription_entitlements(id);
 CREATE INDEX idx_user_subscription_entitlements_user_id ON user_subscription_entitlements(user_id);
 CREATE INDEX idx_user_subscription_entitlements_user_subscription_id ON user_subscription_entitlements(user_subscription_id);

@@ -385,12 +385,13 @@ Stores pricing per country/region for each plan. Allows different pricing for di
 | `country_code` | VARCHAR(10) | NOT NULL, INDEXED | Country/region code (e.g., 'IN-SOUTH', 'US-CENTRAL', 'EU-WEST') |
 | `currency` | VARCHAR(10) | NOT NULL | Currency code (e.g., 'USD', 'INR', 'EUR') |
 | `billing_interval` | VARCHAR(20) | NOT NULL | Billing interval: 'monthly' or 'yearly' |
-| `price` | INTEGER | NOT NULL | Price in smallest currency unit (e.g., cents for USD, paise for INR) |
+| `price` | INTEGER | NOT NULL, CHECK (price > 0) | Price in smallest currency unit (e.g., cents for USD, paise for INR). Must be positive. |
 | `is_active` | BOOLEAN | NOT NULL, DEFAULT true | Enable/disable this price |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
 
 #### Notes
+- **One price per subscription/country/billing_interval**: UNIQUE constraint on `(subscription_id, country_code, billing_interval)` ensures each subscription plan can only have one price per country and billing interval combination (e.g., only one monthly price for Pro plan in US)
 - Supports different prices for different regions/countries
 - Supports both monthly and yearly billing
 - Price stored as integer in smallest currency unit (avoids floating-point issues)
@@ -498,13 +499,13 @@ Tracks per-user entitlement usage and consumption. This table records the actual
 | Column Name | Type | Constraints | Description |
 |------------|------|-------------|-------------|
 | `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique entitlement instance identifier |
-| `user_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Foreign key to users.id - the user who has this entitlement |
-| `subscription_id` | UUID | FOREIGN KEY → subscriptions.id, NOT NULL, INDEXED, CASCADE DELETE | Foreign key to subscriptions.id - the subscription plan |
+| `user_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Foreign key to users.id - the user who has this entitlement. **Must match** the `user_id` of the referenced `user_subscription` (enforced by database trigger). |
+| `user_subscription_id` | UUID | FOREIGN KEY → user_subscriptions.id, NOT NULL, INDEXED, CASCADE DELETE | Foreign key to user_subscriptions.id - the user's subscription instance |
 | `category` | ENUM | NOT NULL, INDEXED | Entitlement category: file, chat, or other |
 | `entitlement` | VARCHAR(100) | NOT NULL | Entitlement type (e.g., 'storage', 'file_count', 'tokens', 'api_calls', etc.) |
 | `unit` | VARCHAR(20) | NOT NULL | Unit of measurement (e.g., 'MB', 'count', 'GB', 'hours', etc.) |
-| `quota` | INTEGER | NOT NULL, DEFAULT 0 | Quota/limit value (e.g., 1000 for 1000 MB, 10000 for 10000 tokens, etc.) |
-| `consumption` | INTEGER | NOT NULL, DEFAULT 0 | Current consumption/usage value (e.g., 500 for 500 MB used, 5000 for 5000 tokens used, etc.) |
+| `quota` | INTEGER | NOT NULL, DEFAULT 0, CHECK (quota >= 0) | Quota/limit value (e.g., 1000 for 1000 MB, 10000 for 10000 tokens, etc.). Must be non-negative. |
+| `consumption` | INTEGER | NOT NULL, DEFAULT 0, CHECK (consumption >= 0) | Current consumption/usage value (e.g., 500 for 500 MB used, 5000 for 5000 tokens used, etc.). Must be non-negative. |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
 
@@ -515,6 +516,7 @@ Tracks per-user entitlement usage and consumption. This table records the actual
 
 #### Notes
 - **One row per category/entitlement per user subscription**: UNIQUE constraint on `(user_subscription_id, category, entitlement)` ensures each user subscription can only have one entitlement record per category/entitlement combination (e.g., only one 'file'/'storage' entitlement per subscription)
+- **User ID Validation**: Database trigger ensures `user_id` matches the `user_id` of the referenced `user_subscription`. This prevents data integrity issues where an entitlement could reference a subscription belonging to a different user.
 - Tracks actual usage/consumption for each entitlement type per user subscription
 - One user can have multiple entitlement records (one per entitlement type)
 - `quota` is the limit allocated to the user for this entitlement
@@ -708,6 +710,13 @@ CREATE TABLE pricing_plan_country_prices (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Unique constraint: one price per subscription/country/billing_interval combination
+ALTER TABLE pricing_plan_country_prices ADD CONSTRAINT uq_pricing_plan_country_prices_subscription_country_interval UNIQUE (subscription_id, country_code, billing_interval);
+
+-- Check constraint: price must be positive
+ALTER TABLE pricing_plan_country_prices ADD CONSTRAINT chk_pricing_plan_country_prices_price_positive CHECK (price > 0);
+
+-- Create indexes
 CREATE INDEX idx_pricing_plan_country_prices_id ON pricing_plan_country_prices(id);
 CREATE INDEX idx_pricing_plan_country_prices_subscription_id ON pricing_plan_country_prices(subscription_id);
 CREATE INDEX idx_pricing_plan_country_prices_country_code ON pricing_plan_country_prices(country_code);
@@ -792,6 +801,39 @@ CREATE TABLE user_subscription_entitlements (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Unique constraint: one entitlement record per user subscription/category/entitlement combination
+ALTER TABLE user_subscription_entitlements ADD CONSTRAINT uq_user_subscription_entitlements_user_subscription_category_entitlement UNIQUE (user_subscription_id, category, entitlement);
+
+-- Check constraints: prevent negative consumption and quota
+ALTER TABLE user_subscription_entitlements ADD CONSTRAINT chk_user_subscription_entitlements_consumption_non_negative CHECK (consumption >= 0);
+ALTER TABLE user_subscription_entitlements ADD CONSTRAINT chk_user_subscription_entitlements_quota_non_negative CHECK (quota >= 0);
+
+-- Trigger function: validates that user_id matches user_subscriptions.user_id
+CREATE OR REPLACE FUNCTION validate_user_subscription_entitlement_user_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Check if the user_id matches the user_id of the referenced user_subscription
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM user_subscriptions 
+        WHERE id = NEW.user_subscription_id 
+        AND user_id = NEW.user_id
+    ) THEN
+        RAISE EXCEPTION 'user_id mismatch: user_id (%) does not match user_subscriptions.user_id for user_subscription_id (%)',
+            NEW.user_id, NEW.user_subscription_id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger: fires before INSERT or UPDATE to validate user_id consistency
+CREATE TRIGGER trg_validate_user_subscription_entitlement_user_id
+BEFORE INSERT OR UPDATE OF user_id, user_subscription_id
+ON user_subscription_entitlements
+FOR EACH ROW
+EXECUTE FUNCTION validate_user_subscription_entitlement_user_id();
+
+-- Create indexes
 CREATE INDEX idx_user_subscription_entitlements_id ON user_subscription_entitlements(id);
 CREATE INDEX idx_user_subscription_entitlements_user_id ON user_subscription_entitlements(user_id);
 CREATE INDEX idx_user_subscription_entitlements_user_subscription_id ON user_subscription_entitlements(user_subscription_id);

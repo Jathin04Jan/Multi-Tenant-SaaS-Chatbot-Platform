@@ -61,18 +61,22 @@ Stores pricing per country/region for each plan. Allows different pricing for di
 | `country_code` | VARCHAR(10) | NOT NULL, INDEXED | Country/region code (e.g., 'IN-SOUTH', 'US-CENTRAL', 'EU-WEST') |
 | `currency` | VARCHAR(10) | NOT NULL | Currency code (e.g., 'USD', 'INR', 'EUR') |
 | `billing_interval` | VARCHAR(20) | NOT NULL | Billing interval: 'monthly' or 'yearly' |
-| `price` | INTEGER | NOT NULL | Price in smallest currency unit (e.g., cents for USD, paise for INR) |
+| `price` | INTEGER | NOT NULL, CHECK (price > 0) | Price in smallest currency unit (e.g., cents for USD, paise for INR). Must be positive. |
 | `is_active` | BOOLEAN | NOT NULL, DEFAULT true | Enable/disable this price |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
 
 ### Key Design Decisions
 
-1. **Country-Based Pricing**: Supports different prices for different regions/countries.
-2. **Currency Support**: Stores currency code separately from price.
-3. **Billing Intervals**: Supports both monthly and yearly billing.
-4. **Price Storage**: Price stored as integer in smallest currency unit (avoids floating-point issues).
-5. **Active/Inactive**: `is_active` allows disabling prices without deleting records.
+1. **One Price Per Subscription/Country/Interval**: UNIQUE constraint on `(subscription_id, country_code, billing_interval)` ensures each subscription plan can only have one price per country and billing interval combination. This prevents duplicate prices (e.g., you can't have two monthly prices for the same plan in the same country).
+
+2. **Positive Prices**: CHECK constraint ensures `price > 0` (prices must be positive, preventing zero or negative prices).
+
+3. **Country-Based Pricing**: Supports different prices for different regions/countries.
+3. **Currency Support**: Stores currency code separately from price.
+4. **Billing Intervals**: Supports both monthly and yearly billing.
+5. **Price Storage**: Price stored as integer in smallest currency unit (avoids floating-point issues).
+6. **Active/Inactive**: `is_active` allows disabling prices without deleting records.
 
 ### Relationships
 
@@ -115,6 +119,13 @@ CREATE TABLE pricing_plan_country_prices (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Unique constraint: one price per subscription/country/billing_interval combination
+ALTER TABLE pricing_plan_country_prices ADD CONSTRAINT uq_pricing_plan_country_prices_subscription_country_interval UNIQUE (subscription_id, country_code, billing_interval);
+
+-- Check constraint: price must be positive
+ALTER TABLE pricing_plan_country_prices ADD CONSTRAINT chk_pricing_plan_country_prices_price_positive CHECK (price > 0);
+
+-- Create indexes
 CREATE INDEX idx_pricing_plan_country_prices_id ON pricing_plan_country_prices(id);
 CREATE INDEX idx_pricing_plan_country_prices_subscription_id ON pricing_plan_country_prices(subscription_id);
 CREATE INDEX idx_pricing_plan_country_prices_country_code ON pricing_plan_country_prices(country_code);

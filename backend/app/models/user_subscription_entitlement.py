@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, DateTime, Enum as SQLEnum, ForeignKey, Index, UniqueConstraint
+from sqlalchemy import Column, String, Integer, DateTime, Enum as SQLEnum, ForeignKey, Index, UniqueConstraint, CheckConstraint, DDL, event
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -8,7 +8,11 @@ from app.models.entitlement import EntitlementCategory
 
 
 class UserSubscriptionEntitlement(Base):
-    """User subscription entitlement model - tracks per-user entitlement usage and consumption."""
+    """User subscription entitlement model - tracks per-user entitlement usage and consumption.
+    
+    Note: This table enforces non-negative consumption and quota values via check constraints.
+    Also enforces that user_id matches the user_id of the referenced user_subscription via a trigger.
+    """
     
     __tablename__ = "user_subscription_entitlements"
     __table_args__ = (
@@ -16,6 +20,8 @@ class UserSubscriptionEntitlement(Base):
         Index('idx_user_subscription_entitlements_category', 'category'),
         Index('idx_user_subscription_entitlements_user_category', 'user_id', 'category'),
         UniqueConstraint('user_subscription_id', 'category', 'entitlement', name='uq_user_subscription_entitlements_user_subscription_category_entitlement'),
+        CheckConstraint('consumption >= 0', name='chk_user_subscription_entitlements_consumption_non_negative'),
+        CheckConstraint('quota >= 0', name='chk_user_subscription_entitlements_quota_non_negative'),
     )
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
@@ -96,4 +102,40 @@ class UserSubscriptionEntitlement(Base):
     
     def __repr__(self):
         return f"<UserSubscriptionEntitlement(id={self.id}, user_id={self.user_id}, user_subscription_id={self.user_subscription_id}, entitlement={self.entitlement}, quota={self.quota}, consumption={self.consumption}, balance={self.balance})>"
+
+
+# Create trigger function and trigger after table creation
+# This ensures user_id matches the user_id of the referenced user_subscription
+@event.listens_for(UserSubscriptionEntitlement.__table__, "after_create")
+def create_user_id_validation_trigger(target, connection, **kw):
+    """Create trigger to validate that user_id matches user_subscriptions.user_id."""
+    
+    # Create trigger function
+    connection.execute(DDL("""
+        CREATE OR REPLACE FUNCTION validate_user_subscription_entitlement_user_id()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            -- Check if the user_id matches the user_id of the referenced user_subscription
+            IF NOT EXISTS (
+                SELECT 1 
+                FROM user_subscriptions 
+                WHERE id = NEW.user_subscription_id 
+                AND user_id = NEW.user_id
+            ) THEN
+                RAISE EXCEPTION 'user_id mismatch: user_id (%) does not match user_subscriptions.user_id for user_subscription_id (%)',
+                    NEW.user_id, NEW.user_subscription_id;
+            END IF;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+    """))
+    
+    # Create trigger that fires before INSERT or UPDATE
+    connection.execute(DDL("""
+        CREATE TRIGGER trg_validate_user_subscription_entitlement_user_id
+        BEFORE INSERT OR UPDATE OF user_id, user_subscription_id
+        ON user_subscription_entitlements
+        FOR EACH ROW
+        EXECUTE FUNCTION validate_user_subscription_entitlement_user_id();
+    """))
 

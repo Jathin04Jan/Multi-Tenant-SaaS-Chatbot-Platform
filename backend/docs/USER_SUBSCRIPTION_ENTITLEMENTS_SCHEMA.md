@@ -11,7 +11,7 @@ Tracks per-user entitlement usage and consumption. This table records the actual
 | Column Name | Type | Constraints | Description |
 |------------|------|-------------|-------------|
 | `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique entitlement instance identifier |
-| `user_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Foreign key to users.id - the user who has this entitlement |
+| `user_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Foreign key to users.id - the user who has this entitlement. **Must match** the `user_id` of the referenced `user_subscription` (enforced by database trigger). |
 | `user_subscription_id` | UUID | FOREIGN KEY → user_subscriptions.id, NOT NULL, INDEXED, CASCADE DELETE | Foreign key to user_subscriptions.id - the user's subscription instance |
 | `category` | ENUM | NOT NULL, INDEXED | Entitlement category: file, chat, or other |
 | `entitlement` | VARCHAR(100) | NOT NULL | Entitlement type (e.g., 'storage', 'file_count', 'tokens', 'api_calls', etc.) |
@@ -30,7 +30,9 @@ Tracks per-user entitlement usage and consumption. This table records the actual
 
 1. **One Row Per Category/Entitlement Per User Subscription**: UNIQUE constraint on `(user_subscription_id, category, entitlement)` ensures each user subscription can only have one entitlement record per category/entitlement combination. This prevents duplicate entitlements (e.g., you can't have two 'file'/'storage' entitlements for the same user subscription).
 
-2. **Per-User Tracking**: Tracks actual usage/consumption for each entitlement type per user subscription
+2. **User ID Validation**: Database trigger ensures `user_id` matches the `user_id` of the referenced `user_subscription`. This prevents data integrity issues where an entitlement could reference a subscription belonging to a different user. The trigger fires on INSERT and UPDATE of `user_id` or `user_subscription_id` columns.
+
+3. **Per-User Tracking**: Tracks actual usage/consumption for each entitlement type per user subscription
    - One user can have multiple entitlement records (one per entitlement type)
    - Links to both user and user subscription for complete context
 
@@ -47,6 +49,10 @@ Tracks per-user entitlement usage and consumption. This table records the actual
 5. **Performance Optimization**: 
    - Composite indexes on `(user_id, user_subscription_id)` and `(user_id, category)` for efficient queries
    - Indexes on foreign keys and category for fast lookups
+
+6. **Data Integrity Constraints**:
+   - **Check Constraints**: `consumption >= 0` and `quota >= 0` ensure non-negative values
+   - **Trigger Validation**: PostgreSQL trigger validates that `user_id` matches the `user_id` of the referenced `user_subscription` to prevent data inconsistency
 
 ### Computed Properties (Not Database Columns)
 
@@ -154,6 +160,35 @@ CREATE TABLE user_subscription_entitlements (
 
 -- Unique constraint: one row per user_subscription/category/entitlement combination
 ALTER TABLE user_subscription_entitlements ADD CONSTRAINT uq_user_subscription_entitlements_user_subscription_category_entitlement UNIQUE (user_subscription_id, category, entitlement);
+
+-- Check constraints: prevent negative consumption and quota
+ALTER TABLE user_subscription_entitlements ADD CONSTRAINT chk_user_subscription_entitlements_consumption_non_negative CHECK (consumption >= 0);
+ALTER TABLE user_subscription_entitlements ADD CONSTRAINT chk_user_subscription_entitlements_quota_non_negative CHECK (quota >= 0);
+
+-- Trigger function: validates that user_id matches user_subscriptions.user_id
+CREATE OR REPLACE FUNCTION validate_user_subscription_entitlement_user_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Check if the user_id matches the user_id of the referenced user_subscription
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM user_subscriptions 
+        WHERE id = NEW.user_subscription_id 
+        AND user_id = NEW.user_id
+    ) THEN
+        RAISE EXCEPTION 'user_id mismatch: user_id (%) does not match user_subscriptions.user_id for user_subscription_id (%)',
+            NEW.user_id, NEW.user_subscription_id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger: fires before INSERT or UPDATE to validate user_id consistency
+CREATE TRIGGER trg_validate_user_subscription_entitlement_user_id
+BEFORE INSERT OR UPDATE OF user_id, user_subscription_id
+ON user_subscription_entitlements
+FOR EACH ROW
+EXECUTE FUNCTION validate_user_subscription_entitlement_user_id();
 
 -- Create indexes
 CREATE INDEX idx_user_subscription_entitlements_id ON user_subscription_entitlements(id);
@@ -340,18 +375,26 @@ WHERE user_id = '550e8400-e29b-41d4-a716-446655440000'
 3. **Quota Initialization**: Initialize entitlements when user subscribes (copy from subscription plan entitlements)
 4. **Periodic Resets**: Reset consumption periodically (e.g., monthly) based on billing cycle
 5. **Usage Monitoring**: Monitor usage percentage and warn users at thresholds (80%, 90%, 100%)
-6. **Query Optimization**: Use indexes on `user_id`, `subscription_id`, and `category` for efficient queries
+6. **Query Optimization**: Use indexes on `user_id`, `user_subscription_id`, and `category` for efficient queries
 
 ---
 
 ## 📊 Indexes
 
 - **Primary Key**: `id` (UUID)
-- **Foreign Key Indexes**: `user_id`, `subscription_id`
+- **Foreign Key Indexes**: `user_id`, `user_subscription_id`
 - **Category Index**: `category` (for filtering by category)
 - **Composite Indexes**: 
-  - `(user_id, subscription_id)` - for querying user's entitlements for a specific subscription
+  - `(user_id, user_subscription_id)` - for querying user's entitlements for a specific subscription
   - `(user_id, category)` - for querying user's entitlements by category
+
+## 🔒 Constraints
+
+- **Unique Constraint**: `(user_subscription_id, category, entitlement)` - ensures one entitlement record per user subscription/category/entitlement combination
+- **Check Constraints**:
+  - `consumption >= 0` - ensures consumption is non-negative
+  - `quota >= 0` - ensures quota is non-negative
+- **Trigger**: `trg_validate_user_subscription_entitlement_user_id` - validates that `user_id` matches the `user_id` of the referenced `user_subscription` before INSERT or UPDATE
 
 ---
 
@@ -384,6 +427,8 @@ WHERE user_id = '550e8400-e29b-41d4-a716-446655440000'
 - **Negative Balance**: `balance` can be negative if `consumption > quota` (user has exceeded quota)
 - **Shared Enum**: Uses the same `entitlement_category` enum as the `entitlements` table
 - **Atomic Updates**: Use database transactions when updating consumption to prevent race conditions
+- **Check Constraints**: Database enforces `consumption >= 0` and `quota >= 0` at the database level
+- **Trigger Validation**: The trigger automatically validates that `user_id` matches the `user_id` of the referenced `user_subscription` to prevent data inconsistency
 
 ---
 

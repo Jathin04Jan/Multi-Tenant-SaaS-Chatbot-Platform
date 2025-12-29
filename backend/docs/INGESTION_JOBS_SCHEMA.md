@@ -192,16 +192,18 @@ CREATE TABLE ingestion_jobs (
     finished_at TIMESTAMP WITH TIME ZONE
 );
 
-CREATE INDEX idx_ingestion_jobs_id ON ingestion_jobs(id);
-CREATE INDEX idx_ingestion_jobs_user_id ON ingestion_jobs(user_id);
-CREATE INDEX idx_ingestion_jobs_bot_id ON ingestion_jobs(bot_id);
-CREATE INDEX idx_ingestion_jobs_document_id ON ingestion_jobs(document_id);
-CREATE INDEX idx_ingestion_jobs_job_type ON ingestion_jobs(job_type);
-CREATE INDEX idx_ingestion_jobs_status ON ingestion_jobs(status);
-CREATE INDEX idx_ingestion_jobs_stage ON ingestion_jobs(stage);
-CREATE INDEX idx_ingestion_jobs_created_at ON ingestion_jobs(created_at);
+-- Indexes created automatically by SQLAlchemy (index=True on columns)
+-- Primary key index: id (automatic)
+-- Foreign key indexes: user_id, bot_id, document_id (automatic from index=True)
+-- Column indexes: job_type, status, stage, created_at (automatic from index=True)
+
+-- Composite indexes defined in __table_args__
 CREATE INDEX idx_ingestion_jobs_user_bot ON ingestion_jobs(user_id, bot_id);
 CREATE INDEX idx_ingestion_jobs_user_bot_status ON ingestion_jobs(user_id, bot_id, status);
+CREATE INDEX idx_ingestion_jobs_status ON ingestion_jobs(status);
+CREATE INDEX idx_ingestion_jobs_stage ON ingestion_jobs(stage);
+CREATE INDEX idx_ingestion_jobs_document ON ingestion_jobs(document_id);
+CREATE INDEX idx_ingestion_jobs_created ON ingestion_jobs(created_at);
 ```
 
 ---
@@ -484,11 +486,16 @@ WHERE id = 'j1b2c3d4-e5f6-7890-abcd-ef1234567890';
 
 ## 📊 Indexes
 
-- **Primary Key**: `id` (UUID)
-- **Foreign Key Indexes**: `user_id`, `bot_id`, `document_id`
-- **Status/Stage Indexes**: `status`, `stage`, `job_type`
-- **Time Index**: `created_at` (for time-based queries)
-- **Composite Index**: `(user_id, bot_id)` (for querying user's jobs for a specific bot)
+- **Primary Key**: `id` (UUID) - automatic index
+- **Foreign Key Indexes**: `user_id`, `bot_id`, `document_id` - automatic indexes from `index=True`
+- **Column Indexes**: `job_type`, `status`, `stage`, `created_at` - automatic indexes from `index=True`
+- **Composite Indexes**: 
+  - `idx_ingestion_jobs_user_bot` - `(user_id, bot_id)` for querying user's jobs for a specific bot
+  - `idx_ingestion_jobs_user_bot_status` - `(user_id, bot_id, status)` for filtering by status
+  - `idx_ingestion_jobs_status` - `status` for status filtering
+  - `idx_ingestion_jobs_stage` - `stage` for stage filtering
+  - `idx_ingestion_jobs_document` - `document_id` for document-specific queries
+  - `idx_ingestion_jobs_created` - `created_at` for time-based queries
 
 ---
 

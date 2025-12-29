@@ -27,12 +27,13 @@ erDiagram
 
     users {
         uuid id PK
-        varchar email
-        varchar full_name
-        varchar company_name
-        varchar domain
-        enum status
-        jsonb settings
+        varchar email UNIQUE
+        varchar hashed_password
+        varchar full_name NOT_NULL
+        varchar company_name NOT_NULL
+        varchar domain NULLABLE
+        enum status "active|pending_verification|suspended" DEFAULT_pending_verification
+        jsonb settings NULLABLE
         timestamptz created_at
         timestamptz updated_at
     }
@@ -40,14 +41,14 @@ erDiagram
     bots {
         uuid id PK
         uuid user_id FK
-        varchar name
-        text description
-        enum status
-        jsonb llm_config
-        jsonb retrieval_config
-        jsonb guardrails
-        jsonb branding
-        timestamptz created_at
+        varchar name NOT_NULL
+        text description NULLABLE
+        enum status "draft|active|paused|archived" DEFAULT_draft
+        jsonb llm_config NULLABLE
+        jsonb retrieval_config NULLABLE
+        jsonb guardrails NULLABLE
+        jsonb branding NULLABLE
+        timestamptz created_at INDEXED
         timestamptz updated_at
     }
 
@@ -55,133 +56,144 @@ erDiagram
         uuid id PK
         uuid user_id FK
         uuid bot_id FK
-        text script_url
-        text embed_code
-        varchar status
-        jsonb domain_whitelist
-        integer usage_count
-        timestamptz last_used_at
-        timestamptz created_at
+        text script_url NULLABLE
+        text embed_code NOT_NULL
+        varchar status "active|revoked" DEFAULT_active INDEXED
+        jsonb domain_whitelist NULLABLE
+        integer usage_count DEFAULT_0
+        timestamptz last_used_at NULLABLE
+        timestamptz created_at INDEXED
         timestamptz updated_at
-        timestamptz expires_at
+        timestamptz expires_at NULLABLE
     }
 
     documents {
         uuid id PK
-        uuid tenant_id FK
-        uuid bot_id FK
-        enum source_type
-        varchar source_url
-        varchar filename
-        varchar content_type
-        integer size
-        enum status
-        jsonb metadata
+        uuid tenant_id FK INDEXED
+        uuid bot_id FK INDEXED
+        enum source_type "file|url|integration" DEFAULT_file INDEXED
+        varchar source_url NULLABLE
+        varchar filename NULLABLE
+        varchar content_type NULLABLE
+        integer size NULLABLE
+        enum status "pending|processing|indexed|error" DEFAULT_pending INDEXED
+        jsonb metadata NULLABLE
         timestamptz created_at
         timestamptz updated_at
     }
 
     subscriptions {
-        uuid id PK
-        text name
-        text description
-        boolean is_highlighted
-        jsonb sort_order
-        varchar support_level
-        jsonb features
+        uuid id PK INDEXED
+        text name NOT_NULL
+        text description NULLABLE
+        boolean is_highlighted DEFAULT_false INDEXED
+        jsonb sort_order NULLABLE
+        varchar support_level NULLABLE
+        jsonb features NULLABLE
         timestamptz created_at
         timestamptz updated_at
     }
 
     pricing_plan_country_prices {
-        uuid id PK
-        uuid plan_id FK
-        varchar country_code
-        varchar currency
-        varchar billing_interval
-        integer price
-        boolean is_active
+        uuid id PK INDEXED
+        uuid plan_id FK INDEXED
+        varchar country_code NOT_NULL INDEXED
+        varchar currency NOT_NULL
+        varchar billing_interval "monthly|yearly" NOT_NULL
+        integer price NOT_NULL
+        boolean is_active DEFAULT_true
         timestamptz created_at
         timestamptz updated_at
     }
 
     entitlements {
-        uuid id PK
-        uuid subscription_id FK
-        enum category
-        varchar entitlement
-        varchar unit
-        integer quota
+        uuid id PK INDEXED
+        uuid subscription_id FK INDEXED
+        enum category "file|chat|other" NOT_NULL INDEXED
+        varchar entitlement NOT_NULL
+        varchar unit NOT_NULL
+        integer quota NOT_NULL
         timestamptz created_at
         timestamptz updated_at
     }
 
     user_subscriptions {
-        uuid id PK
-        uuid user_id FK
-        uuid subscription_id FK
-        enum status
-        date start_date
-        date end_date
-        boolean auto_renew
+        uuid id PK INDEXED
+        uuid user_id FK INDEXED
+        uuid subscription_id FK INDEXED
+        enum status "active|expired|cancelled" DEFAULT_active INDEXED
+        date start_date NOT_NULL INDEXED
+        date end_date NULLABLE INDEXED
+        boolean auto_renew DEFAULT_true
         timestamptz created_at
         timestamptz updated_at
     }
 
     user_subscription_entitlements {
-        uuid id PK
-        uuid user_id FK
-        uuid subscription_id FK
-        enum category
-        varchar entitlement
-        varchar unit
-        integer quota
-        integer consumption
+        uuid id PK INDEXED
+        uuid user_id FK INDEXED
+        uuid subscription_id FK INDEXED
+        enum category "file|chat|other" NOT_NULL INDEXED
+        varchar entitlement NOT_NULL
+        varchar unit NOT_NULL
+        integer quota DEFAULT_0
+        integer consumption DEFAULT_0
         timestamptz created_at
         timestamptz updated_at
     }
 
     ingestion_jobs {
-        uuid id PK
-        uuid user_id FK
-        uuid bot_id FK
-        uuid document_id FK
-        enum job_type
-        enum status
-        enum stage
-        integer attempts
-        integer max_attempts
-        jsonb logs
-        timestamptz created_at
+        uuid id PK INDEXED
+        uuid user_id FK INDEXED
+        uuid bot_id FK INDEXED
+        uuid document_id FK NULLABLE INDEXED
+        enum job_type "ingest_upload|ingest_url|reindex_document|delete_document_vectors_reindex_bot" NOT_NULL INDEXED
+        enum status "queued|processing|succeeded|failed|cancelled" DEFAULT_queued INDEXED
+        enum stage "download|parse|chunk|embed|index" NULLABLE INDEXED
+        integer attempts DEFAULT_0
+        integer max_attempts DEFAULT_5
+        jsonb logs NULLABLE
+        timestamptz created_at INDEXED
         timestamptz updated_at
-        timestamptz started_at
-        timestamptz finished_at
+        timestamptz started_at NULLABLE
+        timestamptz finished_at NULLABLE
     }
 
     app_settings {
-        varchar key PK
-        jsonb value
-        text description
-        boolean is_public
+        varchar key PK INDEXED
+        jsonb value NOT_NULL
+        text description NULLABLE
+        boolean is_public DEFAULT_false INDEXED
         timestamptz created_at
         timestamptz updated_at
     }
 ```
 
+## Legend
+
+- **PK** = Primary Key
+- **FK** = Foreign Key (with CASCADE DELETE)
+- **INDEXED** = Column has an index
+- **UNIQUE** = Column has a unique constraint
+- **NOT_NULL** = Column is required (NOT NULL)
+- **NULLABLE** = Column can be NULL
+- **DEFAULT_x** = Default value for the column
+- **Enum values** are shown inline as `"option1|option2|option3"`
+
 ## Notes
 - **Global tables (admin-only):** `subscriptions`, `pricing_plan_country_prices`, `entitlements`, `app_settings`.
 - **Tenant data:** `users` (tenants), `bots`, `documents`, `installation_snippets`, `user_subscriptions`, `user_subscription_entitlements`, `ingestion_jobs`.
-- **Cascade deletes:** FKs are configured with `ON DELETE CASCADE` in the models for dependent rows.
-- **Enums:** 
-  - `user_status` - used by `users.status` (active, pending_verification, suspended)
-  - `bot_status` - used by `bots.status` (draft, active, paused, archived)
-  - `document_source_type` - used by `documents.source_type` (file, url, integration)
-  - `document_status` - used by `documents.status` (pending, processing, indexed, error)
-  - `entitlement_category` - used by `entitlements.category` (file, chat, other)
-  - `user_subscription_status` - used by `user_subscriptions.status` (active, expired, cancelled)
-  - `ingestion_job_type` - used by `ingestion_jobs.job_type` (ingest_upload, ingest_url, reindex_document, delete_document_vectors_reindex_bot)
-  - `ingestion_job_status` - used by `ingestion_jobs.status` (queued, processing, succeeded, failed, cancelled)
-  - `ingestion_job_stage` - used by `ingestion_jobs.stage` (download, parse, chunk, embed, index)
+- **Cascade deletes:** All foreign keys are configured with `ON DELETE CASCADE` in the models for dependent rows.
+- **Enum Details:**
+  - `users.status`: **active** (verified, can log in), **pending_verification** (default, cannot log in), **suspended** (cannot log in)
+  - `bots.status`: **draft** (default, being configured), **active** (live), **paused** (temporarily disabled), **archived** (deactivated)
+  - `documents.source_type`: **file** (uploaded file, default), **url** (crawled URL), **integration** (3rd-party integration)
+  - `documents.status`: **pending** (default), **processing** (being indexed), **indexed** (ready), **error** (failed)
+  - `entitlements.category`: **file** (file-related entitlements), **chat** (chat/token entitlements), **other** (miscellaneous)
+  - `user_subscriptions.status`: **active** (default), **expired** (end_date passed), **cancelled** (manually cancelled)
+  - `ingestion_jobs.job_type`: **ingest_upload** (process uploaded file), **ingest_url** (crawl and process URL), **reindex_document** (re-index existing document), **delete_document_vectors_reindex_bot** (delete vectors and re-index entire bot)
+  - `ingestion_jobs.status`: **queued** (default), **processing** (in progress), **succeeded** (completed), **failed** (error occurred), **cancelled** (manually cancelled)
+  - `ingestion_jobs.stage`: **download** (downloading content), **parse** (parsing document), **chunk** (chunking text), **embed** (generating embeddings), **index** (indexing vectors)
 - **Computed Properties**: Some models provide computed properties (not database columns):
   - `User.is_verified` - computed from `users.status` (returns `True` if status == 'active')
   - `Bot.is_active` - computed from `bots.status` (returns `True` if status == 'active')

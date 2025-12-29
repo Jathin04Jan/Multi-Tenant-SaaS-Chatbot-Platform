@@ -221,6 +221,11 @@ Please refer to the **Enum Details** section below and the full schema documenta
 - **`chat`** - Chat/token entitlements (tokens, API calls)
 - **`other`** - Miscellaneous entitlements
 
+### `user_subscription_entitlements.category` (ENUM: entitlement_category)
+- **`file`** - File-related entitlements (storage, file_count)
+- **`chat`** - Chat/token entitlements (tokens, API calls)
+- **`other`** - Miscellaneous entitlements
+
 ### `user_subscriptions.status` (ENUM: user_subscription_status)
 - **`active`** - Subscription is active (default)
 - **`expired`** - Subscription has expired (end_date passed)

@@ -43,6 +43,22 @@ MINIO_SECRET_KEY=yourbot_minio_password
 MINIO_SECURE=false
 MINIO_BUCKET_NAME=yourbot-documents
 
+# Qdrant Vector Database
+# For local development: use localhost
+# For Docker Compose: use 'qdrant' (service name)
+QDRANT_HOST=localhost
+QDRANT_PORT=6333
+QDRANT_GRPC_PORT=6334
+QDRANT_API_KEY=  # Leave empty for local development
+QDRANT_PREFER_GRPC=true
+
+# Ollama Configuration
+# Ollama must be running locally (default: http://localhost:11434)
+# Make sure you've pulled the models: ollama pull qwen3-embedding:4b && ollama pull qwen3-vl:8b
+OLLAMA_HOST=http://localhost:11434
+OLLAMA_EMBEDDING_MODEL=qwen3-embedding:4b
+OLLAMA_LLM_MODEL=qwen3-vl:8b
+
 # Embed Token Security
 EMBED_TOKEN_SECRET=generate-a-strong-random-key-here
 EMBED_TOKEN_TTL_MINUTES=10
@@ -95,6 +111,14 @@ It should show `.env` in the ignore list.
 | `MINIO_SECRET_KEY` | MinIO secret key | `yourbot_minio_password` | ✅ Yes |
 | `MINIO_SECURE` | Use HTTPS when connecting to MinIO | `false` | No (set `true` in prod) |
 | `MINIO_BUCKET_NAME` | Default bucket name | `yourbot-documents` | ✅ Yes |
+| `QDRANT_HOST` | Qdrant host (use 'qdrant' in Docker, 'localhost' for local) | `localhost` | ✅ Yes |
+| `QDRANT_PORT` | Qdrant REST API port | `6333` | No |
+| `QDRANT_GRPC_PORT` | Qdrant gRPC API port | `6334` | No |
+| `QDRANT_API_KEY` | Qdrant API key (optional, for production/cloud) | `` (empty) | No |
+| `QDRANT_PREFER_GRPC` | Prefer gRPC over REST API | `true` | No |
+| `OLLAMA_HOST` | Ollama API endpoint | `http://localhost:11434` | ✅ Yes |
+| `OLLAMA_EMBEDDING_MODEL` | Default embedding model | `qwen3-embedding:4b` | No |
+| `OLLAMA_LLM_MODEL` | Default LLM model for chat | `qwen3-vl:8b` | No |
 | `EMBED_TOKEN_SECRET` | Secret key for embed JWT tokens | `your-embed-token-secret` | ✅ Yes (production) |
 | `EMBED_TOKEN_TTL_MINUTES` | Embed token expiration (minutes) | `10` | No |
 | `API_BASE_URL` | Base URL for API (used in embed code) | `http://localhost:8000` | ✅ Yes |

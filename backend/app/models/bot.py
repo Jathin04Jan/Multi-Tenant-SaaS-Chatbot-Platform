@@ -99,6 +99,17 @@ class Bot(Base):
         """Computed property: bot is active if status is ACTIVE."""
         return self.status.value == BotStatus.ACTIVE.value
     
+    def get_collection_name(self) -> str:
+        """
+        Get the Qdrant collection name for this bot.
+        
+        Returns:
+            str: Collection name in format 'bot_{bot_id}'
+        """
+        # Import here to avoid circular imports
+        from app.services.qdrant_collection_service import get_bot_collection_name
+        return get_bot_collection_name(self.id)
+    
     def __repr__(self):
         return f"<Bot(id={self.id}, name={self.name}, status={self.status}, user_id={self.user_id})>"
 

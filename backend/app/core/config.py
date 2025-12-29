@@ -35,6 +35,14 @@ class Settings(BaseSettings):
         """Get CORS origins as a list."""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
     
+    def get_qdrant_url(self) -> str:
+        """Get Qdrant REST API URL."""
+        return f"http://{self.QDRANT_HOST}:{self.QDRANT_PORT}"
+    
+    def get_qdrant_grpc_url(self) -> str:
+        """Get Qdrant gRPC API URL."""
+        return f"{self.QDRANT_HOST}:{self.QDRANT_GRPC_PORT}"
+    
     # Email Verification (optional)
     EMAIL_VERIFICATION_REQUIRED: bool = Field(default=False, description="Require email verification")
     
@@ -73,6 +81,42 @@ class Settings(BaseSettings):
     API_BASE_URL: str = Field(
         default="http://localhost:8000",
         description="Base URL for the API (used in embed code generation). In production, set this to your domain."
+    )
+    
+    # Qdrant Vector Database Configuration
+    QDRANT_HOST: str = Field(
+        default="localhost",
+        description="Qdrant host (use 'qdrant' in docker-compose, 'localhost' for local dev)"
+    )
+    QDRANT_PORT: int = Field(
+        default=6333,
+        description="Qdrant REST API port"
+    )
+    QDRANT_GRPC_PORT: int = Field(
+        default=6334,
+        description="Qdrant gRPC API port"
+    )
+    QDRANT_API_KEY: str = Field(
+        default="",
+        description="Qdrant API key (optional, leave empty for local development)"
+    )
+    QDRANT_PREFER_GRPC: bool = Field(
+        default=True,
+        description="Prefer gRPC over REST API for better performance"
+    )
+    
+    # Ollama Configuration
+    OLLAMA_HOST: str = Field(
+        default="http://localhost:11434",
+        description="Ollama API endpoint (default: http://localhost:11434)"
+    )
+    OLLAMA_EMBEDDING_MODEL: str = Field(
+        default="qwen3-embedding:4b",
+        description="Default Ollama embedding model for generating embeddings"
+    )
+    OLLAMA_LLM_MODEL: str = Field(
+        default="qwen3-vl:8b",
+        description="Default Ollama LLM model for chat completions"
     )
     
     class Config:

@@ -320,7 +320,9 @@ function EntitlementsTab() {
   const [formData, setFormData] = useState({
     category: "file" as "file" | "chat" | "other",
     entitlement: "",
+    customEntitlement: "", // For "other" option
     unit: "",
+    customUnit: "", // For "other" option
     quota: 0,
   });
 
@@ -365,17 +367,29 @@ function EntitlementsTab() {
     setFormData({
       category: "file",
       entitlement: "",
+      customEntitlement: "",
       unit: "",
+      customUnit: "",
       quota: 0,
     });
   }
 
   function startEdit(ent: Entitlement) {
     setEditing(ent.id);
+    // Check if entitlement is one of the predefined options
+    const predefinedEntitlements = ["file_storage", "file_count", "tokens"];
+    const isPredefinedEntitlement = predefinedEntitlements.includes(ent.entitlement);
+    
+    // Check if unit is one of the predefined options
+    const predefinedUnits = ["MB", "Count"];
+    const isPredefinedUnit = predefinedUnits.includes(ent.unit);
+    
     setFormData({
       category: ent.category,
-      entitlement: ent.entitlement,
-      unit: ent.unit,
+      entitlement: isPredefinedEntitlement ? ent.entitlement : "other",
+      customEntitlement: isPredefinedEntitlement ? "" : ent.entitlement,
+      unit: isPredefinedUnit ? ent.unit : "other",
+      customUnit: isPredefinedUnit ? "" : ent.unit,
       quota: ent.quota,
     });
   }
@@ -383,11 +397,39 @@ function EntitlementsTab() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedSubscription) return;
+    
+    // Determine the actual entitlement value
+    const actualEntitlement = formData.entitlement === "other" 
+      ? formData.customEntitlement.trim() 
+      : formData.entitlement;
+    
+    // Determine the actual unit value
+    const actualUnit = formData.unit === "other" 
+      ? formData.customUnit.trim() 
+      : formData.unit;
+    
+    if (!actualEntitlement) {
+      alert("Please enter an entitlement value");
+      return;
+    }
+    
+    if (!actualUnit) {
+      alert("Please enter a unit value");
+      return;
+    }
+    
     try {
+      const submitData = {
+        category: formData.category,
+        entitlement: actualEntitlement,
+        unit: actualUnit,
+        quota: formData.quota,
+      };
+      
       if (editing === "new") {
-        await adminEntitlementsApi.create(selectedSubscription, formData);
+        await adminEntitlementsApi.create(selectedSubscription, submitData);
       } else {
-        await adminEntitlementsApi.update(editing, formData);
+        await adminEntitlementsApi.update(editing, submitData);
       }
       setEditing(null);
       loadEntitlements();
@@ -437,12 +479,14 @@ function EntitlementsTab() {
           <h4 className="font-semibold">{editing === "new" ? "Create" : "Edit"} Entitlement</h4>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <label className="text-sm font-medium">Category *</label>
+              <label className="text-sm font-medium" htmlFor="category-select">Category *</label>
               <select
+                id="category-select"
                 className="w-full border rounded-md px-3 py-2"
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
                 required
+                aria-label="Select entitlement category"
               >
                 <option value="file">File</option>
                 <option value="chat">Chat</option>
@@ -450,22 +494,57 @@ function EntitlementsTab() {
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium">Entitlement *</label>
-              <Input
+              <label className="text-sm font-medium" htmlFor="entitlement-select">Entitlement *</label>
+              <select
+                id="entitlement-select"
+                className="w-full border rounded-md px-3 py-2 bg-background text-sm"
                 value={formData.entitlement}
-                onChange={(e) => setFormData({ ...formData, entitlement: e.target.value })}
-                placeholder="e.g., storage, tokens"
+                onChange={(e) => setFormData({ ...formData, entitlement: e.target.value, customEntitlement: "" })}
                 required
-              />
+                aria-label="Select entitlement type"
+              >
+                <option value="">Select entitlement...</option>
+                <option value="file_storage">File Storage</option>
+                <option value="file_count">File Count</option>
+                <option value="tokens">Tokens</option>
+                <option value="other">Other</option>
+              </select>
+              {formData.entitlement === "other" && (
+                <Input
+                  className="mt-2"
+                  value={formData.customEntitlement}
+                  onChange={(e) => setFormData({ ...formData, customEntitlement: e.target.value })}
+                  placeholder="Enter custom entitlement name"
+                  required
+                  aria-label="Custom entitlement name"
+                />
+              )}
             </div>
             <div>
-              <label className="text-sm font-medium">Unit *</label>
-              <Input
+              <label className="text-sm font-medium" htmlFor="unit-select">Unit *</label>
+              <select
+                id="unit-select"
+                className="w-full border rounded-md px-3 py-2 bg-background text-sm"
                 value={formData.unit}
-                onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                placeholder="e.g., MB, count"
+                onChange={(e) => setFormData({ ...formData, unit: e.target.value, customUnit: "" })}
                 required
-              />
+                aria-label="Select unit type"
+              >
+                <option value="">Select unit...</option>
+                <option value="MB">MB</option>
+                <option value="Count">Count</option>
+                <option value="other">Other</option>
+              </select>
+              {formData.unit === "other" && (
+                <Input
+                  className="mt-2"
+                  value={formData.customUnit}
+                  onChange={(e) => setFormData({ ...formData, customUnit: e.target.value })}
+                  placeholder="Enter custom unit name"
+                  required
+                  aria-label="Custom unit name"
+                />
+              )}
             </div>
             <div>
               <label className="text-sm font-medium">Quota *</label>

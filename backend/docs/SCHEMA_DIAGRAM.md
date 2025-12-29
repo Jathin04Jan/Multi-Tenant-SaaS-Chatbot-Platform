@@ -32,7 +32,7 @@ erDiagram
         varchar full_name NOT_NULL
         varchar company_name NOT_NULL
         varchar domain NULLABLE
-        enum status "active|pending_verification|suspended" DEFAULT_pending_verification
+        varchar status ENUM_active_pending_verification_suspended DEFAULT_pending_verification
         jsonb settings NULLABLE
         timestamptz created_at
         timestamptz updated_at
@@ -43,7 +43,7 @@ erDiagram
         uuid user_id FK
         varchar name NOT_NULL
         text description NULLABLE
-        enum status "draft|active|paused|archived" DEFAULT_draft
+        varchar status ENUM_draft_active_paused_archived DEFAULT_draft
         jsonb llm_config NULLABLE
         jsonb retrieval_config NULLABLE
         jsonb guardrails NULLABLE
@@ -58,7 +58,7 @@ erDiagram
         uuid bot_id FK
         text script_url NULLABLE
         text embed_code NOT_NULL
-        varchar status "active|revoked" DEFAULT_active INDEXED
+        varchar status active_revoked DEFAULT_active INDEXED
         jsonb domain_whitelist NULLABLE
         integer usage_count DEFAULT_0
         timestamptz last_used_at NULLABLE
@@ -71,12 +71,12 @@ erDiagram
         uuid id PK
         uuid tenant_id FK INDEXED
         uuid bot_id FK INDEXED
-        enum source_type "file|url|integration" DEFAULT_file INDEXED
+        varchar source_type ENUM_file_url_integration DEFAULT_file INDEXED
         varchar source_url NULLABLE
         varchar filename NULLABLE
         varchar content_type NULLABLE
         integer size NULLABLE
-        enum status "pending|processing|indexed|error" DEFAULT_pending INDEXED
+        varchar status ENUM_pending_processing_indexed_error DEFAULT_pending INDEXED
         jsonb metadata NULLABLE
         timestamptz created_at
         timestamptz updated_at
@@ -99,7 +99,7 @@ erDiagram
         uuid plan_id FK INDEXED
         varchar country_code NOT_NULL INDEXED
         varchar currency NOT_NULL
-        varchar billing_interval "monthly|yearly" NOT_NULL
+        varchar billing_interval monthly_yearly NOT_NULL
         integer price NOT_NULL
         boolean is_active DEFAULT_true
         timestamptz created_at
@@ -109,7 +109,7 @@ erDiagram
     entitlements {
         uuid id PK INDEXED
         uuid subscription_id FK INDEXED
-        enum category "file|chat|other" NOT_NULL INDEXED
+        varchar category ENUM_file_chat_other NOT_NULL INDEXED
         varchar entitlement NOT_NULL
         varchar unit NOT_NULL
         integer quota NOT_NULL
@@ -121,7 +121,7 @@ erDiagram
         uuid id PK INDEXED
         uuid user_id FK INDEXED
         uuid subscription_id FK INDEXED
-        enum status "active|expired|cancelled" DEFAULT_active INDEXED
+        varchar status ENUM_active_expired_cancelled DEFAULT_active INDEXED
         date start_date NOT_NULL INDEXED
         date end_date NULLABLE INDEXED
         boolean auto_renew DEFAULT_true
@@ -133,7 +133,7 @@ erDiagram
         uuid id PK INDEXED
         uuid user_id FK INDEXED
         uuid subscription_id FK INDEXED
-        enum category "file|chat|other" NOT_NULL INDEXED
+        varchar category ENUM_file_chat_other NOT_NULL INDEXED
         varchar entitlement NOT_NULL
         varchar unit NOT_NULL
         integer quota DEFAULT_0
@@ -147,9 +147,9 @@ erDiagram
         uuid user_id FK INDEXED
         uuid bot_id FK INDEXED
         uuid document_id FK NULLABLE INDEXED
-        enum job_type "ingest_upload|ingest_url|reindex_document|delete_document_vectors_reindex_bot" NOT_NULL INDEXED
-        enum status "queued|processing|succeeded|failed|cancelled" DEFAULT_queued INDEXED
-        enum stage "download|parse|chunk|embed|index" NULLABLE INDEXED
+        varchar job_type ENUM_ingest_upload_ingest_url_reindex_document_delete_document_vectors_reindex_bot NOT_NULL INDEXED
+        varchar status ENUM_queued_processing_succeeded_failed_cancelled DEFAULT_queued INDEXED
+        varchar stage ENUM_download_parse_chunk_embed_index NULLABLE INDEXED
         integer attempts DEFAULT_0
         integer max_attempts DEFAULT_5
         jsonb logs NULLABLE
@@ -178,7 +178,7 @@ erDiagram
 - **NOT_NULL** = Column is required (NOT NULL)
 - **NULLABLE** = Column can be NULL
 - **DEFAULT_x** = Default value for the column
-- **Enum values** are shown inline as `"option1|option2|option3"`
+- **Enum values** are shown inline as `ENUM_option1_option2_option3` (underscores separate options, e.g., `ENUM_active_pending_verification_suspended` means enum with values: active, pending_verification, suspended)
 
 ## Notes
 - **Global tables (admin-only):** `subscriptions`, `pricing_plan_country_prices`, `entitlements`, `app_settings`.

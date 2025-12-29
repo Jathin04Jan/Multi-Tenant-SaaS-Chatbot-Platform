@@ -32,7 +32,7 @@ erDiagram
         varchar full_name
         varchar company_name
         varchar domain
-        enum status
+        varchar status "ENUM"
         jsonb settings
         timestamptz created_at
         timestamptz updated_at
@@ -43,7 +43,7 @@ erDiagram
         uuid user_id FK
         varchar name
         text description
-        enum status
+        varchar status "ENUM"
         jsonb llm_config
         jsonb retrieval_config
         jsonb guardrails
@@ -71,12 +71,12 @@ erDiagram
         uuid id PK
         uuid tenant_id FK
         uuid bot_id FK
-        enum source_type
+        varchar source_type "ENUM"
         varchar source_url
         varchar filename
         varchar content_type
         integer size
-        enum status
+        varchar status "ENUM"
         jsonb metadata
         timestamptz created_at
         timestamptz updated_at
@@ -109,7 +109,7 @@ erDiagram
     entitlements {
         uuid id PK
         uuid subscription_id FK
-        enum category
+        varchar category "ENUM"
         varchar entitlement
         varchar unit
         integer quota
@@ -121,7 +121,7 @@ erDiagram
         uuid id PK
         uuid user_id FK
         uuid subscription_id FK
-        enum status
+        varchar status "ENUM"
         date start_date
         date end_date
         boolean auto_renew
@@ -133,7 +133,7 @@ erDiagram
         uuid id PK
         uuid user_id FK
         uuid subscription_id FK
-        enum category
+        varchar category "ENUM"
         varchar entitlement
         varchar unit
         integer quota
@@ -147,9 +147,9 @@ erDiagram
         uuid user_id FK
         uuid bot_id FK
         uuid document_id FK
-        enum job_type
-        enum status
-        enum stage
+        varchar job_type "ENUM"
+        varchar status "ENUM"
+        varchar stage "ENUM"
         integer attempts
         integer max_attempts
         jsonb logs
@@ -174,7 +174,7 @@ erDiagram
 - **PK** = Primary Key
 - **FK** = Foreign Key (with CASCADE DELETE)
 - **UK** = Unique Key/Constraint
-- **enum** = Enum type (fixed set of values, see Enum Details section below)
+- **"ENUM"** = Fields marked with "ENUM" are database ENUM types (not VARCHAR). See Enum Details section below for all possible values.
 - **varchar** = Variable-length string
 - **jsonb** = JSON Binary (PostgreSQL JSON type)
 - **timestamptz** = Timestamp with timezone
@@ -183,6 +183,8 @@ erDiagram
 - **date** = Date (without time)
 - **text** = Text (unlimited length)
 - **uuid** = UUID (Universally Unique Identifier)
+
+**Note:** Mermaid ER diagrams do not natively support ENUM types, so enum fields are shown as `varchar` with `"ENUM"` annotation to indicate they are actually database ENUM types.
 
 **Note:** This diagram shows the basic structure. For detailed information including:
 - Enum values and their options (see Enum Details section below)

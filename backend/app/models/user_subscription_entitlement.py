@@ -19,7 +19,7 @@ class UserSubscriptionEntitlement(Base):
         Index('idx_user_subscription_entitlements_user_subscription', 'user_id', 'user_subscription_id'),
         Index('idx_user_subscription_entitlements_category', 'category'),
         Index('idx_user_subscription_entitlements_user_category', 'user_id', 'category'),
-        UniqueConstraint('user_subscription_id', 'category', 'entitlement', name='uq_user_subscription_entitlements_user_subscription_category_entitlement'),
+        UniqueConstraint('user_subscription_id', 'category', 'entitlement', name='uq_use_sub_ent_user_sub_cat_ent'),
         CheckConstraint('consumption >= 0', name='chk_user_subscription_entitlements_consumption_non_negative'),
         CheckConstraint('quota >= 0', name='chk_user_subscription_entitlements_quota_non_negative'),
     )
@@ -111,6 +111,7 @@ def create_user_id_validation_trigger(target, connection, **kw):
     """Create trigger to validate that user_id matches user_subscriptions.user_id."""
     
     # Create trigger function
+    # Note: %% is used to escape % characters so SQLAlchemy doesn't interpret them as format specifiers
     connection.execute(DDL("""
         CREATE OR REPLACE FUNCTION validate_user_subscription_entitlement_user_id()
         RETURNS TRIGGER AS $$
@@ -122,7 +123,7 @@ def create_user_id_validation_trigger(target, connection, **kw):
                 WHERE id = NEW.user_subscription_id 
                 AND user_id = NEW.user_id
             ) THEN
-                RAISE EXCEPTION 'user_id mismatch: user_id (%) does not match user_subscriptions.user_id for user_subscription_id (%)',
+                RAISE EXCEPTION 'user_id mismatch: user_id (%%) does not match user_subscriptions.user_id for user_subscription_id (%%)',
                     NEW.user_id, NEW.user_subscription_id;
             END IF;
             RETURN NEW;

@@ -159,7 +159,7 @@ CREATE TABLE user_subscription_entitlements (
 );
 
 -- Unique constraint: one row per user_subscription/category/entitlement combination
-ALTER TABLE user_subscription_entitlements ADD CONSTRAINT uq_user_subscription_entitlements_user_subscription_category_entitlement UNIQUE (user_subscription_id, category, entitlement);
+ALTER TABLE user_subscription_entitlements ADD CONSTRAINT uq_use_sub_ent_user_sub_cat_ent UNIQUE (user_subscription_id, category, entitlement);
 
 -- Check constraints: prevent negative consumption and quota
 ALTER TABLE user_subscription_entitlements ADD CONSTRAINT chk_user_subscription_entitlements_consumption_non_negative CHECK (consumption >= 0);

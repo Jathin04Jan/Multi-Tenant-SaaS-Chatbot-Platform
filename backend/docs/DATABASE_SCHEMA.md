@@ -783,7 +783,7 @@ ADD CONSTRAINT uq_user_subscriptions_no_overlap_active
 EXCLUDE USING GIST (
     user_id WITH =,
     daterange(start_date, COALESCE(end_date, 'infinity'::date), '[)') WITH &&
-) WHERE (status = 'active');
+) WHERE (status = 'active'::user_subscription_status);
 ```
 
 ### User Subscription Entitlements Table
@@ -802,7 +802,7 @@ CREATE TABLE user_subscription_entitlements (
 );
 
 -- Unique constraint: one entitlement record per user subscription/category/entitlement combination
-ALTER TABLE user_subscription_entitlements ADD CONSTRAINT uq_user_subscription_entitlements_user_subscription_category_entitlement UNIQUE (user_subscription_id, category, entitlement);
+ALTER TABLE user_subscription_entitlements ADD CONSTRAINT uq_use_sub_ent_user_sub_cat_ent UNIQUE (user_subscription_id, category, entitlement);
 
 -- Check constraints: prevent negative consumption and quota
 ALTER TABLE user_subscription_entitlements ADD CONSTRAINT chk_user_subscription_entitlements_consumption_non_negative CHECK (consumption >= 0);
@@ -880,16 +880,18 @@ CREATE TABLE ingestion_jobs (
     finished_at TIMESTAMP WITH TIME ZONE
 );
 
-CREATE INDEX idx_ingestion_jobs_id ON ingestion_jobs(id);
-CREATE INDEX idx_ingestion_jobs_user_id ON ingestion_jobs(user_id);
-CREATE INDEX idx_ingestion_jobs_bot_id ON ingestion_jobs(bot_id);
-CREATE INDEX idx_ingestion_jobs_document_id ON ingestion_jobs(document_id);
-CREATE INDEX idx_ingestion_jobs_job_type ON ingestion_jobs(job_type);
-CREATE INDEX idx_ingestion_jobs_status ON ingestion_jobs(status);
-CREATE INDEX idx_ingestion_jobs_stage ON ingestion_jobs(stage);
-CREATE INDEX idx_ingestion_jobs_created_at ON ingestion_jobs(created_at);
+-- Indexes created automatically by SQLAlchemy (index=True on columns)
+-- Primary key index: id (automatic)
+-- Foreign key indexes: user_id, bot_id, document_id (automatic from index=True)
+-- Column indexes: job_type, status, stage, created_at (automatic from index=True)
+
+-- Composite indexes defined in __table_args__
 CREATE INDEX idx_ingestion_jobs_user_bot ON ingestion_jobs(user_id, bot_id);
 CREATE INDEX idx_ingestion_jobs_user_bot_status ON ingestion_jobs(user_id, bot_id, status);
+CREATE INDEX idx_ingestion_jobs_status ON ingestion_jobs(status);
+CREATE INDEX idx_ingestion_jobs_stage ON ingestion_jobs(stage);
+CREATE INDEX idx_ingestion_jobs_document ON ingestion_jobs(document_id);
+CREATE INDEX idx_ingestion_jobs_created ON ingestion_jobs(created_at);
 ```
 
 ---

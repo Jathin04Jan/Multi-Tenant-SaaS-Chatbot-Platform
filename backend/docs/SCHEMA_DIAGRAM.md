@@ -146,10 +146,10 @@ erDiagram
         uuid id PK
         uuid user_id FK
         uuid bot_id FK
-        uuid document_id FK
+        uuid document_id FK "nullable"
         varchar job_type "ENUM"
         varchar status "ENUM"
-        varchar stage "ENUM"
+        varchar stage "ENUM" "nullable"
         integer attempts
         integer max_attempts
         jsonb logs "nullable"
@@ -210,8 +210,18 @@ Please refer to the **Enum Details** section below and the full schema documenta
   - `installation_snippets.bot_id` - One snippet per bot (enforced by UNIQUE constraint)
   - `entitlements(subscription_id, category, entitlement)` - One entitlement definition per subscription/category/entitlement combination
   - `user_subscription_entitlements(user_subscription_id, category, entitlement)` - One entitlement record per user subscription/category/entitlement combination
-- **Nullable foreign keys (not shown in diagram due to Mermaid limitations):**
+  - `pricing_plan_country_prices(subscription_id, country_code, billing_interval)` - One price per subscription/country/billing interval combination
+- **Check constraints:**
+  - `user_subscription_entitlements.consumption >= 0` - Ensures consumption is non-negative
+  - `user_subscription_entitlements.quota >= 0` - Ensures quota is non-negative
+  - `pricing_plan_country_prices.price > 0` - Ensures price is positive
+- **Exclusion constraint:**
+  - `user_subscriptions` - Prevents overlapping date ranges for active subscriptions per user (ensures only one active subscription per user at any given time)
+- **Database triggers:**
+  - `user_subscription_entitlements` - Validates that `user_id` matches the `user_id` of the referenced `user_subscription` before INSERT or UPDATE
+- **Nullable fields:**
   - `ingestion_jobs.document_id` - Nullable because bot-level jobs (e.g., `delete_document_vectors_reindex_bot`) don't reference a specific document
+  - `ingestion_jobs.stage` - Nullable when job is queued or not yet started
 
 ## Enum Details
 

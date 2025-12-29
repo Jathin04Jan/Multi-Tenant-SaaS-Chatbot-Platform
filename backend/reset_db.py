@@ -144,6 +144,8 @@ def reset_database():
         # Recreate all tables (this will also recreate enum types)
         # Note: Exclusion constraint for user_subscriptions is automatically created
         # via SQLAlchemy event listener in the model (see app/models/user_subscription.py)
+        # Note: Trigger for user_subscription_entitlements (user_id validation) is automatically created
+        # via SQLAlchemy event listener in the model (see app/models/user_subscription_entitlement.py)
         print("  → Creating all tables and enum types...")
         Base.metadata.create_all(bind=engine)
         

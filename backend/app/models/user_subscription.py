@@ -107,13 +107,25 @@ def create_exclusion_constraint(target, connection, **kw):
     # Enable btree_gist extension (required for UUID in exclusion constraints)
     connection.execute(DDL("CREATE EXTENSION IF NOT EXISTS btree_gist"))
     
-    # Add exclusion constraint
+    # Create an immutable function to convert enum to text for use in index predicates
+    # This is required because PostgreSQL requires immutable functions in index predicates
     connection.execute(DDL("""
+        CREATE OR REPLACE FUNCTION user_subscription_status_to_text(status_val user_subscription_status)
+        RETURNS text AS $$
+        BEGIN
+            RETURN status_val::text;
+        END;
+        $$ LANGUAGE plpgsql IMMUTABLE;
+    """))
+    
+    # Add exclusion constraint using the immutable function
+    active_value = UserSubscriptionStatus.ACTIVE.value
+    connection.execute(DDL(f"""
         ALTER TABLE user_subscriptions 
         ADD CONSTRAINT uq_user_subscriptions_no_overlap_active 
         EXCLUDE USING GIST (
             user_id WITH =,
             daterange(start_date, COALESCE(end_date, 'infinity'::date), '[)') WITH &&
-        ) WHERE (status = 'active')
+        ) WHERE (user_subscription_status_to_text(status) = '{active_value}')
     """))
 

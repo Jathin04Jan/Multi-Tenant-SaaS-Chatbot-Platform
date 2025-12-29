@@ -140,7 +140,7 @@ ADD CONSTRAINT uq_user_subscriptions_no_overlap_active
 EXCLUDE USING GIST (
     user_id WITH =,
     daterange(start_date, COALESCE(end_date, 'infinity'::date), '[)') WITH &&
-) WHERE (status = 'active');
+) WHERE (status = 'active'::user_subscription_status);
 ```
 
 ---

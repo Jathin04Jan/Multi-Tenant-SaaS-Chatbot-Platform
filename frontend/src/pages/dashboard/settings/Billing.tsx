@@ -6,6 +6,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { mockGetSubscription, type SubscriptionDTO } from '@/lib/api';
 import { pricingPlans, getPlanPrice, type BillingFrequency } from '@/constants/pricingPlans';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { PageContainer } from '@/components/ui/page-container';
+import { PageSection } from '@/components/ui/page-section';
+import { SectionHeader } from '@/components/ui/section-header';
+import { Card } from '@/components/ui/card';
 import {
   Dialog,
   DialogContent,
@@ -182,30 +186,27 @@ const Billing = () => {
     : [];
 
   return (
-    <div className="container max-w-7xl px-4 py-8 space-y-8">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        <h1 className="text-4xl font-bold mb-2">
-          Billing & Subscription
-          <span className="ml-2 text-xs text-red-500 font-mono">
-            DEBUG_BILLING_LIVE
-          </span>
-        </h1>
-        <p className="text-muted-foreground">Manage your plan, usage, and payment methods</p>
-      </motion.div>
+    <PageContainer className="py-8">
+      <PageSection>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          <SectionHeader
+            title="Billing & Subscription"
+            subtitle="Manage your plan, usage, and payment methods"
+          />
+        </motion.div>
 
-      {/* Current Plan & Usage */}
-      {
-        !loading && sub && (
+        {/* Current Plan & Usage */}
+        {!loading && sub && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.1 }}
-            className="glass-card p-8"
           >
+            <Card variant="default" className="p-8">
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
               <div className="space-y-1">
                 <div className="flex items-center gap-3 flex-wrap">
@@ -249,15 +250,14 @@ const Billing = () => {
                   {summaryCards.map((card) => {
                     if (card.label !== 'Storage') return null;
                     return (
-                      <div key={card.label} className="p-6 rounded-2xl border border-primary/20 bg-secondary/50 shadow-sm relative overflow-hidden group hover:border-primary/40 transition-colors dark:bg-white/5 dark:border-white/20">
-                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <Card key={card.label} variant="default" className="p-6 hover:border-primary/30 transition-colors">
                         <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2 font-semibold">
                           {card.label}
                         </p>
                         <p className="text-3xl font-bold mb-1">{card.value}</p>
                         {card.detail && <p className="text-sm text-primary/80 font-medium">{card.detail}</p>}
                         <p className="text-xs text-muted-foreground mt-2">{card.hint}</p>
-                      </div>
+                      </Card>
                     );
                   })}
 
@@ -265,21 +265,20 @@ const Billing = () => {
                   {summaryCards.map((card) => {
                     if (card.label !== 'Chatbots') return null;
                     return (
-                      <div key={card.label} className="p-6 rounded-2xl border border-primary/20 bg-secondary/50 shadow-sm relative overflow-hidden group hover:border-primary/40 transition-colors dark:bg-white/5 dark:border-white/20">
-                        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <Card key={card.label} variant="default" className="p-6 hover:border-primary/30 transition-colors">
                         <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2 font-semibold">
                           {card.label}
                         </p>
                         <p className="text-3xl font-bold mb-1">{card.value}</p>
                         {card.detail && <p className="text-sm text-primary/80 font-medium">{card.detail}</p>}
                         <p className="text-xs text-muted-foreground mt-2">{card.hint}</p>
-                      </div>
+                      </Card>
                     );
                   })}
 
                   {/* 3. Tokens, 4. Upload, 5. Bot Slots */}
                   {planAnalytics.billingMetrics.map((item) => (
-                    <div key={item.label} className="p-6 rounded-2xl border border-primary/20 bg-secondary/50 shadow-sm relative overflow-hidden hover:border-primary/40 transition-colors dark:bg-white/5 dark:border-white/20">
+                    <Card key={item.label} variant="default" className="p-6 hover:border-primary/30 transition-colors">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2 font-semibold">
                         {item.label}
                       </p>
@@ -288,15 +287,15 @@ const Billing = () => {
                         <p className="text-sm text-primary/80 font-medium">{item.detail}</p>
                       )}
                       <p className="text-xs text-muted-foreground mt-2">{item.hint}</p>
-                    </div>
+                    </Card>
                   ))}
 
                   {/* 6. Vector Memory */}
-                  <div
-                    className="p-6 rounded-2xl border border-primary/20 bg-secondary/50 shadow-sm cursor-pointer hover:border-primary/40 transition-colors relative overflow-hidden group dark:bg-white/5 dark:border-white/20"
+                  <Card
+                    variant="default"
+                    className="p-6 cursor-pointer hover:border-primary/30 transition-colors"
                     onClick={() => setVectorDialogOpen(true)}
                   >
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                     <div className="flex items-start justify-between mb-2">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
                         Vector memory
@@ -310,10 +309,10 @@ const Billing = () => {
                     <p className="text-xs text-muted-foreground mt-2">
                       Tap to inspect embeddings utilisation.
                     </p>
-                  </div>
+                  </Card>
 
                   {/* 7. API Requests */}
-                  <div className="p-6 rounded-2xl border border-primary/20 bg-secondary/50 shadow-sm relative overflow-hidden hover:border-primary/40 transition-colors dark:bg-white/5 dark:border-white/20">
+                  <Card variant="default" className="p-6 hover:border-primary/30 transition-colors">
                     <div className="flex items-start justify-between mb-2">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
                         API requests remaining
@@ -358,21 +357,21 @@ const Billing = () => {
                         </div>
                       </motion.div>
                     )}
-                  </div>
+                  </Card>
                 </div>
               </>
             )}
+            </Card>
           </motion.div>
-        )
-      }
+        )}
 
-      {/* Plan Comparison */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.2 }}
-        className="space-y-6"
-      >
+        {/* Plan Comparison */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+          className="space-y-6"
+        >
         <div className="text-center space-y-3">
           <p className="text-sm uppercase tracking-[0.3em] text-muted-foreground">Individual Plans</p>
           <h2 className="text-4xl font-bold">Pricing</h2>
@@ -403,9 +402,11 @@ const Billing = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.1 * index }}
-                className={`relative flex flex-col rounded-3xl border border-white/10 bg-card/60 p-6 text-left shadow-lg ${plan.recommended ? 'ring-2 ring-primary/50' : ''
-                  }`}
               >
+                <Card
+                  variant={plan.recommended ? 'elevated' : 'default'}
+                  className={`p-6 ${plan.recommended ? 'ring-2 ring-primary/30' : ''}`}
+                >
                 {plan.badge && (
                   <span className="absolute -top-3 right-4 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
                     {plan.badge}
@@ -437,11 +438,12 @@ const Billing = () => {
                 >
                   {isCurrent ? 'Current Plan' : plan.ctaLabel}
                 </Button>
+                </Card>
               </motion.div>
             );
           })}
         </div>
-      </motion.div>
+        </motion.div>
 
       {
         planAnalytics && (
@@ -474,13 +476,13 @@ const Billing = () => {
         )
       }
 
-      {/* Payment Method */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.3 }}
-        className="glass-card p-8"
-      >
+        {/* Payment Method */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.3 }}
+        >
+          <Card variant="default" className="p-8">
         <h2 className="text-xl font-semibold mb-4">Payment Method</h2>
         <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/30">
           <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -494,13 +496,15 @@ const Billing = () => {
                 : 'Add a payment method to continue your subscription'}
             </div>
           </div>
-          <Button variant="outline" className="rounded-xl glass">
+          <Button variant="outline" className="rounded-lg">
             <CreditCard className="w-4 h-4 mr-2" />
             Add Card
           </Button>
         </div>
-      </motion.div>
-    </div >
+          </Card>
+        </motion.div>
+      </PageSection>
+    </PageContainer>
   );
 };
 

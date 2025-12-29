@@ -7,6 +7,11 @@ import { useWizardStore } from '@/store/wizard';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { PageContainer } from '@/components/ui/page-container';
+import { PageSection } from '@/components/ui/page-section';
+import { SectionHeader } from '@/components/ui/section-header';
+import { StatCard } from '@/components/ui/stat-card';
+import { Card } from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -95,189 +100,171 @@ const Analytics = () => {
   ] as const;
 
   return (
-    <div className="container max-w-7xl px-4 py-8 space-y-8">
-      {/* Header Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
-      >
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-4xl font-bold">Dashboard</h1>
-            <Badge variant="secondary" className="rounded-full">
-              <Sparkles className="w-3 h-3 mr-1" />
-              Live
-            </Badge>
-          </div>
-          <p className="text-muted-foreground text-lg">
-            Welcome back{userName ? `, ${userName}` : ''}! Here's what's happening with your chatbot.
-          </p>
-        </div>
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="rounded-xl glass hover:bg-muted/50 transition-colors">
-                <CalendarIcon className="w-4 h-4 mr-2" />
-                {selectedRange.label}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 glass rounded-xl">
-              <DropdownMenuLabel>Date range</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {ranges.map((r) => (
-                <DropdownMenuItem
-                  key={r.id}
-                  onClick={() => setSelectedRange(r)}
-                  className="justify-between rounded-lg cursor-pointer"
-                >
-                  {r.label}
-                  {selectedRange.id === r.id && <Check className="w-4 h-4 text-primary" />}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button variant="outline" className="rounded-xl glass hover:bg-muted/50 transition-colors">
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </Button>
-        </div>
-      </motion.div>
+    <PageContainer className="py-8">
+      <PageSection>
+        {/* Header Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          <SectionHeader
+            title="Dashboard"
+            subtitle={`Welcome back${userName ? `, ${userName}` : ''}! Here's what's happening with your chatbot.`}
+            icon={Sparkles}
+            actions={
+              <>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="rounded-lg">
+                      <CalendarIcon className="w-4 h-4 mr-2" />
+                      {selectedRange.label}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56 rounded-xl">
+                    <DropdownMenuLabel>Date range</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {ranges.map((r) => (
+                      <DropdownMenuItem
+                        key={r.id}
+                        onClick={() => setSelectedRange(r)}
+                        className="justify-between rounded-lg cursor-pointer"
+                      >
+                        {r.label}
+                        {selectedRange.id === r.id && <Check className="w-4 h-4 text-primary" />}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button variant="outline" className="rounded-lg">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+              </>
+            }
+          />
+        </motion.div>
 
-      {/* Enhanced Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, index) => (
+        {/* Enhanced Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((stat, index) => (
+            <motion.div
+              key={stat.name}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: index * 0.05 }}
+              whileHover={{ scale: 1.01, y: -1 }}
+            >
+              <StatCard
+                label={stat.name}
+                value={stat.value}
+                hint={stat.description}
+                icon={stat.icon}
+                trend={{
+                  value: parseFloat(stat.change.replace(/[^0-9.-]/g, '')),
+                  label: stat.change,
+                  positive: stat.trend === 'up',
+                }}
+              />
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Conversations Chart */}
           <motion.div
-            key={stat.name}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: index * 0.05 }}
-            whileHover={{ scale: 1.02, y: -2 }}
-            className="group relative glass-card p-6 rounded-2xl cursor-pointer overflow-hidden transition-all duration-300 hover:shadow-lg"
+            transition={{ duration: 0.4, delay: 0.2 }}
           >
-            {/* Gradient overlay on hover */}
-            <div className={`absolute inset-0 ${stat.bgColor} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
-            
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-4">
-                <div className={`w-14 h-14 rounded-xl ${stat.bgColor} flex items-center justify-center group-hover:scale-110 transition-transform duration-300`}>
-                  <stat.icon className={`w-7 h-7 ${stat.color}`} />
+            <Card variant="default" className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold mb-1">Conversations Over Time</h3>
+                  <p className="text-sm text-muted-foreground">Daily conversation volume</p>
                 </div>
-                <div className="flex items-center gap-1">
-                  {stat.trend === 'up' ? (
-                    <TrendingUp className="w-4 h-4 text-green-500" />
-                  ) : (
-                    <TrendingDown className="w-4 h-4 text-green-500" />
-                  )}
-                  <span className={`text-sm font-semibold ${stat.trend === 'up' ? 'text-green-500' : 'text-green-500'}`}>
-                    {stat.change}
-                  </span>
+                <Button variant="ghost" size="icon" className="rounded-lg">
+                  <ArrowUpRight className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="h-64 flex items-center justify-center">
+                <div className="text-center space-y-3">
+                  <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+                    <MessageSquare className="w-8 h-8 text-primary" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-muted-foreground">Chart visualization</div>
+                    <div className="text-xs text-muted-foreground/70">Connect your analytics to see real-time data</div>
+                  </div>
                 </div>
               </div>
-              <div className="text-3xl font-bold mb-1">{stat.value}</div>
-              <div className="text-sm font-medium text-muted-foreground mb-1">{stat.name}</div>
-              <div className="text-xs text-muted-foreground/70">{stat.description}</div>
-            </div>
-            
-            {/* Hover indicator */}
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            </Card>
           </motion.div>
-        ))}
-      </div>
 
-      {/* Charts Section */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        {/* Conversations Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.2 }}
-          className="glass-card p-6 rounded-2xl"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold mb-1">Conversations Over Time</h3>
-              <p className="text-sm text-muted-foreground">Daily conversation volume</p>
-            </div>
-            <Button variant="ghost" size="icon" className="rounded-lg">
-              <ArrowUpRight className="w-4 h-4" />
-            </Button>
-          </div>
-          <div className="h-64 flex items-center justify-center">
-            <div className="text-center space-y-3">
-              <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-                <MessageSquare className="w-8 h-8 text-primary" />
-              </div>
-              <div className="space-y-2">
-                <div className="text-sm font-medium text-muted-foreground">Chart visualization</div>
-                <div className="text-xs text-muted-foreground/70">Connect your analytics to see real-time data</div>
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Sentiment Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.3 }}
-          className="glass-card p-6 rounded-2xl"
-        >
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold mb-1">Sentiment Analysis</h3>
-              <p className="text-sm text-muted-foreground">User sentiment breakdown</p>
-            </div>
-            <Button variant="ghost" size="icon" className="rounded-lg">
-              <ArrowUpRight className="w-4 h-4" />
-            </Button>
-          </div>
-          <div className="h-64 flex items-center justify-center">
-            <div className="grid grid-cols-3 gap-4 w-full max-w-xs">
-              <div className="text-center space-y-2">
-                <div className="w-16 h-16 mx-auto rounded-full bg-green-500/20 flex items-center justify-center">
-                  <span className="text-2xl">😊</span>
+          {/* Sentiment Chart */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.3 }}
+          >
+            <Card variant="default" className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold mb-1">Sentiment Analysis</h3>
+                  <p className="text-sm text-muted-foreground">User sentiment breakdown</p>
                 </div>
-                <div className="text-sm font-medium">72%</div>
-                <div className="text-xs text-muted-foreground">Positive</div>
+                <Button variant="ghost" size="icon" className="rounded-lg">
+                  <ArrowUpRight className="w-4 h-4" />
+                </Button>
               </div>
-              <div className="text-center space-y-2">
-                <div className="w-16 h-16 mx-auto rounded-full bg-yellow-500/20 flex items-center justify-center">
-                  <span className="text-2xl">😐</span>
+              <div className="h-64 flex items-center justify-center">
+                <div className="grid grid-cols-3 gap-4 w-full max-w-xs">
+                  <div className="text-center space-y-2">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-green-500/20 flex items-center justify-center">
+                      <span className="text-2xl">😊</span>
+                    </div>
+                    <div className="text-sm font-medium">72%</div>
+                    <div className="text-xs text-muted-foreground">Positive</div>
+                  </div>
+                  <div className="text-center space-y-2">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-yellow-500/20 flex items-center justify-center">
+                      <span className="text-2xl">😐</span>
+                    </div>
+                    <div className="text-sm font-medium">18%</div>
+                    <div className="text-xs text-muted-foreground">Neutral</div>
+                  </div>
+                  <div className="text-center space-y-2">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-red-500/20 flex items-center justify-center">
+                      <span className="text-2xl">😞</span>
+                    </div>
+                    <div className="text-sm font-medium">10%</div>
+                    <div className="text-xs text-muted-foreground">Negative</div>
+                  </div>
                 </div>
-                <div className="text-sm font-medium">18%</div>
-                <div className="text-xs text-muted-foreground">Neutral</div>
               </div>
-              <div className="text-center space-y-2">
-                <div className="w-16 h-16 mx-auto rounded-full bg-red-500/20 flex items-center justify-center">
-                  <span className="text-2xl">😞</span>
-                </div>
-                <div className="text-sm font-medium">10%</div>
-                <div className="text-xs text-muted-foreground">Negative</div>
-              </div>
-            </div>
-          </div>
-        </motion.div>
+            </Card>
+          </motion.div>
 
         {/* Top Questions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.4 }}
-          className="glass-card p-6 rounded-2xl lg:col-span-2"
+          className="lg:col-span-2"
         >
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold mb-1">Top Questions</h3>
-              <p className="text-sm text-muted-foreground">Most frequently asked questions</p>
+          <Card variant="default" className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-1">Top Questions</h3>
+                <p className="text-sm text-muted-foreground">Most frequently asked questions</p>
+              </div>
+              <Button variant="ghost" size="sm" className="rounded-lg">
+                View All
+                <ArrowUpRight className="w-4 h-4 ml-2" />
+              </Button>
             </div>
-            <Button variant="ghost" size="sm" className="rounded-lg">
-              View All
-              <ArrowUpRight className="w-4 h-4 ml-2" />
-            </Button>
-          </div>
-          <div className="space-y-3">
+            <div className="space-y-3">
             {[
               { question: 'How do I reset my password?', count: 47, trend: 'up' },
               { question: 'What are your business hours?', count: 32, trend: 'up' },
@@ -307,7 +294,8 @@ const Analytics = () => {
                 <ArrowUpRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
               </motion.div>
             ))}
-          </div>
+            </div>
+          </Card>
         </motion.div>
 
         {/* Unanswered Questions Table */}
@@ -315,18 +303,19 @@ const Analytics = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.5 }}
-          className="glass-card p-6 rounded-2xl lg:col-span-2"
+          className="lg:col-span-2"
         >
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold mb-1">Unanswered Questions</h3>
-              <p className="text-sm text-muted-foreground">Questions that need attention</p>
+          <Card variant="default" className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-1">Unanswered Questions</h3>
+                <p className="text-sm text-muted-foreground">Questions that need attention</p>
+              </div>
+              <Badge variant="destructive" className="rounded-full">
+                3 urgent
+              </Badge>
             </div>
-            <Badge variant="destructive" className="rounded-full">
-              3 urgent
-            </Badge>
-          </div>
-          <div className="overflow-x-auto">
+            <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border/50">
@@ -375,22 +364,23 @@ const Analytics = () => {
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          </Card>
         </motion.div>
-      </div>
+        </div>
 
-      {/* Quick Actions */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.6 }}
-        className="glass-card p-6 rounded-2xl"
-      >
-        <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <Zap className="w-5 h-5 text-primary" />
-          Quick Actions
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Quick Actions */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.6 }}
+        >
+          <Card variant="default" className="p-6">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Zap className="w-5 h-5 text-primary" />
+              Quick Actions
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
             { 
               label: 'Manage Documents', 
@@ -427,9 +417,11 @@ const Analytics = () => {
               <div className="font-medium text-sm">{action.label}</div>
             </motion.button>
           ))}
-        </div>
-      </motion.div>
-    </div>
+            </div>
+          </Card>
+        </motion.div>
+      </PageSection>
+    </PageContainer>
   );
 };
 

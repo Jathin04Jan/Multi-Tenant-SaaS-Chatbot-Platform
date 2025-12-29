@@ -36,7 +36,7 @@ export const Sidebar = () => {
       {/* Sidebar */}
       <aside
         className={cn(
-          'relative flex flex-col h-full border-r border-border/50 glass overflow-visible transition-[width,transform] duration-500 ease-[cubic-bezier(0.25,0.1,0.25,1)]',
+          'relative flex flex-col h-full border-r border-border/60 bg-card/95 backdrop-blur-sm overflow-visible transition-[width,transform] duration-500 ease-[cubic-bezier(0.25,0.1,0.25,1)] shadow-sm',
           isCollapsed ? 'w-16' : 'w-64'
         )}
       >
@@ -53,7 +53,7 @@ export const Sidebar = () => {
         </Button>
 
         {/* Navigation Items */}
-        <nav className="flex-1 px-4 py-3 space-y-2 overflow-y-auto">
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href || 
               (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
@@ -63,10 +63,11 @@ export const Sidebar = () => {
                 key={item.name}
                 to={item.href}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap',
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-body-sm font-medium transition-all whitespace-nowrap',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                   isActive
-                    ? 'bg-primary text-primary-foreground shadow-md'
-                    : 'text-foreground hover:bg-muted/50',
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-foreground hover:bg-muted/50 active:bg-muted/70',
                   isCollapsed && 'justify-center px-2'
                 )}
                 title={isCollapsed ? item.name : undefined}

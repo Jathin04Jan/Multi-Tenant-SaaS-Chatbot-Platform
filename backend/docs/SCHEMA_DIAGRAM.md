@@ -32,7 +32,7 @@ erDiagram
         varchar full_name
         varchar company_name
         varchar domain
-        varchar status
+        enum status
         jsonb settings
         timestamptz created_at
         timestamptz updated_at
@@ -43,7 +43,7 @@ erDiagram
         uuid user_id FK
         varchar name
         text description
-        varchar status
+        enum status
         jsonb llm_config
         jsonb retrieval_config
         jsonb guardrails
@@ -71,12 +71,12 @@ erDiagram
         uuid id PK
         uuid tenant_id FK
         uuid bot_id FK
-        varchar source_type
+        enum source_type
         varchar source_url
         varchar filename
         varchar content_type
         integer size
-        varchar status
+        enum status
         jsonb metadata
         timestamptz created_at
         timestamptz updated_at
@@ -109,7 +109,7 @@ erDiagram
     entitlements {
         uuid id PK
         uuid subscription_id FK
-        varchar category
+        enum category
         varchar entitlement
         varchar unit
         integer quota
@@ -121,7 +121,7 @@ erDiagram
         uuid id PK
         uuid user_id FK
         uuid subscription_id FK
-        varchar status
+        enum status
         date start_date
         date end_date
         boolean auto_renew
@@ -133,7 +133,7 @@ erDiagram
         uuid id PK
         uuid user_id FK
         uuid subscription_id FK
-        varchar category
+        enum category
         varchar entitlement
         varchar unit
         integer quota
@@ -147,9 +147,9 @@ erDiagram
         uuid user_id FK
         uuid bot_id FK
         uuid document_id FK
-        varchar job_type
-        varchar status
-        varchar stage
+        enum job_type
+        enum status
+        enum stage
         integer attempts
         integer max_attempts
         jsonb logs
@@ -174,9 +174,18 @@ erDiagram
 - **PK** = Primary Key
 - **FK** = Foreign Key (with CASCADE DELETE)
 - **UK** = Unique Key/Constraint
+- **enum** = Enum type (fixed set of values, see Enum Details section below)
+- **varchar** = Variable-length string
+- **jsonb** = JSON Binary (PostgreSQL JSON type)
+- **timestamptz** = Timestamp with timezone
+- **integer** = Integer number
+- **boolean** = Boolean (true/false)
+- **date** = Date (without time)
+- **text** = Text (unlimited length)
+- **uuid** = UUID (Universally Unique Identifier)
 
 **Note:** This diagram shows the basic structure. For detailed information including:
-- Enum values and their options
+- Enum values and their options (see Enum Details section below)
 - Column constraints (NOT NULL, NULLABLE, DEFAULT values)
 - Indexes
 - Complete column descriptions

@@ -66,7 +66,6 @@ async def create_subscription(
         name=plan_data.name,
         description=plan_data.description,
         is_highlighted=plan_data.is_highlighted,
-        limits=plan_data.limits,
         support_level=plan_data.support_level,
         features=plan_data.features,
     )
@@ -131,8 +130,6 @@ async def update_subscription(
         plan.description = plan_data.description
     if plan_data.is_highlighted is not None:
         plan.is_highlighted = plan_data.is_highlighted
-    if plan_data.limits is not None:
-        plan.limits = plan_data.limits
     if plan_data.support_level is not None:
         plan.support_level = plan_data.support_level
     if plan_data.features is not None:

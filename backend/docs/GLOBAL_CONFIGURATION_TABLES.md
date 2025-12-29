@@ -24,7 +24,7 @@ This document describes the global configuration tables added to the platform:
 **Purpose**: Manage subscription plans that can be offered to tenants.
 
 **Tables**:
-- `subscriptions` - Stores plan definitions (name, description, limits, features, etc.)
+- `subscriptions` - Stores plan definitions (name, description, features, etc.)
 - `pricing_plan_country_prices` - Stores country/region-specific pricing for each plan
 - `entitlements` - Stores plan entitlements/limits (storage, tokens, API calls, etc.)
 - `user_subscriptions` - Tracks user subscription instances (links users to subscription plans with status, dates, auto-renewal)
@@ -32,15 +32,15 @@ This document describes the global configuration tables added to the platform:
 
 **Key Features**:
 - Global plans (not per-tenant)
-- Flexible limits stored as JSONB (e.g., `{ "max_bots": 1, "max_docs": 20 }`)
+- Entitlements defined via `entitlements` table (storage, tokens, etc.)
 - Country-based pricing support
 - Monthly and yearly billing intervals
 - Support level tracking (None, email, call, priority, etc.)
 - Feature lists for UI display
 
 **Usage**:
-- Tenants reference plans (e.g., via `users.plan` field or future `subscriptions` table)
-- Backend enforces limits via `plan.limits` when tenants use the system
+- Tenants reference plans via the `user_subscriptions` table (links users to subscription plans)
+- Backend enforces limits via `entitlements` and `user_subscription_entitlements` tables when tenants use the system
 - Frontend displays plans on pricing/landing page
 
 ### 2. App Settings System
@@ -107,7 +107,6 @@ CREATE TABLE subscriptions (
     description TEXT,
     is_highlighted BOOLEAN NOT NULL DEFAULT false,
     sort_order JSONB,
-    limits JSONB,
     support_level VARCHAR(50),
     features JSONB,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,

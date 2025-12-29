@@ -15,7 +15,6 @@ Stores all subscription plans that can be offered to tenants (Free, Pro, Enterpr
 | `description` | TEXT | NULLABLE | Short tagline/description |
 | `is_highlighted` | BOOLEAN | NOT NULL, DEFAULT false | Mark as "Most Popular" in UI |
 | `sort_order` | JSONB | NULLABLE | Ordering configuration for UI display |
-| `limits` | JSONB | NULLABLE | Plan limits (e.g., { "max_bots": 1, "max_docs": 20, "max_chats_per_month": 1000 }) |
 | `support_level` | VARCHAR(50) | NULLABLE | Support level (None, email, call, priority, etc.) |
 | `features` | JSONB | NULLABLE | List of features (e.g., ["Unlimited chats", "Priority support", "Custom branding"]) |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
@@ -25,19 +24,8 @@ Stores all subscription plans that can be offered to tenants (Free, Pro, Enterpr
 
 1. **Global Plans**: Plans are global, not per-tenant. All tenants can reference the same set of plans.
 2. **Admin-Only**: Only platform admins can create or modify pricing plans.
-3. **Flexible Limits**: `limits` JSONB allows for flexible plan configurations without schema changes.
-4. **Feature Lists**: `features` JSONB stores an array of feature strings for easy UI rendering.
-
-### Example `limits` JSONB Structure:
-```json
-{
-  "max_bots": 1,
-  "max_docs": 20,
-  "max_chats_per_month": 1000,
-  "max_storage_gb": 5,
-  "max_users": 1
-}
-```
+3. **Feature Lists**: `features` JSONB stores an array of feature strings for easy UI rendering.
+4. **Entitlements**: Related `entitlements` table defines plan limits (storage, tokens, etc.) instead of using a JSONB limits field.
 
 ### Example `features` JSONB Structure:
 ```json
@@ -103,7 +91,6 @@ CREATE TABLE subscriptions (
     description TEXT,
     is_highlighted BOOLEAN NOT NULL DEFAULT false,
     sort_order JSONB,
-    limits JSONB,
     support_level VARCHAR(50),
     features JSONB,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -148,12 +135,6 @@ CREATE INDEX idx_pricing_plan_country_prices_country_code ON pricing_plan_countr
     "position": 2,
     "category": "standard"
   },
-  "limits": {
-    "max_bots": 10,
-    "max_docs": 100,
-    "max_chats_per_month": 10000,
-    "max_storage_gb": 50
-  },
   "support_level": "email",
   "features": [
     "Unlimited chats",
@@ -190,7 +171,7 @@ CREATE INDEX idx_pricing_plan_country_prices_country_code ON pricing_plan_countr
 - **Admin-Only**: Only platform admins can create or modify pricing plans
 - **Global Scope**: Plans are global, not per-tenant
 - **Tenant Reference**: Tenants reference plans (e.g., via subscriptions table) but cannot modify them
-- **Backend Enforcement**: Backend enforces limits via `plan.limits` when tenants use the system
+- **Backend Enforcement**: Backend enforces limits via `entitlements` and `user_subscription_entitlements` tables when tenants use the system
 
 ---
 
@@ -198,8 +179,8 @@ CREATE INDEX idx_pricing_plan_country_prices_country_code ON pricing_plan_countr
 
 ### Subscriptions ↔ Tenants
 - Plans are global
-- Tenants reference a plan (e.g., via `users.plan` field)
-- Backend enforces limits via `plan.limits` when tenants create bots, upload documents, etc.
+- Tenants reference plans via the `user_subscriptions` table (links users to subscription plans)
+- Backend enforces limits via `entitlements` and `user_subscription_entitlements` tables when tenants create bots, upload documents, etc.
 
 ### Subscriptions ↔ Country Prices
 - One pricing plan can have multiple country prices (one per country/region)

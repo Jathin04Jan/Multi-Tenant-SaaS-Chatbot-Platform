@@ -16,11 +16,6 @@ class Subscription(Base):
     description = Column(Text, nullable=True, comment="Short tagline/description")
     is_highlighted = Column(Boolean, nullable=False, default=False, index=True, comment="Mark as 'Most Popular' in UI")
     sort_order = Column(JSONB, nullable=True, comment="Ordering configuration for UI display")
-    limits = Column(
-        JSONB,
-        nullable=True,
-        comment="Plan limits (e.g., { 'max_bots': 1, 'max_docs': 20, 'max_chats_per_month': 1000 })"
-    )
     support_level = Column(
         String(50),
         nullable=True,

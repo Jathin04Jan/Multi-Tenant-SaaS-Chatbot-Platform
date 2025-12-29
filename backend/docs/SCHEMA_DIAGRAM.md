@@ -32,7 +32,6 @@ erDiagram
         varchar company_name
         varchar domain
         enum status
-        varchar plan
         jsonb settings
         timestamptz created_at
         timestamptz updated_at
@@ -88,7 +87,6 @@ erDiagram
         text description
         boolean is_highlighted
         jsonb sort_order
-        jsonb limits
         varchar support_level
         jsonb features
         timestamptz created_at

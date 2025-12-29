@@ -36,7 +36,7 @@ class Entitlement(Base):
     entitlement = Column(
         String(100),
         nullable=False,
-        comment="Entitlement type (e.g., 'storagefile_count', 'tokens', 'api_calls', etc.)"
+        comment="Entitlement type (e.g., 'storage', 'file_count', 'tokens', 'api_calls', etc.)"
     )
     unit = Column(
         String(20),

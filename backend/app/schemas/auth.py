@@ -30,7 +30,6 @@ class UserResponse(BaseModel):
     company_name: str  # Organization/Company name
     domain: Optional[str] = None
     status: str  # UserStatus enum as string
-    plan: Optional[str] = None
     is_verified: bool
     created_at: datetime
     
@@ -51,7 +50,6 @@ class UserResponse(BaseModel):
             "company_name": obj.company_name,
             "domain": obj.domain,
             "status": status_value,
-            "plan": obj.plan,
             "is_verified": is_verified,  # Computed from status
             "created_at": obj.created_at,
         }

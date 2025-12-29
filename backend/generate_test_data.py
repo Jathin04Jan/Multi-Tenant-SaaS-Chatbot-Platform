@@ -101,7 +101,6 @@ def seed_subscriptions(session) -> Dict[str, Subscription]:
             "name": "Free",
             "description": "Perfect for getting started",
             "is_highlighted": False,
-            "limits": {"max_bots": 1, "max_docs": 10},
             "support_level": None,
             "features": ["1 bot", "10 documents", "Community support"],
             "entitlements": [
@@ -114,7 +113,6 @@ def seed_subscriptions(session) -> Dict[str, Subscription]:
             "name": "Pro",
             "description": "For growing businesses",
             "is_highlighted": True,
-            "limits": {"max_bots": 5, "max_docs": 100},
             "support_level": "email",
             "features": ["5 bots", "100 documents", "Email support", "Advanced analytics"],
             "entitlements": [
@@ -127,7 +125,6 @@ def seed_subscriptions(session) -> Dict[str, Subscription]:
             "name": "Enterprise",
             "description": "For large organizations",
             "is_highlighted": False,
-            "limits": {"max_bots": -1, "max_docs": -1},
             "support_level": "priority",
             "features": ["Unlimited bots", "Unlimited documents", "Priority support", "Custom integrations"],
             "entitlements": [
@@ -144,7 +141,6 @@ def seed_subscriptions(session) -> Dict[str, Subscription]:
             name=plan_data["name"],
             description=plan_data["description"],
             is_highlighted=plan_data["is_highlighted"],
-            limits=plan_data["limits"],
             support_level=plan_data["support_level"],
             features=plan_data["features"],
         )
@@ -196,7 +192,6 @@ def seed_users(total_users: int, bots_per_user: int | tuple[int, int], plans: Di
                 company_name=f"Test Company {user_index}",
                 domain=f"tenant{user_index}.example.com",
                 status=UserStatus.ACTIVE,
-                plan=plan_name,
                 settings={"seed_user": True, "index": user_index},
             )
             session.add(user)

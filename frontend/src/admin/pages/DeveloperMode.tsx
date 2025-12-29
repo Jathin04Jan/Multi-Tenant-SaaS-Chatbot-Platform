@@ -66,11 +66,6 @@ function SubscriptionsTab() {
     description: "",
     is_highlighted: false,
     support_level: "",
-    limits: {
-      max_bots: "",
-      max_docs: "",
-      max_storage_mb: "",
-    },
     features: [] as string[],
   });
   const [newFeature, setNewFeature] = useState("");
@@ -99,11 +94,6 @@ function SubscriptionsTab() {
       description: "",
       is_highlighted: false,
       support_level: "",
-      limits: {
-        max_bots: "",
-        max_docs: "",
-        max_storage_mb: "",
-      },
       features: [],
     });
     setNewFeature("");
@@ -111,17 +101,11 @@ function SubscriptionsTab() {
 
   function startEdit(sub: Subscription) {
     setEditing(sub.id);
-    const limits = sub.limits || {};
     setFormData({
       name: sub.name,
       description: sub.description || "",
       is_highlighted: sub.is_highlighted,
       support_level: sub.support_level || "",
-      limits: {
-        max_bots: limits.max_bots?.toString() || "",
-        max_docs: limits.max_docs?.toString() || "",
-        max_storage_mb: limits.max_storage_mb?.toString() || "",
-      },
       features: sub.features || [],
     });
     setNewFeature("");
@@ -147,27 +131,11 @@ function SubscriptionsTab() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     try {
-      // Build limits object from form fields
-      const limits: Record<string, any> = {};
-      if (formData.limits.max_bots) {
-        const val = parseInt(formData.limits.max_bots);
-        limits.max_bots = isNaN(val) ? -1 : val; // -1 means unlimited
-      }
-      if (formData.limits.max_docs) {
-        const val = parseInt(formData.limits.max_docs);
-        limits.max_docs = isNaN(val) ? -1 : val;
-      }
-      if (formData.limits.max_storage_mb) {
-        const val = parseInt(formData.limits.max_storage_mb);
-        limits.max_storage_mb = isNaN(val) ? -1 : val;
-      }
-
       if (editing === "new") {
         await adminSubscriptionsApi.create({
           name: formData.name,
           description: formData.description || null,
           is_highlighted: formData.is_highlighted,
-          limits: Object.keys(limits).length > 0 ? limits : null,
           support_level: formData.support_level || null,
           features: formData.features.length > 0 ? formData.features : null,
         });
@@ -176,7 +144,6 @@ function SubscriptionsTab() {
           name: formData.name,
           description: formData.description || null,
           is_highlighted: formData.is_highlighted,
-          limits: Object.keys(limits).length > 0 ? limits : null,
           support_level: formData.support_level || null,
           features: formData.features.length > 0 ? formData.features : null,
         });
@@ -235,60 +202,6 @@ function SubscriptionsTab() {
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Plan description"
               />
-            </div>
-            
-            {/* Limits Section */}
-            <div className="md:col-span-2">
-              <label className="text-sm font-medium mb-2 block">Limits</label>
-              <div className="space-y-3 p-4 border rounded-md bg-muted/50">
-                <div className="grid gap-3 md:grid-cols-3">
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Max Bots</label>
-                    <Input
-                      type="number"
-                      value={formData.limits.max_bots}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          limits: { ...formData.limits, max_bots: e.target.value },
-                        })
-                      }
-                      placeholder="Leave empty for unlimited"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Max Documents</label>
-                    <Input
-                      type="number"
-                      value={formData.limits.max_docs}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          limits: { ...formData.limits, max_docs: e.target.value },
-                        })
-                      }
-                      placeholder="Leave empty for unlimited"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground mb-1 block">Max Storage (MB)</label>
-                    <Input
-                      type="number"
-                      value={formData.limits.max_storage_mb}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          limits: { ...formData.limits, max_storage_mb: e.target.value },
-                        })
-                      }
-                      placeholder="Leave empty for unlimited"
-                    />
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Leave fields empty for unlimited. Use -1 in API for unlimited.
-                </p>
-              </div>
             </div>
 
             {/* Features Section */}

@@ -30,7 +30,6 @@ class User(Base):
         default=UserStatus.PENDING_VERIFICATION,
         comment="User status: active, pending_verification, or suspended"
     )
-    plan = Column(String(50), nullable=True, comment="Subscription plan (free, pro, enterprise)")
     settings = Column(
         JSONB,
         nullable=True,

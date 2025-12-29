@@ -33,7 +33,6 @@ In this multi-tenant system, **users are tenants**. Each user account represents
 | `company_name` | VARCHAR(255) | **NOT NULL** | Organization/Company name (required) |
 | `domain` | VARCHAR(255) | NULLABLE | Tenant domain (optional) |
 | `status` | ENUM | NOT NULL, DEFAULT 'pending_verification' | User status: active, pending_verification, suspended |
-| `plan` | VARCHAR(50) | NULLABLE | Subscription plan (free, pro, enterprise) |
 | `settings` | JSONB | NULLABLE | Miscellaneous configuration (limits, billing IDs, etc.) |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
@@ -134,7 +133,6 @@ CREATE TABLE users (
     company_name VARCHAR(255) NOT NULL,
     domain VARCHAR(255),
     status user_status NOT NULL DEFAULT 'pending_verification',
-    plan VARCHAR(50),
     settings JSONB,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -252,7 +250,6 @@ CREATE INDEX idx_documents_source_type ON documents(source_type);
 2. ✅ **`company_name`** - **NOT NULL** (required) - Organization/Company name
 3. ✅ **`domain`** - Optional tenant domain
 4. ✅ **`status`** - Enum with three states (active, pending_verification, suspended)
-5. ✅ **`plan`** - Subscription plan field
 6. ✅ **`settings`** - JSONB for miscellaneous configuration
 7. ✅ **`is_verified`** - Computed property from `status` (not stored in database)
 
@@ -287,7 +284,6 @@ CREATE INDEX idx_documents_source_type ON documents(source_type);
   "company_name": "Acme Corporation",
   "domain": "acme.com",
   "status": "active",
-  "plan": "pro",
   "is_verified": true,  // Computed from status (status == 'active')
   "settings": {
     "max_users": 100,
@@ -357,7 +353,6 @@ Stores all subscription plans that can be offered to tenants (Free, Pro, Enterpr
 | `description` | TEXT | NULLABLE | Short tagline/description |
 | `is_highlighted` | BOOLEAN | NOT NULL, DEFAULT false | Mark as "Most Popular" in UI |
 | `sort_order` | JSONB | NULLABLE | Ordering configuration for UI display |
-| `limits` | JSONB | NULLABLE | Plan limits (e.g., { "max_bots": 1, "max_docs": 20 }) |
 | `support_level` | VARCHAR(50) | NULLABLE | Support level (None, email, call, priority, etc.) |
 | `features` | JSONB | NULLABLE | List of features (e.g., ["Unlimited chats", "Priority support"]) |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
@@ -366,8 +361,8 @@ Stores all subscription plans that can be offered to tenants (Free, Pro, Enterpr
 #### Notes
 - Plans are global, not per-tenant
 - Only platform admins can create or modify pricing plans
-- Tenants reference plans (e.g., via `users.plan` field or future `subscriptions` table)
-- Backend enforces limits via `plan.limits` when tenants use the system
+- Tenants reference plans via the `user_subscriptions` table (links users to subscription plans)
+- Backend enforces limits via `entitlements` and `user_subscription_entitlements` tables when tenants use the system
 
 ---
 
@@ -679,7 +674,6 @@ CREATE TABLE subscriptions (
     description TEXT,
     is_highlighted BOOLEAN NOT NULL DEFAULT false,
     sort_order JSONB,
-    limits JSONB,
     support_level VARCHAR(50),
     features JSONB,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -838,7 +832,6 @@ CREATE INDEX idx_ingestion_jobs_user_bot ON ingestion_jobs(user_id, bot_id);
 2. ✅ **`company_name`** - **NOT NULL** (required) - Organization/Company name
 3. ✅ **`domain`** - Optional tenant domain
 4. ✅ **`status`** - Enum with three states (active, pending_verification, suspended)
-5. ✅ **`plan`** - Subscription plan field
 6. ✅ **`settings`** - JSONB for miscellaneous configuration
 7. ✅ **`is_verified`** - Computed property from `status` (not stored in database)
 
@@ -865,9 +858,9 @@ CREATE INDEX idx_ingestion_jobs_user_bot ON ingestion_jobs(user_id, bot_id);
 ### Subscriptions Table:
 1. ✅ **Global Plans** - Plans are global, not per-tenant
 2. ✅ **Admin-Only** - Only platform admins can create or modify subscription plans
-3. ✅ **Flexible Limits** - `limits` JSONB allows for flexible plan configurations
-4. ✅ **Feature Lists** - `features` JSONB stores an array of feature strings
-5. ✅ **Country Pricing** - Related `pricing_plan_country_prices` table supports country-based pricing
+3. ✅ **Feature Lists** - `features` JSONB stores an array of feature strings
+4. ✅ **Country Pricing** - Related `pricing_plan_country_prices` table supports country-based pricing
+5. ✅ **Entitlements** - Related `entitlements` table defines plan limits (storage, tokens, etc.)
 
 ### Pricing Plan Country Prices Table:
 1. ✅ **Country-Based Pricing** - Supports different prices for different regions/countries
@@ -894,7 +887,6 @@ CREATE INDEX idx_ingestion_jobs_user_bot ON ingestion_jobs(user_id, bot_id);
   "company_name": "Acme Corporation",
   "domain": "acme.com",
   "status": "active",
-  "plan": "pro",
   "is_verified": true,  // Computed from status (status == 'active')
   "settings": {
     "max_users": 100,

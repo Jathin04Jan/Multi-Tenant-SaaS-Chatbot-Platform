@@ -35,7 +35,6 @@ This document provides the complete database schema for the Multi-Tenant SaaS Ch
 | `company_name` | VARCHAR(255) | **NOT NULL** | Organization/Company name (required) |
 | `domain` | VARCHAR(255) | NULLABLE | Tenant domain (optional) |
 | `status` | ENUM | NOT NULL, DEFAULT 'pending_verification' | User status: active, pending_verification, suspended |
-| `plan` | VARCHAR(50) | NULLABLE | Subscription plan (free, pro, enterprise) |
 | `settings` | JSONB | NULLABLE | Miscellaneous configuration (limits, billing IDs, etc.) |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last update timestamp |
@@ -72,7 +71,6 @@ CREATE TABLE users (
     company_name VARCHAR(255) NOT NULL,
     domain VARCHAR(255),
     status user_status NOT NULL DEFAULT 'pending_verification',
-    plan VARCHAR(50),
     settings JSONB,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -97,7 +95,6 @@ CREATE INDEX idx_users_id ON users(id);
   "company_name": "Acme Corporation",
   "domain": "acme.com",
   "status": "active",
-  "plan": "pro",
   "is_verified": true,  // Computed from status (status == 'active')
   "settings": {
     "max_users": 100,
@@ -169,12 +166,6 @@ CREATE INDEX idx_users_id ON users(id);
   "sort_order": {
     "position": 2,
     "category": "standard"
-  },
-  "limits": {
-    "max_bots": 10,
-    "max_docs": 100,
-    "max_chats_per_month": 10000,
-    "max_storage_gb": 50
   },
   "support_level": "email",
   "features": [
@@ -455,7 +446,6 @@ CREATE TABLE users (
     company_name VARCHAR(255) NOT NULL,
     domain VARCHAR(255),
     status user_status NOT NULL DEFAULT 'pending_verification',
-    plan VARCHAR(50),
     settings JSONB,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -555,7 +545,6 @@ CREATE TABLE subscriptions (
     description TEXT,
     is_highlighted BOOLEAN NOT NULL DEFAULT false,
     sort_order JSONB,
-    limits JSONB,
     support_level VARCHAR(50),
     features JSONB,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -720,7 +709,6 @@ Stores all subscription plans that can be offered to tenants (Free, Pro, Enterpr
 | `description` | TEXT | NULLABLE | Short tagline/description |
 | `is_highlighted` | BOOLEAN | NOT NULL, DEFAULT false | Mark as "Most Popular" in UI |
 | `sort_order` | JSONB | NULLABLE | Ordering configuration for UI display |
-| `limits` | JSONB | NULLABLE | Plan limits (e.g., { "max_bots": 1, "max_docs": 20 }) |
 | `support_level` | VARCHAR(50) | NULLABLE | Support level (None, email, call, priority, etc.) |
 | `features` | JSONB | NULLABLE | List of features (e.g., ["Unlimited chats", "Priority support"]) |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Creation timestamp |
@@ -729,8 +717,8 @@ Stores all subscription plans that can be offered to tenants (Free, Pro, Enterpr
 ### Notes
 - Plans are global, not per-tenant
 - Only platform admins can create or modify pricing plans
-- Tenants reference plans (e.g., via `users.plan` field or future `subscriptions` table)
-- Backend enforces limits via `plan.limits` when tenants use the system
+- Tenants reference plans via the `user_subscriptions` table (links users to subscription plans)
+- Backend enforces limits via `entitlements` and `user_subscription_entitlements` tables when tenants use the system
 
 ---
 

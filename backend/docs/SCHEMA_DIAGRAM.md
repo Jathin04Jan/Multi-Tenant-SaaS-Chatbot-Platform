@@ -146,10 +146,10 @@ erDiagram
         uuid id PK
         uuid user_id FK
         uuid bot_id FK
-        uuid document_id FK "nullable"
+        uuid document_id FK
         varchar job_type "ENUM"
         varchar status "ENUM"
-        varchar stage "ENUM" "nullable"
+        varchar stage "ENUM"
         integer attempts
         integer max_attempts
         jsonb logs "nullable"

@@ -27,13 +27,13 @@ erDiagram
 
     users {
         uuid id PK
-        varchar email UNIQUE
+        varchar email UK
         varchar hashed_password
-        varchar full_name NOT_NULL
-        varchar company_name NOT_NULL
-        varchar domain NULLABLE
-        varchar status ENUM_active_pending_verification_suspended DEFAULT_pending_verification
-        jsonb settings NULLABLE
+        varchar full_name
+        varchar company_name
+        varchar domain
+        varchar status
+        jsonb settings
         timestamptz created_at
         timestamptz updated_at
     }
@@ -41,14 +41,14 @@ erDiagram
     bots {
         uuid id PK
         uuid user_id FK
-        varchar name NOT_NULL
-        text description NULLABLE
-        varchar status ENUM_draft_active_paused_archived DEFAULT_draft
-        jsonb llm_config NULLABLE
-        jsonb retrieval_config NULLABLE
-        jsonb guardrails NULLABLE
-        jsonb branding NULLABLE
-        timestamptz created_at INDEXED
+        varchar name
+        text description
+        varchar status
+        jsonb llm_config
+        jsonb retrieval_config
+        jsonb guardrails
+        jsonb branding
+        timestamptz created_at
         timestamptz updated_at
     }
 
@@ -56,114 +56,114 @@ erDiagram
         uuid id PK
         uuid user_id FK
         uuid bot_id FK
-        text script_url NULLABLE
-        text embed_code NOT_NULL
-        varchar status active_revoked DEFAULT_active INDEXED
-        jsonb domain_whitelist NULLABLE
-        integer usage_count DEFAULT_0
-        timestamptz last_used_at NULLABLE
-        timestamptz created_at INDEXED
+        text script_url
+        text embed_code
+        varchar status
+        jsonb domain_whitelist
+        integer usage_count
+        timestamptz last_used_at
+        timestamptz created_at
         timestamptz updated_at
-        timestamptz expires_at NULLABLE
+        timestamptz expires_at
     }
 
     documents {
         uuid id PK
-        uuid tenant_id FK INDEXED
-        uuid bot_id FK INDEXED
-        varchar source_type ENUM_file_url_integration DEFAULT_file INDEXED
-        varchar source_url NULLABLE
-        varchar filename NULLABLE
-        varchar content_type NULLABLE
-        integer size NULLABLE
-        varchar status ENUM_pending_processing_indexed_error DEFAULT_pending INDEXED
-        jsonb metadata NULLABLE
+        uuid tenant_id FK
+        uuid bot_id FK
+        varchar source_type
+        varchar source_url
+        varchar filename
+        varchar content_type
+        integer size
+        varchar status
+        jsonb metadata
         timestamptz created_at
         timestamptz updated_at
     }
 
     subscriptions {
-        uuid id PK INDEXED
-        text name NOT_NULL
-        text description NULLABLE
-        boolean is_highlighted DEFAULT_false INDEXED
-        jsonb sort_order NULLABLE
-        varchar support_level NULLABLE
-        jsonb features NULLABLE
+        uuid id PK
+        text name
+        text description
+        boolean is_highlighted
+        jsonb sort_order
+        varchar support_level
+        jsonb features
         timestamptz created_at
         timestamptz updated_at
     }
 
     pricing_plan_country_prices {
-        uuid id PK INDEXED
-        uuid plan_id FK INDEXED
-        varchar country_code NOT_NULL INDEXED
-        varchar currency NOT_NULL
-        varchar billing_interval monthly_yearly NOT_NULL
-        integer price NOT_NULL
-        boolean is_active DEFAULT_true
+        uuid id PK
+        uuid plan_id FK
+        varchar country_code
+        varchar currency
+        varchar billing_interval
+        integer price
+        boolean is_active
         timestamptz created_at
         timestamptz updated_at
     }
 
     entitlements {
-        uuid id PK INDEXED
-        uuid subscription_id FK INDEXED
-        varchar category ENUM_file_chat_other NOT_NULL INDEXED
-        varchar entitlement NOT_NULL
-        varchar unit NOT_NULL
-        integer quota NOT_NULL
+        uuid id PK
+        uuid subscription_id FK
+        varchar category
+        varchar entitlement
+        varchar unit
+        integer quota
         timestamptz created_at
         timestamptz updated_at
     }
 
     user_subscriptions {
-        uuid id PK INDEXED
-        uuid user_id FK INDEXED
-        uuid subscription_id FK INDEXED
-        varchar status ENUM_active_expired_cancelled DEFAULT_active INDEXED
-        date start_date NOT_NULL INDEXED
-        date end_date NULLABLE INDEXED
-        boolean auto_renew DEFAULT_true
+        uuid id PK
+        uuid user_id FK
+        uuid subscription_id FK
+        varchar status
+        date start_date
+        date end_date
+        boolean auto_renew
         timestamptz created_at
         timestamptz updated_at
     }
 
     user_subscription_entitlements {
-        uuid id PK INDEXED
-        uuid user_id FK INDEXED
-        uuid subscription_id FK INDEXED
-        varchar category ENUM_file_chat_other NOT_NULL INDEXED
-        varchar entitlement NOT_NULL
-        varchar unit NOT_NULL
-        integer quota DEFAULT_0
-        integer consumption DEFAULT_0
+        uuid id PK
+        uuid user_id FK
+        uuid subscription_id FK
+        varchar category
+        varchar entitlement
+        varchar unit
+        integer quota
+        integer consumption
         timestamptz created_at
         timestamptz updated_at
     }
 
     ingestion_jobs {
-        uuid id PK INDEXED
-        uuid user_id FK INDEXED
-        uuid bot_id FK INDEXED
-        uuid document_id FK NULLABLE INDEXED
-        varchar job_type ENUM_ingest_upload_ingest_url_reindex_document_delete_document_vectors_reindex_bot NOT_NULL INDEXED
-        varchar status ENUM_queued_processing_succeeded_failed_cancelled DEFAULT_queued INDEXED
-        varchar stage ENUM_download_parse_chunk_embed_index NULLABLE INDEXED
-        integer attempts DEFAULT_0
-        integer max_attempts DEFAULT_5
-        jsonb logs NULLABLE
-        timestamptz created_at INDEXED
+        uuid id PK
+        uuid user_id FK
+        uuid bot_id FK
+        uuid document_id FK
+        varchar job_type
+        varchar status
+        varchar stage
+        integer attempts
+        integer max_attempts
+        jsonb logs
+        timestamptz created_at
         timestamptz updated_at
-        timestamptz started_at NULLABLE
-        timestamptz finished_at NULLABLE
+        timestamptz started_at
+        timestamptz finished_at
     }
 
     app_settings {
-        varchar key PK INDEXED
-        jsonb value NOT_NULL
-        text description NULLABLE
-        boolean is_public DEFAULT_false INDEXED
+        varchar key PK
+        jsonb value
+        text description
+        boolean is_public
         timestamptz created_at
         timestamptz updated_at
     }
@@ -173,27 +173,82 @@ erDiagram
 
 - **PK** = Primary Key
 - **FK** = Foreign Key (with CASCADE DELETE)
-- **INDEXED** = Column has an index
-- **UNIQUE** = Column has a unique constraint
-- **NOT_NULL** = Column is required (NOT NULL)
-- **NULLABLE** = Column can be NULL
-- **DEFAULT_x** = Default value for the column
-- **Enum values** are shown inline as `ENUM_option1_option2_option3` (underscores separate options, e.g., `ENUM_active_pending_verification_suspended` means enum with values: active, pending_verification, suspended)
+- **UK** = Unique Key/Constraint
+
+**Note:** This diagram shows the basic structure. For detailed information including:
+- Enum values and their options
+- Column constraints (NOT NULL, NULLABLE, DEFAULT values)
+- Indexes
+- Complete column descriptions
+
+Please refer to the **Enum Details** section below and the full schema documentation in `FINAL_SCHEMA.md` and `DATABASE_SCHEMA.md`.
 
 ## Notes
 - **Global tables (admin-only):** `subscriptions`, `pricing_plan_country_prices`, `entitlements`, `app_settings`.
 - **Tenant data:** `users` (tenants), `bots`, `documents`, `installation_snippets`, `user_subscriptions`, `user_subscription_entitlements`, `ingestion_jobs`.
 - **Cascade deletes:** All foreign keys are configured with `ON DELETE CASCADE` in the models for dependent rows.
-- **Enum Details:**
-  - `users.status`: **active** (verified, can log in), **pending_verification** (default, cannot log in), **suspended** (cannot log in)
-  - `bots.status`: **draft** (default, being configured), **active** (live), **paused** (temporarily disabled), **archived** (deactivated)
-  - `documents.source_type`: **file** (uploaded file, default), **url** (crawled URL), **integration** (3rd-party integration)
-  - `documents.status`: **pending** (default), **processing** (being indexed), **indexed** (ready), **error** (failed)
-  - `entitlements.category`: **file** (file-related entitlements), **chat** (chat/token entitlements), **other** (miscellaneous)
-  - `user_subscriptions.status`: **active** (default), **expired** (end_date passed), **cancelled** (manually cancelled)
-  - `ingestion_jobs.job_type`: **ingest_upload** (process uploaded file), **ingest_url** (crawl and process URL), **reindex_document** (re-index existing document), **delete_document_vectors_reindex_bot** (delete vectors and re-index entire bot)
-  - `ingestion_jobs.status`: **queued** (default), **processing** (in progress), **succeeded** (completed), **failed** (error occurred), **cancelled** (manually cancelled)
-  - `ingestion_jobs.stage`: **download** (downloading content), **parse** (parsing document), **chunk** (chunking text), **embed** (generating embeddings), **index** (indexing vectors)
+
+## Enum Details
+
+### `users.status` (ENUM: user_status)
+- **`active`** - User/tenant account is active and verified (can log in)
+- **`pending_verification`** - Account created but email not verified (default, cannot log in)
+- **`suspended`** - Account suspended (cannot log in)
+
+### `bots.status` (ENUM: bot_status)
+- **`draft`** - Bot is being created/configured (default)
+- **`active`** - Bot is live and operational
+- **`paused`** - Bot is temporarily disabled
+- **`archived`** - Bot is deactivated/removed
+
+### `documents.source_type` (ENUM: document_source_type)
+- **`file`** - Uploaded file stored in MinIO (default)
+- **`url`** - External URL to crawl and process
+- **`integration`** - 3rd-party integration (e.g., Notion, Google Drive)
+
+### `documents.status` (ENUM: document_status)
+- **`pending`** - Document uploaded, waiting for processing (default)
+- **`processing`** - Currently being indexed/processed
+- **`indexed`** - Successfully indexed and ready for use
+- **`error`** - Processing failed
+
+### `installation_snippets.status` (VARCHAR)
+- **`active`** - Snippet is active and can be used (default)
+- **`revoked`** - Snippet has been revoked and cannot be used
+
+### `entitlements.category` (ENUM: entitlement_category)
+- **`file`** - File-related entitlements (storage, file_count)
+- **`chat`** - Chat/token entitlements (tokens, API calls)
+- **`other`** - Miscellaneous entitlements
+
+### `user_subscriptions.status` (ENUM: user_subscription_status)
+- **`active`** - Subscription is active (default)
+- **`expired`** - Subscription has expired (end_date passed)
+- **`cancelled`** - Subscription was manually cancelled
+
+### `pricing_plan_country_prices.billing_interval` (VARCHAR)
+- **`monthly`** - Monthly billing cycle
+- **`yearly`** - Yearly billing cycle
+
+### `ingestion_jobs.job_type` (ENUM: ingestion_job_type)
+- **`ingest_upload`** - Process an uploaded file
+- **`ingest_url`** - Crawl and process a URL
+- **`reindex_document`** - Re-index an existing document
+- **`delete_document_vectors_reindex_bot`** - Delete all document vectors and re-index entire bot
+
+### `ingestion_jobs.status` (ENUM: ingestion_job_status)
+- **`queued`** - Job is queued for processing (default)
+- **`processing`** - Job is currently being processed
+- **`succeeded`** - Job completed successfully
+- **`failed`** - Job failed with an error
+- **`cancelled`** - Job was manually cancelled
+
+### `ingestion_jobs.stage` (ENUM: ingestion_job_stage)
+- **`download`** - Downloading content from URL
+- **`parse`** - Parsing document content
+- **`chunk`** - Chunking text into smaller pieces
+- **`embed`** - Generating embeddings for chunks
+- **`index`** - Indexing vectors in the vector database
 - **Computed Properties**: Some models provide computed properties (not database columns):
   - `User.is_verified` - computed from `users.status` (returns `True` if status == 'active')
   - `Bot.is_active` - computed from `bots.status` (returns `True` if status == 'active')

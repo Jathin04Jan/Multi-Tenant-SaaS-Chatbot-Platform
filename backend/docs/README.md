@@ -20,6 +20,7 @@ This directory contains detailed documentation for the backend API.
 - **[DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md)** – Complete database schema documentation
 - **[FINAL_SCHEMA.md](./FINAL_SCHEMA.md)** – Final database schema reference (all tables, including crawl-aware documents)
 - **[SCHEMA_DIAGRAM.md](./SCHEMA_DIAGRAM.md)** – ER diagram of all tables and relationships
+- **[SCHEMA_VALIDATION_REPORT.md](./SCHEMA_VALIDATION_REPORT.md)** – Comprehensive production readiness validation and recommendations
 - **[BOTS_SCHEMA.md](./BOTS_SCHEMA.md)** – Bots table schema documentation
 - **[DOCUMENTS_SCHEMA.md](./DOCUMENTS_SCHEMA.md)** – Knowledge source/document storage schema (details file-type/size limits and URL support)
 - **[INSTALLATION_SNIPPETS_SCHEMA.md](./INSTALLATION_SNIPPETS_SCHEMA.md)** – Installation snippets table schema documentation

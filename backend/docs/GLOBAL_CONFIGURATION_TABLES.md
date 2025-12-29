@@ -177,6 +177,18 @@ CREATE INDEX idx_user_subscriptions_start_date ON user_subscriptions(start_date)
 CREATE INDEX idx_user_subscriptions_end_date ON user_subscriptions(end_date);
 CREATE INDEX idx_user_subscriptions_user_status ON user_subscriptions(user_id, status);
 CREATE INDEX idx_user_subscriptions_dates ON user_subscriptions(start_date, end_date);
+
+-- Enable btree_gist extension for exclusion constraints with UUID
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+-- Exclusion constraint: prevent overlapping date ranges for active subscriptions per user
+-- This ensures only one active subscription per user at any given time
+ALTER TABLE user_subscriptions 
+ADD CONSTRAINT uq_user_subscriptions_no_overlap_active 
+EXCLUDE USING GIST (
+    user_id WITH =,
+    daterange(start_date, COALESCE(end_date, 'infinity'::date), '[)') WITH &&
+) WHERE (status = 'active');
 ```
 
 **Computed Properties (Not Database Columns):**

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, DateTime, Date, Enum as SQLEnum, ForeignKey, Index
+from sqlalchemy import Column, String, Boolean, DateTime, Date, Enum as SQLEnum, ForeignKey, Index, DDL, event
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -15,7 +15,13 @@ class UserSubscriptionStatus(str, enum.Enum):
 
 
 class UserSubscription(Base):
-    """User subscription model - tracks user subscription instances to subscription plans."""
+    """User subscription model - tracks user subscription instances to subscription plans.
+    
+    Note: This table has a PostgreSQL exclusion constraint (uq_user_subscriptions_no_overlap_active)
+    that prevents overlapping date ranges for active subscriptions per user. This ensures only one
+    active subscription per user at any given time. The constraint is automatically created via
+    SQLAlchemy event listener when the table is created.
+    """
     
     __tablename__ = "user_subscriptions"
     __table_args__ = (
@@ -91,4 +97,23 @@ class UserSubscription(Base):
     
     def __repr__(self):
         return f"<UserSubscription(id={self.id}, user_id={self.user_id}, subscription_id={self.subscription_id}, status={self.status})>"
+
+
+# Create exclusion constraint after table creation
+# This prevents overlapping date ranges for active subscriptions per user
+@event.listens_for(UserSubscription.__table__, "after_create")
+def create_exclusion_constraint(target, connection, **kw):
+    """Create exclusion constraint to prevent overlapping active subscriptions per user."""
+    # Enable btree_gist extension (required for UUID in exclusion constraints)
+    connection.execute(DDL("CREATE EXTENSION IF NOT EXISTS btree_gist"))
+    
+    # Add exclusion constraint
+    connection.execute(DDL("""
+        ALTER TABLE user_subscriptions 
+        ADD CONSTRAINT uq_user_subscriptions_no_overlap_active 
+        EXCLUDE USING GIST (
+            user_id WITH =,
+            daterange(start_date, COALESCE(end_date, 'infinity'::date), '[)') WITH &&
+        ) WHERE (status = 'active')
+    """))
 

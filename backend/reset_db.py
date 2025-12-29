@@ -142,6 +142,8 @@ def reset_database():
             print(f"  → Dropped {len(enum_types)} enum type(s)")
         
         # Recreate all tables (this will also recreate enum types)
+        # Note: Exclusion constraint for user_subscriptions is automatically created
+        # via SQLAlchemy event listener in the model (see app/models/user_subscription.py)
         print("  → Creating all tables and enum types...")
         Base.metadata.create_all(bind=engine)
         

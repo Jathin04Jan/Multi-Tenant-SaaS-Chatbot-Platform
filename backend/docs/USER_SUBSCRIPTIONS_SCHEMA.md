@@ -40,6 +40,13 @@ Tracks user subscription instances - records when users subscribe to subscriptio
 
 5. **Status Management**: Status enum provides clear lifecycle states (active, expired, cancelled)
 
+6. **No Overlapping Active Subscriptions**: PostgreSQL exclusion constraint prevents overlapping date ranges for active subscriptions per user
+   - Ensures only one active subscription per user at any given time
+   - Prevents data integrity issues from bugs or race conditions
+   - Uses `daterange` with GiST index for efficient range overlap checking
+   - Only applies to `status = 'active'` subscriptions (expired/cancelled can overlap)
+   - Handles NULL `end_date` as open-ended (infinity) for lifetime subscriptions
+
 ### Computed Properties (Not Database Columns)
 
 The model provides two computed properties for convenience:
@@ -122,6 +129,18 @@ CREATE INDEX idx_user_subscriptions_start_date ON user_subscriptions(start_date)
 CREATE INDEX idx_user_subscriptions_end_date ON user_subscriptions(end_date);
 CREATE INDEX idx_user_subscriptions_user_status ON user_subscriptions(user_id, status);
 CREATE INDEX idx_user_subscriptions_dates ON user_subscriptions(start_date, end_date);
+
+-- Enable btree_gist extension for exclusion constraints with UUID
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+-- Exclusion constraint: prevent overlapping date ranges for active subscriptions per user
+-- This ensures only one active subscription per user at any given time
+ALTER TABLE user_subscriptions 
+ADD CONSTRAINT uq_user_subscriptions_no_overlap_active 
+EXCLUDE USING GIST (
+    user_id WITH =,
+    daterange(start_date, COALESCE(end_date, 'infinity'::date), '[)') WITH &&
+) WHERE (status = 'active');
 ```
 
 ---

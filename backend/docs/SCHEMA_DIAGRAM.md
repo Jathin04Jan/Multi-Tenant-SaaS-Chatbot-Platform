@@ -55,7 +55,7 @@ erDiagram
     installation_snippets {
         uuid id PK
         uuid user_id FK
-        uuid bot_id FK UK
+        uuid bot_id FK
         text script_url "nullable"
         text embed_code
         varchar status
@@ -146,10 +146,10 @@ erDiagram
         uuid id PK
         uuid user_id FK
         uuid bot_id FK
-        uuid document_id FK "nullable"
+        uuid document_id FK
         varchar job_type "ENUM"
         varchar status "ENUM"
-        varchar stage "ENUM" "nullable"
+        varchar stage "ENUM"
         integer attempts
         integer max_attempts
         jsonb logs "nullable"
@@ -187,7 +187,12 @@ erDiagram
 
 **Note:** Mermaid ER diagrams do not natively support ENUM types, so enum fields are shown as `varchar` with `"ENUM"` annotation to indicate they are actually database ENUM types.
 
-**Note:** The `document_id` foreign key in `ingestion_jobs` is nullable because bot-level jobs (e.g., `delete_document_vectors_reindex_bot`) don't reference a specific document.
+**Note:** Mermaid ER diagrams only support one annotation per field. Therefore:
+- Fields with constraint annotations (`PK`, `FK`, `UK`) show only the constraint type
+- Nullable fields without constraints are marked with `"nullable"`
+- The `document_id` foreign key in `ingestion_jobs` is nullable (not shown in diagram) because bot-level jobs don't reference a specific document
+- The `stage` field in `ingestion_jobs` is nullable (not shown in diagram) - it's NULL when job is queued or not yet started
+- See the Notes section below and detailed schema docs for complete constraint and nullable field information
 
 **Note:** This diagram shows the basic structure. For detailed information including:
 - Enum values and their options (see Enum Details section below)
@@ -205,6 +210,8 @@ Please refer to the **Enum Details** section below and the full schema documenta
   - `installation_snippets.bot_id` - One snippet per bot (enforced by UNIQUE constraint)
   - `entitlements(subscription_id, category, entitlement)` - One entitlement definition per subscription/category/entitlement combination
   - `user_subscription_entitlements(user_subscription_id, category, entitlement)` - One entitlement record per user subscription/category/entitlement combination
+- **Nullable foreign keys (not shown in diagram due to Mermaid limitations):**
+  - `ingestion_jobs.document_id` - Nullable because bot-level jobs (e.g., `delete_document_vectors_reindex_bot`) don't reference a specific document
 
 ## Enum Details
 

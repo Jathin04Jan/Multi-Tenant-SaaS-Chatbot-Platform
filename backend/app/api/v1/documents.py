@@ -85,7 +85,7 @@ async def upload_document(
 
     document = DocumentService.create_document_record(
         db=db,
-        tenant_id=owner_id,
+        user_id=owner_id,
         bot_id=bot_id,
         filename=file.filename or "file",
         content_type=file.content_type,
@@ -94,7 +94,7 @@ async def upload_document(
     )
 
     object_key = build_object_key(
-        tenant_id=owner_id,
+        user_id=owner_id,
         bot_id=bot_id,
         document_id=cast(UUID, document.id),
         filename=file.filename or "file",
@@ -120,7 +120,7 @@ async def upload_document(
     document = DocumentService.update_storage_metadata(
         db=db,
         document_id=cast(UUID, document.id),
-        tenant_id=owner_id,
+        user_id=owner_id,
         source_url=object_key,
         size=len(content),
         content_type=file.content_type or "application/octet-stream",
@@ -151,7 +151,7 @@ async def register_crawl_document(
 
     document = DocumentService.create_document_record(
         db=db,
-        tenant_id=owner_id,
+        user_id=owner_id,
         bot_id=bot_id,
         filename=payload.name or str(payload.url),
         content_type=None,

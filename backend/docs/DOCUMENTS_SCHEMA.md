@@ -7,7 +7,7 @@ This table stores metadata for tenant knowledge sources persisted in MinIO or re
 | Column | Type | Description |
 |--------|------|-------------|
 | `id` | UUID (PK) | Document identifier |
-| `tenant_id` | UUID (FK → users.id) | Tenant/owner reference. Every query must filter by this column. |
+| `user_id` | UUID (FK → users.id) | User/owner reference. Every query must filter by this column. |
 | `bot_id` | UUID (FK → bots.id) | Bot that the document belongs to. Enforces tenant → bot ownership. |
 | `source_type` | ENUM('file','url','integration') | Origin of the knowledge item (uploaded file, crawled URL, or 3rd-party integration). |
 | `source_url` | VARCHAR(512) | Storage path or remote URL. For uploads, this is the MinIO object key; for crawls/integrations it's the external URL. |
@@ -67,7 +67,7 @@ CREATE TYPE document_status AS ENUM ('pending', 'processing', 'indexed', 'error'
 
 CREATE TABLE documents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     bot_id UUID NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
     source_type document_source_type NOT NULL DEFAULT 'file',
     source_url VARCHAR(512),
@@ -80,7 +80,7 @@ CREATE TABLE documents (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_documents_tenant_id ON documents(tenant_id);
+CREATE INDEX idx_documents_user_id ON documents(user_id);
 CREATE INDEX idx_documents_bot_id ON documents(bot_id);
 CREATE INDEX idx_documents_status ON documents(status);
 CREATE INDEX idx_documents_source_type ON documents(source_type);

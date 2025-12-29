@@ -98,7 +98,7 @@ Stores embed codes and script URLs for installing bots on customer websites.
 |------------|------|-------------|-------------|
 | `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique snippet identifier |
 | `user_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Owner/tenant reference |
-| `bot_id` | UUID | FOREIGN KEY → bots.id, NOT NULL, INDEXED, CASCADE DELETE | Bot reference - snippet is specific to this bot |
+| `bot_id` | UUID | FOREIGN KEY → bots.id, NOT NULL, UNIQUE, INDEXED, CASCADE DELETE | Bot reference - snippet is specific to this bot. **One snippet per bot (UNIQUE constraint)** |
 | `script_url` | TEXT | NULLABLE | CDN-hosted script URL |
 | `embed_code` | TEXT | NOT NULL | Full JavaScript snippet for installation |
 | `status` | VARCHAR(20) | NOT NULL, DEFAULT 'active', INDEXED | Snippet status: 'active' | 'revoked' |
@@ -171,7 +171,7 @@ CREATE INDEX idx_bots_created_at ON bots(created_at);
 CREATE TABLE installation_snippets (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    bot_id UUID NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+    bot_id UUID NOT NULL UNIQUE REFERENCES bots(id) ON DELETE CASCADE,
     script_url TEXT,
     embed_code TEXT NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'active',
@@ -183,6 +183,10 @@ CREATE TABLE installation_snippets (
     expires_at TIMESTAMP WITH TIME ZONE
 );
 
+-- Unique constraint: one snippet per bot
+ALTER TABLE installation_snippets ADD CONSTRAINT uq_installation_snippets_bot_id UNIQUE (bot_id);
+
+-- Create indexes
 CREATE INDEX idx_installation_snippets_user_id ON installation_snippets(user_id);
 CREATE INDEX idx_installation_snippets_bot_id ON installation_snippets(bot_id);
 CREATE INDEX idx_installation_snippets_id ON installation_snippets(id);
@@ -200,7 +204,7 @@ Stores tenant-uploaded knowledge sources that live in MinIO. The backend control
 | Column Name | Type | Constraints | Description |
 |------------|------|-------------|-------------|
 | `id` | UUID | PRIMARY KEY, NOT NULL | Document identifier |
-| `tenant_id` | UUID | FOREIGN KEY → users.id, NOT NULL, ON DELETE CASCADE | Owner/tenant reference |
+| `user_id` | UUID | FOREIGN KEY → users.id, NOT NULL, ON DELETE CASCADE | Owner/user reference |
 | `bot_id` | UUID | FOREIGN KEY → bots.id, NOT NULL, ON DELETE CASCADE | Bot this document belongs to |
 | `source_type` | ENUM('file','url','integration') | NOT NULL, DEFAULT 'file' | Origin of the knowledge item |
 | `source_url` | VARCHAR(512) | NULLABLE | Storage key (uploads) or remote URL |
@@ -213,8 +217,8 @@ Stores tenant-uploaded knowledge sources that live in MinIO. The backend control
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last modification |
 
 #### Notes
-- Tenants never provide storage paths. The backend builds the MinIO key as `{tenant_id}/{bot_id}/{document_id}/{filename}` and persists it in `source_url`.
-- Queries always filter by `tenant_id` to enforce isolation.
+- Tenants never provide storage paths. The backend builds the MinIO key as `{user_id}/{bot_id}/{document_id}/{filename}` and persists it in `source_url`.
+- Queries always filter by `user_id` to enforce isolation.
 
 ### Documents Table
 ```sql
@@ -224,7 +228,7 @@ CREATE TYPE document_status AS ENUM ('pending', 'processing', 'indexed', 'error'
 
 CREATE TABLE documents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     bot_id UUID NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
     source_type document_source_type NOT NULL DEFAULT 'file',
     source_url VARCHAR(512),
@@ -237,7 +241,7 @@ CREATE TABLE documents (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_documents_tenant_id ON documents(tenant_id);
+CREATE INDEX idx_documents_user_id ON documents(user_id);
 CREATE INDEX idx_documents_bot_id ON documents(bot_id);
 CREATE INDEX idx_documents_status ON documents(status);
 CREATE INDEX idx_documents_source_type ON documents(source_type);
@@ -375,7 +379,7 @@ Stores pricing per country/region for each plan. Allows different pricing for di
 | Column Name | Type | Constraints | Description |
 |------------|------|-------------|-------------|
 | `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique row ID |
-| `plan_id` | UUID | FOREIGN KEY → subscriptions.id, NOT NULL, INDEXED, CASCADE DELETE | Maps price to plan |
+| `subscription_id` | UUID | FOREIGN KEY → subscriptions.id, NOT NULL, INDEXED, CASCADE DELETE | Maps price to subscription plan |
 | `country_code` | VARCHAR(10) | NOT NULL, INDEXED | Country/region code (e.g., 'IN-SOUTH', 'US-CENTRAL', 'EU-WEST') |
 | `currency` | VARCHAR(10) | NOT NULL | Currency code (e.g., 'USD', 'INR', 'EUR') |
 | `billing_interval` | VARCHAR(20) | NOT NULL | Billing interval: 'monthly' or 'yearly' |
@@ -415,6 +419,7 @@ Stores subscription plan entitlements/limits. Defines what resources and limits 
 - **`other`** - Other entitlements (API calls, integrations, etc.)
 
 #### Notes
+- **One row per category/entitlement per subscription**: UNIQUE constraint on `(subscription_id, category, entitlement)` ensures each subscription plan can only have one entitlement definition per category/entitlement combination (e.g., only one 'file'/'storage' entitlement per plan)
 - One subscription can have multiple entitlements (one-to-many relationship)
 - Entitlements are used by the backend to enforce plan limits when tenants use the system
 - Flexible design allows adding new entitlement types without schema changes
@@ -506,11 +511,12 @@ Tracks per-user entitlement usage and consumption. This table records the actual
 - **`other`** - Other entitlements (API calls, custom features, etc.)
 
 #### Notes
+- **One row per category/entitlement per user subscription**: UNIQUE constraint on `(user_subscription_id, category, entitlement)` ensures each user subscription can only have one entitlement record per category/entitlement combination (e.g., only one 'file'/'storage' entitlement per subscription)
 - Tracks actual usage/consumption for each entitlement type per user subscription
 - One user can have multiple entitlement records (one per entitlement type)
 - `quota` is the limit allocated to the user for this entitlement
 - `consumption` tracks how much has been used
-- Composite indexes on `(user_id, subscription_id)`, `(user_id, category)` for efficient queries
+- Composite indexes on `(user_id, user_subscription_id)`, `(user_id, category)` for efficient queries
 
 #### Computed Properties (Not Database Columns)
 The model provides three computed properties for convenience:
@@ -598,7 +604,8 @@ Tracks RAG pipeline jobs for document processing. This table manages the lifecyc
 - `document_id` is nullable for bot-level jobs (e.g., `delete_document_vectors_reindex_bot`)
 - `stage` tracks current processing stage within the pipeline
 - `logs` stores detailed execution logs and error information as JSONB
-- Composite indexes on `(user_id, bot_id)`, `status`, `stage` for efficient queries
+- Composite indexes on `(user_id, bot_id)` and `(user_id, bot_id, status)` for efficient queries
+- Index on `document_id` for document-specific queries
 
 #### Computed Properties (Not Database Columns)
 The model provides four computed properties for convenience:
@@ -688,7 +695,7 @@ CREATE INDEX idx_subscriptions_is_highlighted ON subscriptions(is_highlighted);
 ```sql
 CREATE TABLE pricing_plan_country_prices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    plan_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
     country_code VARCHAR(10) NOT NULL,
     currency VARCHAR(10) NOT NULL,
     billing_interval VARCHAR(20) NOT NULL,
@@ -699,7 +706,7 @@ CREATE TABLE pricing_plan_country_prices (
 );
 
 CREATE INDEX idx_pricing_plan_country_prices_id ON pricing_plan_country_prices(id);
-CREATE INDEX idx_pricing_plan_country_prices_plan_id ON pricing_plan_country_prices(plan_id);
+CREATE INDEX idx_pricing_plan_country_prices_subscription_id ON pricing_plan_country_prices(subscription_id);
 CREATE INDEX idx_pricing_plan_country_prices_country_code ON pricing_plan_country_prices(country_code);
 ```
 
@@ -719,6 +726,10 @@ CREATE TABLE entitlements (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Unique constraint: one row per subscription/category/entitlement combination
+ALTER TABLE entitlements ADD CONSTRAINT uq_entitlements_subscription_category_entitlement UNIQUE (subscription_id, category, entitlement);
+
+-- Create indexes
 CREATE INDEX idx_entitlements_id ON entitlements(id);
 CREATE INDEX idx_entitlements_subscription_id ON entitlements(subscription_id);
 CREATE INDEX idx_entitlements_category ON entitlements(category);
@@ -756,7 +767,7 @@ CREATE INDEX idx_user_subscriptions_dates ON user_subscriptions(start_date, end_
 CREATE TABLE user_subscription_entitlements (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    user_subscription_id UUID NOT NULL REFERENCES user_subscriptions(id) ON DELETE CASCADE,
     category entitlement_category NOT NULL,
     entitlement VARCHAR(100) NOT NULL,
     unit VARCHAR(20) NOT NULL,
@@ -768,9 +779,9 @@ CREATE TABLE user_subscription_entitlements (
 
 CREATE INDEX idx_user_subscription_entitlements_id ON user_subscription_entitlements(id);
 CREATE INDEX idx_user_subscription_entitlements_user_id ON user_subscription_entitlements(user_id);
-CREATE INDEX idx_user_subscription_entitlements_subscription_id ON user_subscription_entitlements(subscription_id);
+CREATE INDEX idx_user_subscription_entitlements_user_subscription_id ON user_subscription_entitlements(user_subscription_id);
 CREATE INDEX idx_user_subscription_entitlements_category ON user_subscription_entitlements(category);
-CREATE INDEX idx_user_subscription_entitlements_user_subscription ON user_subscription_entitlements(user_id, subscription_id);
+CREATE INDEX idx_user_subscription_entitlements_user_subscription ON user_subscription_entitlements(user_id, user_subscription_id);
 CREATE INDEX idx_user_subscription_entitlements_user_category ON user_subscription_entitlements(user_id, category);
 ```
 
@@ -821,6 +832,7 @@ CREATE INDEX idx_ingestion_jobs_status ON ingestion_jobs(status);
 CREATE INDEX idx_ingestion_jobs_stage ON ingestion_jobs(stage);
 CREATE INDEX idx_ingestion_jobs_created_at ON ingestion_jobs(created_at);
 CREATE INDEX idx_ingestion_jobs_user_bot ON ingestion_jobs(user_id, bot_id);
+CREATE INDEX idx_ingestion_jobs_user_bot_status ON ingestion_jobs(user_id, bot_id, status);
 ```
 
 ---
@@ -974,7 +986,7 @@ CREATE INDEX idx_ingestion_jobs_user_bot ON ingestion_jobs(user_id, bot_id);
 ```json
 {
   "id": "c1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "plan_id": "p1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "subscription_id": "p1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "country_code": "US-CENTRAL",
   "currency": "USD",
   "billing_interval": "monthly",

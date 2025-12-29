@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, DateTime, Enum as SQLEnum, ForeignKey
+from sqlalchemy import Column, String, Integer, DateTime, Enum as SQLEnum, ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -18,6 +18,9 @@ class Entitlement(Base):
     """Entitlement model - stores subscription plan entitlements/limits."""
     
     __tablename__ = "entitlements"
+    __table_args__ = (
+        UniqueConstraint('subscription_id', 'category', 'entitlement', name='uq_entitlements_subscription_category_entitlement'),
+    )
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     subscription_id = Column(

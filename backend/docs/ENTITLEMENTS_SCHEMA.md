@@ -26,10 +26,11 @@ Stores subscription plan entitlements/limits. Defines what resources and limits 
 
 ### Key Design Decisions
 
-1. **Flexible Entitlement System**: The `entitlement` and `unit` fields are VARCHAR to allow for flexible entitlement types without schema changes.
-2. **Category Grouping**: The `category` enum groups entitlements by type (file, chat, other) for easier querying and organization.
-3. **One-to-Many Relationship**: One subscription can have multiple entitlements (e.g., storage size, file count, tokens, API calls).
-4. **Integer Quota**: Quota is stored as INTEGER for simplicity. For fractional values (e.g., 0.5 GB), store in smaller units (e.g., 500 MB).
+1. **One Row Per Category/Entitlement Per Subscription**: UNIQUE constraint on `(subscription_id, category, entitlement)` ensures each subscription plan can only have one entitlement definition per category/entitlement combination. This prevents duplicate entitlements (e.g., you can't have two 'file'/'storage' entitlements for the same plan).
+2. **Flexible Entitlement System**: The `entitlement` and `unit` fields are VARCHAR to allow for flexible entitlement types without schema changes.
+3. **Category Grouping**: The `category` enum groups entitlements by type (file, chat, other) for easier querying and organization.
+4. **One-to-Many Relationship**: One subscription can have multiple entitlements (e.g., storage size, file count, tokens, API calls).
+5. **Integer Quota**: Quota is stored as INTEGER for simplicity. For fractional values (e.g., 0.5 GB), store in smaller units (e.g., 500 MB).
 
 ### Common Entitlement Examples
 
@@ -105,6 +106,10 @@ CREATE TABLE entitlements (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Unique constraint: one row per subscription/category/entitlement combination
+ALTER TABLE entitlements ADD CONSTRAINT uq_entitlements_subscription_category_entitlement UNIQUE (subscription_id, category, entitlement);
+
+-- Create indexes
 CREATE INDEX idx_entitlements_id ON entitlements(id);
 CREATE INDEX idx_entitlements_subscription_id ON entitlements(subscription_id);
 CREATE INDEX idx_entitlements_category ON entitlements(category);

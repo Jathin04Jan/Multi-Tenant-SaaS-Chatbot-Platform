@@ -12,7 +12,7 @@ Tracks per-user entitlement usage and consumption. This table records the actual
 |------------|------|-------------|-------------|
 | `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique entitlement instance identifier |
 | `user_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Foreign key to users.id - the user who has this entitlement |
-| `subscription_id` | UUID | FOREIGN KEY → subscriptions.id, NOT NULL, INDEXED, CASCADE DELETE | Foreign key to subscriptions.id - the subscription plan |
+| `user_subscription_id` | UUID | FOREIGN KEY → user_subscriptions.id, NOT NULL, INDEXED, CASCADE DELETE | Foreign key to user_subscriptions.id - the user's subscription instance |
 | `category` | ENUM | NOT NULL, INDEXED | Entitlement category: file, chat, or other |
 | `entitlement` | VARCHAR(100) | NOT NULL | Entitlement type (e.g., 'storage', 'file_count', 'tokens', 'api_calls', etc.) |
 | `unit` | VARCHAR(20) | NOT NULL | Unit of measurement (e.g., 'MB', 'count', 'GB', 'hours', etc.) |
@@ -28,22 +28,24 @@ Tracks per-user entitlement usage and consumption. This table records the actual
 
 ### Key Design Decisions
 
-1. **Per-User Tracking**: Tracks actual usage/consumption for each entitlement type per user subscription
-   - One user can have multiple entitlement records (one per entitlement type)
-   - Links to both user and subscription for complete context
+1. **One Row Per Category/Entitlement Per User Subscription**: UNIQUE constraint on `(user_subscription_id, category, entitlement)` ensures each user subscription can only have one entitlement record per category/entitlement combination. This prevents duplicate entitlements (e.g., you can't have two 'file'/'storage' entitlements for the same user subscription).
 
-2. **Quota vs Consumption**: 
+2. **Per-User Tracking**: Tracks actual usage/consumption for each entitlement type per user subscription
+   - One user can have multiple entitlement records (one per entitlement type)
+   - Links to both user and user subscription for complete context
+
+3. **Quota vs Consumption**: 
    - `quota` is the limit allocated to the user for this entitlement
    - `consumption` tracks how much has been used
    - Balance is computed (not stored) as `quota - consumption`
 
-3. **Flexible Entitlement Types**: 
+4. **Flexible Entitlement Types**: 
    - `entitlement` field allows any string (storage, file_count, tokens, api_calls, etc.)
    - `unit` field allows any unit (MB, count, GB, hours, etc.)
    - `category` enum provides grouping (file, chat, other)
 
-4. **Performance Optimization**: 
-   - Composite indexes on `(user_id, subscription_id)` and `(user_id, category)` for efficient queries
+5. **Performance Optimization**: 
+   - Composite indexes on `(user_id, user_subscription_id)` and `(user_id, category)` for efficient queries
    - Indexes on foreign keys and category for fast lookups
 
 ### Computed Properties (Not Database Columns)
@@ -140,7 +142,7 @@ elif usage > 100:
 CREATE TABLE user_subscription_entitlements (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    user_subscription_id UUID NOT NULL REFERENCES user_subscriptions(id) ON DELETE CASCADE,
     category entitlement_category NOT NULL,
     entitlement VARCHAR(100) NOT NULL,
     unit VARCHAR(20) NOT NULL,
@@ -150,11 +152,15 @@ CREATE TABLE user_subscription_entitlements (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Unique constraint: one row per user_subscription/category/entitlement combination
+ALTER TABLE user_subscription_entitlements ADD CONSTRAINT uq_user_subscription_entitlements_user_subscription_category_entitlement UNIQUE (user_subscription_id, category, entitlement);
+
+-- Create indexes
 CREATE INDEX idx_user_subscription_entitlements_id ON user_subscription_entitlements(id);
 CREATE INDEX idx_user_subscription_entitlements_user_id ON user_subscription_entitlements(user_id);
-CREATE INDEX idx_user_subscription_entitlements_subscription_id ON user_subscription_entitlements(subscription_id);
+CREATE INDEX idx_user_subscription_entitlements_user_subscription_id ON user_subscription_entitlements(user_subscription_id);
 CREATE INDEX idx_user_subscription_entitlements_category ON user_subscription_entitlements(category);
-CREATE INDEX idx_user_subscription_entitlements_user_subscription ON user_subscription_entitlements(user_id, subscription_id);
+CREATE INDEX idx_user_subscription_entitlements_user_subscription ON user_subscription_entitlements(user_id, user_subscription_id);
 CREATE INDEX idx_user_subscription_entitlements_user_category ON user_subscription_entitlements(user_id, category);
 ```
 
@@ -237,8 +243,7 @@ ORDER BY category, entitlement;
 ```sql
 SELECT use.* 
 FROM user_subscription_entitlements use
-JOIN user_subscriptions us ON use.user_id = us.user_id 
-    AND use.subscription_id = us.subscription_id
+JOIN user_subscriptions us ON use.user_subscription_id = us.id
 WHERE use.user_id = '550e8400-e29b-41d4-a716-446655440000'
   AND us.status = 'active'
 ORDER BY use.category, use.entitlement;
@@ -273,7 +278,8 @@ SELECT
     (use.quota - use.consumption) as balance
 FROM user_subscription_entitlements use
 JOIN users u ON use.user_id = u.id
-JOIN subscriptions s ON use.subscription_id = s.id
+JOIN user_subscriptions us ON use.user_subscription_id = us.id
+JOIN subscriptions s ON us.subscription_id = s.id
 WHERE use.user_id = '550e8400-e29b-41d4-a716-446655440000'
 ORDER BY use.category, use.entitlement;
 ```
@@ -390,11 +396,11 @@ WHERE user_id = '550e8400-e29b-41d4-a716-446655440000'
 
 ### `user_subscriptions` Table
 - **Purpose**: Tracks user subscription instances (when user subscribes, status, dates)
-- **Relationship**: `user_subscription_entitlements` links to `user_subscriptions` via `user_id` and `subscription_id`
+- **Relationship**: `user_subscription_entitlements` links to `user_subscriptions` via `user_subscription_id` (FK to `user_subscriptions.id`)
 - **Usage**: Check `user_subscriptions.status == 'active'` before allowing entitlement usage
 
 ### `subscriptions` Table
 - **Purpose**: Defines subscription plans (Free, Pro, Enterprise, etc.)
-- **Relationship**: `user_subscription_entitlements` links to `subscriptions` via `subscription_id`
+- **Relationship**: `user_subscription_entitlements` links to `subscriptions` indirectly via `user_subscriptions.subscription_id`
 - **Usage**: Initialize entitlements from subscription plan when user subscribes
 

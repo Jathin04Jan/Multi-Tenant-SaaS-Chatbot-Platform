@@ -8,15 +8,15 @@
 erDiagram
     users ||--o{ bots : user_id
     users ||--o{ installation_snippets : user_id
-    users ||--o{ documents : tenant_id
+    users ||--o{ documents : user_id
 
     bots ||--o{ installation_snippets : bot_id
     bots ||--o{ documents : bot_id
 
-    subscriptions ||--o{ pricing_plan_country_prices : plan_id
+    subscriptions ||--o{ pricing_plan_country_prices : subscription_id
     subscriptions ||--o{ entitlements : subscription_id
     subscriptions ||--o{ user_subscriptions : subscription_id
-    subscriptions ||--o{ user_subscription_entitlements : subscription_id
+    user_subscriptions ||--o{ user_subscription_entitlements : user_subscription_id
     
     users ||--o{ user_subscriptions : user_id
     users ||--o{ user_subscription_entitlements : user_id
@@ -55,7 +55,7 @@ erDiagram
     installation_snippets {
         uuid id PK
         uuid user_id FK
-        uuid bot_id FK
+        uuid bot_id FK UK
         text script_url
         text embed_code
         varchar status
@@ -69,7 +69,7 @@ erDiagram
 
     documents {
         uuid id PK
-        uuid tenant_id FK
+        uuid user_id FK
         uuid bot_id FK
         varchar source_type "ENUM"
         varchar source_url
@@ -96,7 +96,7 @@ erDiagram
 
     pricing_plan_country_prices {
         uuid id PK
-        uuid plan_id FK
+        uuid subscription_id FK
         varchar country_code
         varchar currency
         varchar billing_interval
@@ -132,7 +132,7 @@ erDiagram
     user_subscription_entitlements {
         uuid id PK
         uuid user_id FK
-        uuid subscription_id FK
+        uuid user_subscription_id FK
         varchar category "ENUM"
         varchar entitlement
         varchar unit

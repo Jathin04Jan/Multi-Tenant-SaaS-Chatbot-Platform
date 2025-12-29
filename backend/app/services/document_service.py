@@ -16,11 +16,11 @@ class DocumentService:
     def ensure_bot_owned_by_user(
         db: Session,
         bot_id: UUID,
-        tenant_id: UUID,
+        user_id: UUID,
     ) -> Bot:
         bot = (
             db.query(Bot)
-            .filter(Bot.id == bot_id, Bot.user_id == tenant_id)
+            .filter(Bot.id == bot_id, Bot.user_id == user_id)
             .first()
         )
         if not bot:
@@ -30,7 +30,7 @@ class DocumentService:
     @staticmethod
     def create_document_record(
         db: Session,
-        tenant_id: UUID,
+        user_id: UUID,
         bot_id: UUID,
         filename: Optional[str],
         content_type: Optional[str],
@@ -41,7 +41,7 @@ class DocumentService:
         size: Optional[int] = None,
     ) -> Document:
         doc = Document(
-            tenant_id=tenant_id,
+            user_id=user_id,
             bot_id=bot_id,
             filename=filename,
             content_type=content_type,
@@ -60,7 +60,7 @@ class DocumentService:
     def update_storage_metadata(
         db: Session,
         document_id: UUID,
-        tenant_id: UUID,
+        user_id: UUID,
         source_url: str,
         size: Optional[int],
         content_type: Optional[str],
@@ -68,7 +68,7 @@ class DocumentService:
     ) -> Document:
         doc = (
             db.query(Document)
-            .filter(Document.id == document_id, Document.tenant_id == tenant_id)
+            .filter(Document.id == document_id, Document.user_id == user_id)
             .first()
         )
         if not doc:
@@ -85,11 +85,11 @@ class DocumentService:
     def get_document(
         db: Session,
         document_id: UUID,
-        tenant_id: UUID,
+        user_id: UUID,
     ) -> Optional[Document]:
         return (
             db.query(Document)
-            .filter(Document.id == document_id, Document.tenant_id == tenant_id)
+            .filter(Document.id == document_id, Document.user_id == user_id)
             .first()
         )
 
@@ -97,9 +97,9 @@ class DocumentService:
     def delete_document_record(
         db: Session,
         document_id: UUID,
-        tenant_id: UUID,
+        user_id: UUID,
     ) -> None:
-        doc = DocumentService.get_document(db, document_id, tenant_id)
+        doc = DocumentService.get_document(db, document_id, user_id)
         if not doc:
             raise ValueError("Document not found")
         db.delete(doc)
@@ -109,11 +109,11 @@ class DocumentService:
     def list_documents_for_bot(
         db: Session,
         bot_id: UUID,
-        tenant_id: UUID,
+        user_id: UUID,
     ) -> List[Document]:
         return (
             db.query(Document)
-            .filter(Document.bot_id == bot_id, Document.tenant_id == tenant_id)
+            .filter(Document.bot_id == bot_id, Document.user_id == user_id)
             .order_by(Document.created_at.desc())
             .all()
         )

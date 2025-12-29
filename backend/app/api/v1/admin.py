@@ -313,7 +313,7 @@ async def list_country_prices(
         )
     
     prices = db.query(PricingPlanCountryPrice).filter(
-        PricingPlanCountryPrice.plan_id == plan_uuid
+        PricingPlanCountryPrice.subscription_id == plan_uuid
     ).order_by(PricingPlanCountryPrice.country_code, PricingPlanCountryPrice.billing_interval).all()
     
     return [PricingPlanCountryPriceResponse.from_orm(price) for price in prices]
@@ -344,7 +344,7 @@ async def create_country_price(
         )
     
     price = PricingPlanCountryPrice(
-        plan_id=plan_uuid,
+        subscription_id=plan_uuid,
         country_code=price_data.country_code,
         currency=price_data.currency,
         billing_interval=price_data.billing_interval,

@@ -39,6 +39,7 @@ class IngestionJob(Base):
     __tablename__ = "ingestion_jobs"
     __table_args__ = (
         Index('idx_ingestion_jobs_user_bot', 'user_id', 'bot_id'),
+        Index('idx_ingestion_jobs_user_bot_status', 'user_id', 'bot_id', 'status'),
         Index('idx_ingestion_jobs_status', 'status'),
         Index('idx_ingestion_jobs_stage', 'stage'),
         Index('idx_ingestion_jobs_document', 'document_id'),

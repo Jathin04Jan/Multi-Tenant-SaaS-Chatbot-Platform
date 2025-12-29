@@ -25,14 +25,14 @@ def sanitize_filename(filename: str) -> str:
 
 
 def build_object_key(
-    tenant_id: UUID,
+    user_id: UUID,
     bot_id: UUID,
     document_id: UUID,
     filename: str,
 ) -> str:
     """Build a safe object key for storage in MinIO."""
     clean_name = sanitize_filename(filename)
-    return f"{tenant_id}/{bot_id}/{document_id}/{clean_name}"
+    return f"{user_id}/{bot_id}/{document_id}/{clean_name}"
 
 
 def build_brand_logo_key(user_id: UUID, filename: str) -> str:

@@ -54,9 +54,9 @@ class InstallationSnippetService:
             )
         
         # Check if a snippet already exists for this bot (only one snippet per bot)
+        # Note: bot_id has a UNIQUE constraint, so only one snippet per bot is allowed
         existing_snippet = db.query(InstallationSnippet).filter(
-            InstallationSnippet.bot_id == bot_id,
-            InstallationSnippet.user_id == user_id
+            InstallationSnippet.bot_id == bot_id
         ).first()
         
         if existing_snippet:

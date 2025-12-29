@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Text, DateTime, Integer, ForeignKey, Index
+from sqlalchemy import Column, String, Text, DateTime, Integer, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -12,6 +12,7 @@ class InstallationSnippet(Base):
     __tablename__ = "installation_snippets"
     __table_args__ = (
         Index('idx_installation_snippets_user_bot', 'user_id', 'bot_id'),
+        UniqueConstraint('bot_id', name='uq_installation_snippets_bot_id'),
     )
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
@@ -28,8 +29,9 @@ class InstallationSnippet(Base):
         UUID(as_uuid=True),
         ForeignKey("bots.id", ondelete="CASCADE"),
         nullable=False,
+        unique=True,
         index=True,
-        comment="Bot reference - snippet is specific to this bot (FK to bots.id)"
+        comment="Bot reference - snippet is specific to this bot (FK to bots.id). One snippet per bot (UNIQUE constraint)."
     )
     
     # Snippet Content

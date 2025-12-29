@@ -172,7 +172,7 @@ SELECT
     pp.price,
     pp.is_active
 FROM subscriptions p
-LEFT JOIN pricing_plan_country_prices pp ON p.id = pp.plan_id
+LEFT JOIN pricing_plan_country_prices pp ON p.id = pp.subscription_id
 WHERE pp.is_active = true;
 
 -- View subscriptions with their entitlements
@@ -236,7 +236,8 @@ SELECT
     (use.quota - use.consumption) as balance
 FROM user_subscription_entitlements use
 JOIN users u ON use.user_id = u.id
-JOIN subscriptions s ON use.subscription_id = s.id
+JOIN user_subscriptions us ON use.user_subscription_id = us.id
+JOIN subscriptions s ON us.subscription_id = s.id
 ORDER BY u.email, use.category, use.entitlement;
 
 -- View entitlements that are exceeded

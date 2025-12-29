@@ -12,7 +12,7 @@ class PricingPlanCountryPrice(Base):
     __tablename__ = "pricing_plan_country_prices"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    plan_id = Column(
+    subscription_id = Column(
         UUID(as_uuid=True),
         ForeignKey("subscriptions.id", ondelete="CASCADE"),
         nullable=False,
@@ -53,5 +53,5 @@ class PricingPlanCountryPrice(Base):
     plan = relationship("Subscription", back_populates="country_prices")
     
     def __repr__(self):
-        return f"<PricingPlanCountryPrice(id={self.id}, plan_id={self.plan_id}, country_code={self.country_code}, price={self.price} {self.currency})>"
+        return f"<PricingPlanCountryPrice(id={self.id}, subscription_id={self.subscription_id}, country_code={self.country_code}, price={self.price} {self.currency})>"
 

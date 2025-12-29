@@ -67,7 +67,7 @@ Tracks RAG pipeline jobs for document processing. This table manages the lifecyc
    - Can store error details and stack traces
 
 5. **Performance Optimization**: 
-   - Composite indexes on `(user_id, bot_id)` for efficient user/bot queries
+   - Composite indexes on `(user_id, bot_id)` and `(user_id, bot_id, status)` for efficient user/bot/status queries
    - Indexes on `status`, `stage`, `document_id` for filtering
    - Index on `created_at` for time-based queries
 
@@ -201,6 +201,7 @@ CREATE INDEX idx_ingestion_jobs_status ON ingestion_jobs(status);
 CREATE INDEX idx_ingestion_jobs_stage ON ingestion_jobs(stage);
 CREATE INDEX idx_ingestion_jobs_created_at ON ingestion_jobs(created_at);
 CREATE INDEX idx_ingestion_jobs_user_bot ON ingestion_jobs(user_id, bot_id);
+CREATE INDEX idx_ingestion_jobs_user_bot_status ON ingestion_jobs(user_id, bot_id, status);
 ```
 
 ---

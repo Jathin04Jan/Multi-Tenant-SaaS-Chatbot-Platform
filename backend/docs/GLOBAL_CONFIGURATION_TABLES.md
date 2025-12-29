@@ -118,7 +118,7 @@ CREATE TABLE subscriptions (
 ```sql
 CREATE TABLE pricing_plan_country_prices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    plan_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
     country_code VARCHAR(10) NOT NULL,
     currency VARCHAR(10) NOT NULL,
     billing_interval VARCHAR(20) NOT NULL,
@@ -144,6 +144,10 @@ CREATE TABLE entitlements (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Unique constraint: one row per subscription/category/entitlement combination
+ALTER TABLE entitlements ADD CONSTRAINT uq_entitlements_subscription_category_entitlement UNIQUE (subscription_id, category, entitlement);
+
+-- Create indexes
 CREATE INDEX idx_entitlements_id ON entitlements(id);
 CREATE INDEX idx_entitlements_subscription_id ON entitlements(subscription_id);
 CREATE INDEX idx_entitlements_category ON entitlements(category);
@@ -184,7 +188,7 @@ CREATE INDEX idx_user_subscriptions_dates ON user_subscriptions(start_date, end_
 CREATE TABLE user_subscription_entitlements (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    user_subscription_id UUID NOT NULL REFERENCES user_subscriptions(id) ON DELETE CASCADE,
     category entitlement_category NOT NULL,
     entitlement VARCHAR(100) NOT NULL,
     unit VARCHAR(20) NOT NULL,
@@ -196,9 +200,9 @@ CREATE TABLE user_subscription_entitlements (
 
 CREATE INDEX idx_user_subscription_entitlements_id ON user_subscription_entitlements(id);
 CREATE INDEX idx_user_subscription_entitlements_user_id ON user_subscription_entitlements(user_id);
-CREATE INDEX idx_user_subscription_entitlements_subscription_id ON user_subscription_entitlements(subscription_id);
+CREATE INDEX idx_user_subscription_entitlements_user_subscription_id ON user_subscription_entitlements(user_subscription_id);
 CREATE INDEX idx_user_subscription_entitlements_category ON user_subscription_entitlements(category);
-CREATE INDEX idx_user_subscription_entitlements_user_subscription ON user_subscription_entitlements(user_id, subscription_id);
+CREATE INDEX idx_user_subscription_entitlements_user_subscription ON user_subscription_entitlements(user_id, user_subscription_id);
 CREATE INDEX idx_user_subscription_entitlements_user_category ON user_subscription_entitlements(user_id, category);
 ```
 

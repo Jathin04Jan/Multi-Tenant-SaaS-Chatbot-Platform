@@ -12,7 +12,7 @@ Stores embed codes and script URLs for installing bots on customer websites. Eac
 |------------|------|-------------|-------------|
 | `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique snippet identifier |
 | `user_id` | UUID | FOREIGN KEY → users.id, NOT NULL, INDEXED, CASCADE DELETE | Owner/tenant reference |
-| `bot_id` | UUID | FOREIGN KEY → bots.id, NOT NULL, INDEXED, CASCADE DELETE | Bot reference - snippet is specific to this bot |
+| `bot_id` | UUID | FOREIGN KEY → bots.id, NOT NULL, UNIQUE, INDEXED, CASCADE DELETE | Bot reference - snippet is specific to this bot. **One snippet per bot (UNIQUE constraint)** |
 | `script_url` | TEXT | NULLABLE | CDN-hosted script URL (e.g., https://cdn.example.com/bot-script.js) |
 | `embed_code` | TEXT | NOT NULL | Full JavaScript snippet for installation |
 | `status` | VARCHAR(20) | NOT NULL, DEFAULT 'active', INDEXED | Snippet status: 'active' | 'revoked' |
@@ -25,7 +25,12 @@ Stores embed codes and script URLs for installing bots on customer websites. Eac
 
 ### Key Design Decisions
 
-1. **Dual Foreign Keys (`user_id` + `bot_id`)**
+1. **One Snippet Per Bot (UNIQUE Constraint)**
+   - `bot_id` has a UNIQUE constraint ensuring each bot can only have one snippet
+   - This prevents duplicate snippets and ensures consistency
+   - The application logic updates existing snippets instead of creating duplicates
+
+2. **Dual Foreign Keys (`user_id` + `bot_id`)**
    - `user_id`: Enables user-level queries (get all snippets for a user)
    - `bot_id`: Links snippet to specific bot (each bot has its own embed code)
    - Both are required for data integrity and query flexibility
@@ -75,7 +80,7 @@ Stores embed codes and script URLs for installing bots on customer websites. Eac
 CREATE TABLE installation_snippets (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    bot_id UUID NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+    bot_id UUID NOT NULL UNIQUE REFERENCES bots(id) ON DELETE CASCADE,
     script_url TEXT,
     embed_code TEXT NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'active',
@@ -86,6 +91,9 @@ CREATE TABLE installation_snippets (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP WITH TIME ZONE
 );
+
+-- Unique constraint: one snippet per bot
+ALTER TABLE installation_snippets ADD CONSTRAINT uq_installation_snippets_bot_id UNIQUE (bot_id);
 
 -- Create indexes
 CREATE INDEX idx_installation_snippets_user_id ON installation_snippets(user_id);

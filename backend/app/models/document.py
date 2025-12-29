@@ -21,12 +21,12 @@ class Document(Base):
     __tablename__ = "documents"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    tenant_id = Column(
+    user_id = Column(
         UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="Tenant/user owner reference",
+        comment="User/tenant owner reference",
     )
     bot_id = Column(
         UUID(as_uuid=True),
@@ -77,12 +77,12 @@ class Document(Base):
     )
 
     # Relationships
-    tenant = relationship("User", backref="documents")
+    user = relationship("User", backref="documents")
     bot = relationship("Bot", backref="documents")
 
     def __repr__(self) -> str:
         return (
-            f"<Document id={self.id} tenant_id={self.tenant_id} "
+            f"<Document id={self.id} user_id={self.user_id} "
             f"bot_id={self.bot_id} status={self.status}>"
         )
 

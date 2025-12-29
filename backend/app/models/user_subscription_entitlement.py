@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, DateTime, Enum as SQLEnum, ForeignKey, Index
+from sqlalchemy import Column, String, Integer, DateTime, Enum as SQLEnum, ForeignKey, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -12,9 +12,10 @@ class UserSubscriptionEntitlement(Base):
     
     __tablename__ = "user_subscription_entitlements"
     __table_args__ = (
-        Index('idx_user_subscription_entitlements_user_subscription', 'user_id', 'subscription_id'),
+        Index('idx_user_subscription_entitlements_user_subscription', 'user_id', 'user_subscription_id'),
         Index('idx_user_subscription_entitlements_category', 'category'),
         Index('idx_user_subscription_entitlements_user_category', 'user_id', 'category'),
+        UniqueConstraint('user_subscription_id', 'category', 'entitlement', name='uq_user_subscription_entitlements_user_subscription_category_entitlement'),
     )
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
@@ -25,12 +26,12 @@ class UserSubscriptionEntitlement(Base):
         index=True,
         comment="Foreign key to users.id - the user who has this entitlement"
     )
-    subscription_id = Column(
+    user_subscription_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("subscriptions.id", ondelete="CASCADE"),
+        ForeignKey("user_subscriptions.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="Foreign key to subscriptions.id - the subscription plan"
+        comment="Foreign key to user_subscriptions.id - the user's subscription instance"
     )
     category = Column(
         SQLEnum(EntitlementCategory, name="entitlement_category"),
@@ -65,7 +66,7 @@ class UserSubscriptionEntitlement(Base):
     
     # Relationships
     user = relationship("User", backref="user_subscription_entitlements")
-    subscription = relationship("Subscription", backref="user_subscription_entitlements")
+    user_subscription = relationship("UserSubscription", backref="user_subscription_entitlements")
     
     @property
     def balance(self) -> int:
@@ -94,5 +95,5 @@ class UserSubscriptionEntitlement(Base):
         return min(100.0, (consumption_value / quota_value) * 100.0)
     
     def __repr__(self):
-        return f"<UserSubscriptionEntitlement(id={self.id}, user_id={self.user_id}, subscription_id={self.subscription_id}, entitlement={self.entitlement}, quota={self.quota}, consumption={self.consumption}, balance={self.balance})>"
+        return f"<UserSubscriptionEntitlement(id={self.id}, user_id={self.user_id}, user_subscription_id={self.user_subscription_id}, entitlement={self.entitlement}, quota={self.quota}, consumption={self.consumption}, balance={self.balance})>"
 

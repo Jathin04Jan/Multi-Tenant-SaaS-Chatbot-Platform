@@ -57,7 +57,7 @@ Stores pricing per country/region for each plan. Allows different pricing for di
 | Column Name | Type | Constraints | Description |
 |------------|------|-------------|-------------|
 | `id` | UUID | PRIMARY KEY, NOT NULL, INDEXED | Unique row ID |
-| `plan_id` | UUID | FOREIGN KEY → subscriptions.id, NOT NULL, INDEXED, CASCADE DELETE | Maps price to plan |
+| `subscription_id` | UUID | FOREIGN KEY → subscriptions.id, NOT NULL, INDEXED, CASCADE DELETE | Maps price to subscription plan |
 | `country_code` | VARCHAR(10) | NOT NULL, INDEXED | Country/region code (e.g., 'IN-SOUTH', 'US-CENTRAL', 'EU-WEST') |
 | `currency` | VARCHAR(10) | NOT NULL | Currency code (e.g., 'USD', 'INR', 'EUR') |
 | `billing_interval` | VARCHAR(20) | NOT NULL | Billing interval: 'monthly' or 'yearly' |
@@ -105,7 +105,7 @@ CREATE INDEX idx_subscriptions_is_highlighted ON subscriptions(is_highlighted);
 ```sql
 CREATE TABLE pricing_plan_country_prices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    plan_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+    subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
     country_code VARCHAR(10) NOT NULL,
     currency VARCHAR(10) NOT NULL,
     billing_interval VARCHAR(20) NOT NULL,
@@ -116,7 +116,7 @@ CREATE TABLE pricing_plan_country_prices (
 );
 
 CREATE INDEX idx_pricing_plan_country_prices_id ON pricing_plan_country_prices(id);
-CREATE INDEX idx_pricing_plan_country_prices_plan_id ON pricing_plan_country_prices(plan_id);
+CREATE INDEX idx_pricing_plan_country_prices_subscription_id ON pricing_plan_country_prices(subscription_id);
 CREATE INDEX idx_pricing_plan_country_prices_country_code ON pricing_plan_country_prices(country_code);
 ```
 
@@ -151,7 +151,7 @@ CREATE INDEX idx_pricing_plan_country_prices_country_code ON pricing_plan_countr
 ```json
 {
   "id": "c1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "plan_id": "p1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "subscription_id": "p1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "country_code": "US-CENTRAL",
   "currency": "USD",
   "billing_interval": "monthly",

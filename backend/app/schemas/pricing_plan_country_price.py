@@ -6,7 +6,7 @@ from uuid import UUID
 
 class PricingPlanCountryPriceBase(BaseModel):
     """Base pricing plan country price schema."""
-    plan_id: str = Field(..., description="Subscription plan ID")
+    subscription_id: str = Field(..., description="Subscription plan ID")
     country_code: str = Field(..., description="Country/region code")
     currency: str = Field(..., description="Currency code")
     billing_interval: str = Field(..., description="Billing interval: 'monthly' or 'yearly'")
@@ -42,7 +42,7 @@ class PricingPlanCountryPriceResponse(PricingPlanCountryPriceBase):
         """Convert ORM object to response."""
         return cls(
             id=str(obj.id),
-            plan_id=str(obj.plan_id),
+            subscription_id=str(obj.subscription_id),
             country_code=obj.country_code,
             currency=obj.currency,
             billing_interval=obj.billing_interval,

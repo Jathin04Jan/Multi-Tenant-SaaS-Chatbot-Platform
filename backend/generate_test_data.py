@@ -230,7 +230,7 @@ def seed_users(total_users: int, bots_per_user: int | tuple[int, int], plans: Di
                 
                 user_entitlement = UserSubscriptionEntitlement(
                     user_id=user.id,
-                    subscription_id=selected_plan.id,
+                    user_subscription_id=user_subscription.id,
                     category=plan_ent.category,
                     entitlement=plan_ent.entitlement,
                     unit=plan_ent.unit,

@@ -199,3 +199,4 @@ secrets/
 *.crt
 config.yaml
 config.yml
+PORTS.md

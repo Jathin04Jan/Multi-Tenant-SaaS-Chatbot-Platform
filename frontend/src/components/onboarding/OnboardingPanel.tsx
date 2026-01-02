@@ -225,12 +225,41 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
         (brandingConfig.welcome_message &&
           brandingConfig.welcome_message !== DEFAULT_WELCOME_MESSAGE);
 
+      // Only detect tone progress if values differ from defaults
+      // Defaults: temperature=0.7, communication_style='friendly', style_prompt=''
       const hasToneProgress =
-        typeof llmConfig.temperature === 'number' ||
-        typeof llmConfig.communication_style === 'string' ||
-        typeof llmConfig.style_prompt === 'string';
+        (typeof llmConfig.temperature === 'number' && llmConfig.temperature !== 0.7) ||
+        (typeof llmConfig.communication_style === 'string' && 
+         llmConfig.communication_style !== 'friendly' && 
+         llmConfig.communication_style.trim() !== '') ||
+        (typeof llmConfig.style_prompt === 'string' && 
+         llmConfig.style_prompt.trim() !== '');
 
-      const hasGuardrailProgress = Object.keys(guardrailsConfig).length > 0;
+      // Only detect guardrail progress if there are actual customizations
+      // Check if any guardrail values differ from defaults
+      // For a new draft bot, guardrails will be null or empty, so this will be false
+      const defaultGuardrails = {
+        max_response_length: 500,
+        enable_fact_checking: true,
+        block_explicit_content: true,
+        block_political_views: true,
+        strictly_stick_to_topic: true,
+        block_personal_info: true,
+      };
+      const hasGuardrailProgress = 
+        guardrailsConfig &&
+        typeof guardrailsConfig === 'object' &&
+        Object.keys(guardrailsConfig).length > 0 &&
+        (
+          guardrailsConfig.max_response_length !== defaultGuardrails.max_response_length ||
+          guardrailsConfig.enable_fact_checking !== defaultGuardrails.enable_fact_checking ||
+          guardrailsConfig.block_explicit_content !== defaultGuardrails.block_explicit_content ||
+          guardrailsConfig.block_political_views !== defaultGuardrails.block_political_views ||
+          guardrailsConfig.strictly_stick_to_topic !== defaultGuardrails.strictly_stick_to_topic ||
+          guardrailsConfig.block_personal_info !== defaultGuardrails.block_personal_info ||
+          (Array.isArray(guardrailsConfig.blocked_phrases) && guardrailsConfig.blocked_phrases.length > 0) ||
+          (typeof guardrailsConfig.custom_instructions === 'string' && guardrailsConfig.custom_instructions.trim() !== '')
+        );
 
       // Get existing progress from store to preserve steps 4-7
       const existingCompletedSteps = useWizardStore.getState().completedSteps;

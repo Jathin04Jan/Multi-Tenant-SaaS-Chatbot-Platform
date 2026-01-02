@@ -824,6 +824,10 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     }
 
     try {
+      // Get existing draft bot to preserve retrieval_config values
+      const draftBotResponse = await getDraftBot();
+      const existingRetrievalConfig = draftBotResponse.data?.retrieval_config || {};
+      
       const botName = persona.botName || 'My Bot';
       const payload = {
         name: botName,
@@ -866,16 +870,17 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           custom_instructions: guardrails.customInstructions,
         },
         retrieval_config: {
-          data_sources: dataSources.map((ds) => ({
-            id: ds.id,
-            name: ds.name,
-            type: ds.type,
-            status: ds.status,
-            updatedAt: ds.updatedAt,
-          })),
-          chunk_size: 1000,
-          chunk_overlap: 200,
-          embedding_model: 'text-embedding-ada-002',
+          // Preserve existing embedding_model (from backend defaults) or use default
+          embedding_model: existingRetrievalConfig.embedding_model || 'qwen3-embedding:4b',
+          // Preserve existing chunk settings or use defaults
+          chunk_size: existingRetrievalConfig.chunk_size || 1000,
+          chunk_overlap: existingRetrievalConfig.chunk_overlap || 100,
+          // Preserve any other existing retrieval_config fields (vector_db, filters, rag_params, etc.)
+          ...Object.fromEntries(
+            Object.entries(existingRetrievalConfig).filter(([key]) => 
+              !['data_sources'].includes(key) // Remove data_sources as it's redundant (documents are in documents table)
+            )
+          ),
         },
         status: 'active' as const,
       };

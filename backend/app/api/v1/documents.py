@@ -124,7 +124,7 @@ async def upload_document(
         source_url=object_key,
         size=len(content),
         content_type=file.content_type or "application/octet-stream",
-        status="indexed",
+        status="uploaded_to_database",
     )
 
     return DocumentResponse.from_orm(document)

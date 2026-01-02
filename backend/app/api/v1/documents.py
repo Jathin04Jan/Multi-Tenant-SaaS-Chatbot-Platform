@@ -20,8 +20,10 @@ from app.api.dependencies import get_current_user
 from app.core.database import get_db
 from app.core.minio_client import upload_file, download_file, delete_file
 from app.models.user import User
+from app.models.ingestion_job import IngestionJobType, IngestionJobStatus
 from app.schemas import DocumentResponse
 from app.services.document_service import DocumentService
+from app.services.ingestion_job_service import IngestionJobService
 from app.utils.object_keys import build_object_key
 from pydantic import BaseModel, HttpUrl
 
@@ -127,6 +129,21 @@ async def upload_document(
         status="uploaded_to_database",
     )
 
+    # Create ingestion job for this document
+    try:
+        IngestionJobService.create_ingestion_job(
+            db=db,
+            user_id=owner_id,
+            bot_id=bot_id,
+            job_type=IngestionJobType.INGEST_UPLOAD,
+            document_id=cast(UUID, document.id),
+            status=IngestionJobStatus.QUEUED,
+            stage=None,  # Stage is NULL initially
+        )
+    except Exception as e:
+        # Log error but don't fail the upload - job creation can be retried
+        print(f"Warning: Failed to create ingestion job for document {document.id}: {e}")
+
     return DocumentResponse.from_orm(document)
 
 
@@ -161,6 +178,21 @@ async def register_crawl_document(
         source_url=str(payload.url),
         size=None,
     )
+
+    # Create ingestion job for this URL crawl
+    try:
+        IngestionJobService.create_ingestion_job(
+            db=db,
+            user_id=owner_id,
+            bot_id=bot_id,
+            job_type=IngestionJobType.INGEST_URL,
+            document_id=cast(UUID, document.id),
+            status=IngestionJobStatus.QUEUED,
+            stage=None,  # Stage is NULL initially
+        )
+    except Exception as e:
+        # Log error but don't fail the document creation - job creation can be retried
+        print(f"Warning: Failed to create ingestion job for document {document.id}: {e}")
 
     return DocumentResponse.from_orm(document)
 

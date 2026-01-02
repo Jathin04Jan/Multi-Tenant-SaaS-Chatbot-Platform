@@ -620,14 +620,24 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
   // Queued upload helper remains for compatibility but no longer used
   const uploadQueuedDocuments = async (_botId: string) => {};
 
+  // Helper to check if an ID is a UUID (already saved to database)
+  const isUUID = (id: string): boolean => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(id);
+  };
+
   const saveCrawledSources = async (botId: string) => {
-    const crawlSources = dataSources.filter((source) => source.type === 'crawl');
-    if (crawlSources.length === 0) {
+    // Filter crawl sources that haven't been saved yet (don't have UUID IDs)
+    const unsavedCrawlSources = dataSources.filter(
+      (source) => source.type === 'crawl' && !isUUID(source.id)
+    );
+    
+    if (unsavedCrawlSources.length === 0) {
       return;
     }
 
     let successCount = 0;
-    for (const source of crawlSources) {
+    for (const source of unsavedCrawlSources) {
       const url = source.url || source.name;
       if (!url) {
         continue;
@@ -639,7 +649,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           name: source.name,
         });
 
-        if (response.error) {
+        if (response.error || !response.data) {
           toast.error(response.error || `Failed to register ${url}`);
           updateDataSource(source.id, {
             status: 'failed',
@@ -647,9 +657,15 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           });
         } else {
           successCount += 1;
-          updateDataSource(source.id, {
-            status: 'indexed',
-            updatedAt: new Date().toISOString(),
+          // Remove old source and add new one with database ID
+          removeDataSource(source.id);
+          addDataSource({
+            id: response.data.id,
+            type: 'crawl',
+            name: response.data.filename || source.name,
+            url: response.data.source_url || url,
+            status: (response.data.status as DataSource['status']) || 'processing',
+            updatedAt: response.data.updated_at || response.data.created_at || new Date().toISOString(),
           });
         }
       } catch (error) {
@@ -675,22 +691,48 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
       return;
     }
 
+    if (!draftBotId) {
+      toast.error('Draft bot is not ready yet. Please wait and try again.');
+      return;
+    }
+
     setIsCrawling(true);
     try {
       const normalizedUrl = normalizeUrl(crawlUrl);
-      await mockStartCrawl(normalizedUrl);
-      addDataSource({
-        id: Date.now().toString(),
-        type: 'crawl',
-        name: normalizedUrl,
+      if (!normalizedUrl) {
+        toast.error('Please enter a valid URL');
+        return;
+      }
+
+      // Immediately save to database, just like file uploads
+      const response = await createCrawlDocument(draftBotId, {
         url: normalizedUrl,
-        status: 'processing',
-        updatedAt: new Date().toISOString(),
+        name: normalizedUrl,
+      });
+
+      if (response.error || !response.data) {
+        toast.error(response.error || `Failed to register ${normalizedUrl}`);
+        return;
+      }
+
+      const doc = response.data;
+      addDataSource({
+        id: doc.id,
+        type: 'crawl',
+        name: doc.filename || normalizedUrl,
+        url: doc.source_url || normalizedUrl,
+        status: (doc.status as DataSource['status']) || 'processing',
+        updatedAt: doc.updated_at || doc.created_at || new Date().toISOString(),
       });
       setCrawlUrl('');
-      toast.success('Crawl started successfully!');
-    } catch (error) {
-      toast.error('Failed to start crawl');
+      toast.success('Website registered for crawling!');
+    } catch (error: any) {
+      console.error('Error registering crawl source:', error);
+      const message =
+        error?.response?.data?.detail ||
+        error?.message ||
+        'Failed to register website';
+      toast.error(message);
     } finally {
       setIsCrawling(false);
     }

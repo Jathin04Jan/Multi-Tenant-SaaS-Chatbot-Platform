@@ -874,7 +874,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           embedding_model: existingRetrievalConfig.embedding_model || 'qwen3-embedding:4b',
           // Preserve existing chunk settings or use defaults
           chunk_size: existingRetrievalConfig.chunk_size || 1000,
-          chunk_overlap: existingRetrievalConfig.chunk_overlap || 100,
+          chunk_overlap: existingRetrievalConfig.chunk_overlap || 200,
           // Preserve any other existing retrieval_config fields (vector_db, filters, rag_params, etc.)
           ...Object.fromEntries(
             Object.entries(existingRetrievalConfig).filter(([key]) => 

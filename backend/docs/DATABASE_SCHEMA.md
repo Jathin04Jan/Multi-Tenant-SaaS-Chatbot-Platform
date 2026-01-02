@@ -311,8 +311,23 @@ CREATE INDEX idx_documents_source_type ON documents(source_type);
   "status": "active",
   "is_active": true,  // Computed from status (status == 'active')
   "llm_config": {
+    "model": "qwen3-vl:8b",
     "temperature": 0.7,
-    "communication_style": "friendly"
+    "communication_style": "friendly",
+    "style_prompt": "You are a friendly and warm assistant..."
+  },
+  "retrieval_config": {
+    "embedding_model": "qwen3-embedding:4b",
+    "chunk_size": 1000,
+    "chunk_overlap": 200
+  },
+  "guardrails": {
+    "max_response_length": 500,
+    "block_explicit_content": true,
+    "block_political_views": true,
+    "strictly_stick_to_topic": true,
+    "block_personal_info": true,
+    "enable_fact_checking": true
   },
   "branding": {
     "primary_color": "#6366f1",
@@ -979,8 +994,23 @@ CREATE INDEX idx_ingestion_jobs_created ON ingestion_jobs(created_at);
   "status": "active",
   "is_active": true,  // Computed from status (status == 'active')
   "llm_config": {
+    "model": "qwen3-vl:8b",
     "temperature": 0.7,
-    "communication_style": "friendly"
+    "communication_style": "friendly",
+    "style_prompt": "You are a friendly and warm assistant..."
+  },
+  "retrieval_config": {
+    "embedding_model": "qwen3-embedding:4b",
+    "chunk_size": 1000,
+    "chunk_overlap": 200
+  },
+  "guardrails": {
+    "max_response_length": 500,
+    "block_explicit_content": true,
+    "block_political_views": true,
+    "strictly_stick_to_topic": true,
+    "block_personal_info": true,
+    "enable_fact_checking": true
   },
   "branding": {
     "primary_color": "#6366f1",

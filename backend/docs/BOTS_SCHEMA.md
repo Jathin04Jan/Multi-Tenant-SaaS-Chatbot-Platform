@@ -43,7 +43,7 @@ Stores all chatbot/bot configurations and settings for each user/tenant.
 #### `llm_config` Structure:
 ```json
 {
-  "model": "gpt-4",
+  "model": "qwen3-vl:8b",
   "temperature": 0.7,
   "top_p": 0.9,
   "max_tokens": 1000,
@@ -52,23 +52,36 @@ Stores all chatbot/bot configurations and settings for each user/tenant.
 }
 ```
 
+**Default Values** (set automatically when creating a draft bot or new bot):
+- `model`: `"qwen3-vl:8b"` (from `settings.OLLAMA_LLM_MODEL`)
+- `temperature`: `0.7`
+
+These defaults are applied in `BotService.create_draft_bot()` and `BotService.create_bot()` if not provided.
+
 #### `retrieval_config` Structure:
 ```json
 {
+  "embedding_model": "qwen3-embedding:4b",
+  "chunk_size": 1000,
+  "chunk_overlap": 200,
   "vector_db": {
-    "provider": "pinecone",
-    "index_name": "bot-index"
+    "provider": "qdrant",
+    "collection_name": "bot_{bot_id}"
   },
   "filters": {},
   "rag_params": {
     "top_k": 5,
     "similarity_threshold": 0.7
-  },
-  "chunk_size": 1000,
-  "chunk_overlap": 200,
-  "embedding_model": "text-embedding-ada-002"
+  }
 }
 ```
+
+**Default Values** (set automatically when creating a draft bot or new bot):
+- `embedding_model`: `"qwen3-embedding:4b"` (from `settings.OLLAMA_EMBEDDING_MODEL`)
+- `chunk_size`: `1000` (characters)
+- `chunk_overlap`: `200` (characters)
+
+These defaults are applied in `BotService.create_draft_bot()` and `BotService.create_bot()` if not provided.
 
 #### `guardrails` Structure:
 ```json
@@ -154,13 +167,13 @@ CREATE INDEX idx_bots_created_at ON bots(created_at);
     "style_prompt": "You are a friendly and warm assistant..."
   },
   "retrieval_config": {
-    "vector_db": {
-      "provider": "pinecone",
-      "index_name": "support-bot-index"
-    },
+    "embedding_model": "qwen3-embedding:4b",
     "chunk_size": 1000,
     "chunk_overlap": 200,
-    "embedding_model": "text-embedding-ada-002"
+    "vector_db": {
+      "provider": "qdrant",
+      "collection_name": "bot_a1b2c3d4_e5f6_7890_abcd_ef1234567890"
+    }
   },
   "guardrails": {
     "max_response_length": 500,

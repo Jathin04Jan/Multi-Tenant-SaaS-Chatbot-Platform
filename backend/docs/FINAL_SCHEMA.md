@@ -345,6 +345,63 @@ Stores all chatbot/bot configurations and settings for each user/tenant.
 
 ### JSONB Field Structures
 
+#### `llm_config` Structure:
+```json
+{
+  "model": "qwen3-vl:8b",
+  "temperature": 0.7,
+  "top_p": 0.9,
+  "max_tokens": 1000,
+  "communication_style": "friendly",
+  "style_prompt": "You are a friendly and warm assistant..."
+}
+```
+
+**Default Values** (set automatically when creating a draft bot or new bot):
+- `model`: `"qwen3-vl:8b"` (from `settings.OLLAMA_LLM_MODEL`)
+- `temperature`: `0.7`
+
+These defaults are applied in `BotService.create_draft_bot()` and `BotService.create_bot()` if not provided.
+
+#### `retrieval_config` Structure:
+```json
+{
+  "embedding_model": "qwen3-embedding:4b",
+  "chunk_size": 1000,
+  "chunk_overlap": 200,
+  "vector_db": {
+    "provider": "qdrant",
+    "collection_name": "bot_{bot_id}"
+  },
+  "filters": {},
+  "rag_params": {
+    "top_k": 5,
+    "similarity_threshold": 0.7
+  }
+}
+```
+
+**Default Values** (set automatically when creating a draft bot or new bot):
+- `embedding_model`: `"qwen3-embedding:4b"` (from `settings.OLLAMA_EMBEDDING_MODEL`)
+- `chunk_size`: `1000` (characters)
+- `chunk_overlap`: `200` (characters)
+
+These defaults are applied in `BotService.create_draft_bot()` and `BotService.create_bot()` if not provided.
+
+#### `guardrails` Structure:
+```json
+{
+  "max_response_length": 500,
+  "blocked_phrases": ["refund immediately", "cancel now"],
+  "block_explicit_content": true,
+  "block_political_views": true,
+  "strictly_stick_to_topic": true,
+  "block_personal_info": true,
+  "enable_fact_checking": true,
+  "custom_instructions": "Always be helpful and professional..."
+}
+```
+
 #### `branding` Structure (stores all UI configuration):
 ```json
 {

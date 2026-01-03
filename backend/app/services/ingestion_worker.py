@@ -9,6 +9,7 @@ from io import BytesIO
 
 from sqlalchemy import text, func, bindparam
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.database import get_db
 from app.core.minio_client import download_file, upload_file
@@ -53,9 +54,11 @@ class IngestionWorker:
         """
         try:
             # Use SQLAlchemy query API with FOR UPDATE SKIP LOCKED
+            # Only claim jobs for file uploads (not URLs or integrations)
             # This handles enum types automatically
             job = (
                 db.query(IngestionJob)
+                .join(Document, (IngestionJob.document_id == Document.id) & (Document.source_type == "file"))
                 .filter(IngestionJob.status == IngestionJobStatus.QUEUED)
                 .order_by(IngestionJob.created_at.asc())
                 .with_for_update(skip_locked=True)
@@ -110,11 +113,12 @@ class IngestionWorker:
                 self._mark_job_failed(db, job, f"Document {document_id} not found", stage=None)
                 return False
             
-            # Only process file uploads for now (not URLs)
+            # This check should never be reached since we filter in claim_job,
+            # but keeping it as a safety check
             if document.source_type != "file":
-                logger.info(f"Job {job.id} is for non-file document (type: {document.source_type}), skipping text extraction")
-                self._mark_job_succeeded(db, job)
-                return True
+                logger.warning(f"Job {job.id} is for non-file document (type: {document.source_type}), this should have been filtered in claim_job")
+                # Don't mark as succeeded or failed - just skip
+                return False
             
             # Stage 1: Download
             file_data, content_type = self._stage_download(db, job, document)
@@ -223,14 +227,13 @@ class IngestionWorker:
             doc_bot_id = document.bot_id
             doc_doc_id = document.id
             doc_filename = document.filename if document.filename else 'document'
+            # Use .txt extension to distinguish from original file (e.g., document.pdf -> document.txt)
             extracted_text_key = build_object_key(
                 user_id=doc_user_id,
                 bot_id=doc_bot_id,
                 document_id=doc_doc_id,
                 filename=f"{doc_filename}.txt",
             )
-            # Add .extracted suffix
-            extracted_text_key = f"{extracted_text_key}.extracted"
             
             # Upload extracted text to MinIO
             extracted_text_bytes = extracted_text.encode("utf-8")
@@ -249,10 +252,12 @@ class IngestionWorker:
                 **parse_metadata,  # Includes parser, page_count, char_count, checksum
             })
             
-            # Update document
+            # Update document metadata (use flag_modified for JSONB columns)
             setattr(document, "metadata_payload", current_metadata)
-            # Status will be updated in _mark_job_succeeded
-            db.commit()
+            flag_modified(document, "metadata_payload")  # Mark JSONB column as modified
+            
+            # Flush to database (don't commit yet - will commit in _mark_job_succeeded)
+            db.flush()
             db.refresh(document)
             
             logger.info(f"Job {job.id}: Updated document metadata")

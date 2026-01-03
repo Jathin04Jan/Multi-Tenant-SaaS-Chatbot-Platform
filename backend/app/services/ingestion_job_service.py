@@ -50,6 +50,7 @@ class IngestionJobService:
             job_type=job_type,
             status=status,
             stage=stage,
+            attempts=0,  # Explicitly set attempts to 0 for new jobs
             created_at=now,
             updated_at=now,
         )

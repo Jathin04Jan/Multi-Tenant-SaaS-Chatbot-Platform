@@ -27,5 +27,9 @@ qdrant-client==1.7.0
 # Ollama Integration
 ollama==0.1.7
 
+# Document Parsing
+PyPDF2==3.0.1
+python-docx==1.1.0
+
 # Note: CORS middleware is included in FastAPI, no separate package needed
 

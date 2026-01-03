@@ -242,10 +242,10 @@ Please refer to the **Enum Details** section below and the full schema documenta
 - **`integration`** - 3rd-party integration (e.g., Notion, Google Drive)
 
 ### `documents.status` (ENUM: document_status)
-- **`pending`** - Document uploaded, waiting for processing (default)
-- **`processing`** - Currently being indexed/processed
-- **`indexed`** - Successfully indexed and ready for use
-- **`error`** - Processing failed
+- **`pending`** - Document uploaded, waiting for text extraction (default)
+- **`processing`** - Text extraction completed, ready for next pipeline stage
+- **`uploaded_to_database`** - Reserved for future use
+- **`error`** - Text extraction failed permanently (after max retry attempts)
 
 ### `installation_snippets.status` (VARCHAR)
 - **`active`** - Snippet is active and can be used (default)

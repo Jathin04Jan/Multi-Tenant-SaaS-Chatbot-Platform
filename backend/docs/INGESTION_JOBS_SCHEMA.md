@@ -240,7 +240,7 @@ CREATE INDEX idx_ingestion_jobs_created ON ingestion_jobs(created_at);
 - `can_retry`: `False` (job hasn't failed)
 - `duration_seconds`: `180.0` (3 minutes elapsed)
 
-### Example 2: Successful URL Ingestion Job
+### Example 2: URL Ingestion Job (Ignored by Worker)
 ```json
 {
   "id": "j2b3c4d5-e6f7-8901-bcde-f12345678901",
@@ -248,58 +248,56 @@ CREATE INDEX idx_ingestion_jobs_created ON ingestion_jobs(created_at);
   "bot_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "document_id": "d2b3c4d5-e6f7-8901-bcde-f12345678901",
   "job_type": "ingest_url",
-  "status": "succeeded",
-  "stage": "index",
-  "attempts": 1,
+  "status": "queued",
+  "stage": null,
+  "attempts": 0,
   "max_attempts": 5,
-  "logs": [
-    {"timestamp": "2024-01-15T09:00:00Z", "level": "info", "message": "Job started"},
-    {"timestamp": "2024-01-15T09:01:00Z", "level": "info", "message": "URL crawled successfully"},
-    {"timestamp": "2024-01-15T09:02:00Z", "level": "info", "message": "Content parsed into 200 chunks"},
-    {"timestamp": "2024-01-15T09:03:00Z", "level": "info", "message": "Embeddings generated"},
-    {"timestamp": "2024-01-15T09:04:00Z", "level": "info", "message": "Indexed in vector database"}
-  ],
+  "logs": null,
   "created_at": "2024-01-15T09:00:00Z",
-  "updated_at": "2024-01-15T09:04:00Z",
-  "started_at": "2024-01-15T09:00:00Z",
-  "finished_at": "2024-01-15T09:04:00Z"
+  "updated_at": "2024-01-15T09:00:00Z",
+  "started_at": null,
+  "finished_at": null
 }
 ```
 **Computed Properties:**
-- `is_completed`: `True` (status is 'succeeded')
-- `is_active`: `False` (status is 'succeeded')
-- `can_retry`: `False` (job succeeded)
-- `duration_seconds`: `240.0` (4 minutes total)
+- `is_completed`: `False` (status is 'queued')
+- `is_active`: `True` (status is 'queued')
+- `can_retry`: `False` (job hasn't failed)
+- `duration_seconds`: `0.0` (job hasn't started)
 
-### Example 3: Failed Job (Can Retry)
+**Note**: URL and integration jobs are currently ignored by the async worker. They remain in `queued` status and are not processed. Only file upload jobs (`source_type = 'file'`) are processed for text extraction.
+
+### Example 3: Failed Job (Auto-Retry)
 ```json
 {
   "id": "j3b4c5d6-e7f8-9012-cdef-123456789012",
   "user_id": "550e8400-e29b-41d4-a716-446655440000",
   "bot_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "document_id": "d1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "job_type": "reindex_document",
-  "status": "failed",
-  "stage": "embed",
+  "job_type": "ingest_upload",
+  "status": "queued",
+  "stage": null,
   "attempts": 2,
   "max_attempts": 5,
   "logs": [
     {"timestamp": "2024-01-15T11:00:00Z", "level": "info", "message": "Job started"},
     {"timestamp": "2024-01-15T11:01:00Z", "level": "info", "message": "Document downloaded"},
     {"timestamp": "2024-01-15T11:02:00Z", "level": "info", "message": "Document parsed"},
-    {"timestamp": "2024-01-15T11:03:00Z", "level": "error", "message": "Embedding API timeout", "error": "Connection timeout after 30 seconds"}
+    {"timestamp": "2024-01-15T11:03:00Z", "level": "error", "message": "MinIO upload failed", "stage": "store"}
   ],
   "created_at": "2024-01-15T11:00:00Z",
   "updated_at": "2024-01-15T11:03:00Z",
-  "started_at": "2024-01-15T11:00:00Z",
-  "finished_at": "2024-01-15T11:03:00Z"
+  "started_at": null,
+  "finished_at": null
 }
 ```
 **Computed Properties:**
-- `is_completed`: `True` (status is 'failed')
-- `is_active`: `False` (status is 'failed')
-- `can_retry`: `True` (failed and attempts (2) < max_attempts (5))
-- `duration_seconds`: `180.0` (3 minutes before failure)
+- `is_completed`: `False` (status is 'queued' - job was re-queued for retry)
+- `is_active`: `True` (status is 'queued')
+- `can_retry`: `False` (job is queued, not failed)
+- `duration_seconds`: `0.0` (job hasn't restarted yet)
+
+**Note**: This job failed but was automatically re-queued because `attempts (2) < max_attempts (5)`. The worker will pick it up again and retry from the beginning. The stage was cleared and `finished_at` was reset to allow a fresh retry attempt.
 
 ### Example 4: Bot-Level Job (No Document)
 ```json
@@ -476,11 +474,14 @@ WHERE id = 'j1b2c3d4-e5f6-7890-abcd-ef1234567890';
 
 1. **Use Computed Properties**: Use `is_completed`, `is_active`, `can_retry`, and `duration_seconds` properties in code for readability
 2. **Atomic Updates**: Use database transactions when updating job status to prevent race conditions
-3. **Logging**: Always log important events to the `logs` JSONB field for debugging
-4. **Retry Logic**: Check `can_retry` property before attempting to retry failed jobs
+3. **Logging**: Always log important events to the `logs` JSONB field for debugging, including stage information for errors
+4. **Retry Logic**: The async worker automatically handles retries - failed jobs with `attempts < max_attempts` are automatically re-queued
 5. **Status Management**: Always update `status`, `stage`, `started_at`, and `finished_at` appropriately
 6. **Query Optimization**: Use indexes on `user_id`, `bot_id`, `status`, and `stage` for efficient queries
 7. **Cleanup**: Periodically archive or delete old completed jobs to maintain performance
+8. **Worker Process**: Run the ingestion worker as a separate process using `python run_worker.py` to process queued jobs
+9. **Concurrent Workers**: Multiple worker processes can run simultaneously - they use `FOR UPDATE SKIP LOCKED` to safely claim jobs
+10. **URL Jobs**: URL and integration jobs are currently ignored by the worker and remain in `queued` status until URL processing is implemented
 
 ---
 
@@ -502,11 +503,33 @@ WHERE id = 'j1b2c3d4-e5f6-7890-abcd-ef1234567890';
 ## 🔄 Job Lifecycle
 
 1. **Creation**: Job created with `status = 'queued'`, `attempts = 0`
-2. **Queued**: Job is waiting to be processed
-3. **Processing**: Job status updated to `processing`, `started_at` set, `stage` updated as job progresses
-4. **Completion**: Job status updated to `succeeded` or `failed`, `finished_at` set
-5. **Retry**: If failed and `can_retry == True`, increment `attempts` and restart from step 2
-6. **Cancellation**: Job status updated to `cancelled`, `finished_at` set
+2. **Queued**: Job is waiting to be processed by the async worker
+3. **Claiming**: Worker claims job using `FOR UPDATE SKIP LOCKED` (prevents multiple workers from picking the same job)
+4. **Processing**: Job status updated to `processing`, `started_at` set, `stage` updated as job progresses through pipeline stages
+5. **Completion**: Job status updated to `succeeded` or `failed`, `finished_at` set
+6. **Retry**: If failed and `attempts < max_attempts`, job is automatically re-queued (status set back to `queued`, stage cleared, attempts incremented)
+7. **Permanent Failure**: If failed and `attempts >= max_attempts`, job marked as permanently `failed`, document status set to `error`
+8. **Cancellation**: Job status updated to `cancelled`, `finished_at` set
+
+### Async Worker Processing
+
+The ingestion worker (`run_worker.py`) runs as a separate process and:
+- Continuously polls the `ingestion_jobs` table for queued jobs
+- Only processes file uploads (URL and integration jobs are ignored and remain in `queued` status)
+- Uses `FOR UPDATE SKIP LOCKED` to safely claim jobs (supports multiple concurrent workers)
+- Processes jobs through stages: `download` → `parse` → `store`
+- Extracts text from documents (PDF, DOCX, TXT) and stores it in MinIO
+- Updates document metadata with extraction details (`extracted_text_key`, `parser`, `page_count`, `char_count`, `checksum`)
+- Implements automatic retry logic for failed jobs
+- Logs all errors with stage information for debugging
+
+**To start the worker:**
+```bash
+cd backend
+python run_worker.py
+```
+
+The worker runs continuously until stopped (Ctrl+C) and polls every 2 seconds by default.
 
 ---
 

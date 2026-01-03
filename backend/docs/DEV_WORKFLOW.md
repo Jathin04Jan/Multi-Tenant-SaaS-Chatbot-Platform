@@ -108,6 +108,9 @@ docker-compose up -d
 # Start backend (no migrations needed in dev!)
 python run.py
 
+# Start ingestion worker (separate process)
+python run_worker.py
+
 # Reset database
 python reset_db.py
 
@@ -123,6 +126,25 @@ docker-compose logs -f minio
 # Stop services
 docker-compose stop
 ```
+
+### Running the Ingestion Worker
+
+The ingestion worker processes document text extraction jobs from the queue. Run it as a separate process:
+
+```bash
+# In a separate terminal
+cd backend
+python run_worker.py
+```
+
+The worker will:
+- Poll for queued jobs every 2 seconds
+- Extract text from uploaded documents (PDF, DOCX, TXT)
+- Store extracted text in MinIO
+- Update document metadata with extraction details
+- Automatically retry failed jobs
+
+You can run multiple worker processes simultaneously for increased throughput. Each worker safely claims different jobs using `FOR UPDATE SKIP LOCKED`.
 
 ---
 

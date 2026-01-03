@@ -229,6 +229,57 @@ This provides comprehensive analytics showing both installations and actual enga
 
 See [EMBED_SECURITY_AND_SNIPPETS.md](docs/EMBED_SECURITY_AND_SNIPPETS.md) for complete documentation.
 
+## ⚙️ Ingestion Worker
+
+The ingestion worker is an async process that processes document text extraction jobs from the queue.
+
+### Starting the Worker
+
+```bash
+cd backend
+python run_worker.py
+```
+
+The worker will:
+- Continuously poll the `ingestion_jobs` table for queued jobs
+- Only process file uploads (URL and integration jobs are ignored)
+- Extract text from documents (PDF, DOCX, TXT) using PyPDF2 and python-docx
+- Store extracted text in MinIO at `{user_id}/{bot_id}/{document_id}/{filename}.txt`
+- Update document metadata with extraction details (parser, page_count, char_count, checksum)
+- Automatically retry failed jobs (up to 5 attempts by default)
+- Use `FOR UPDATE SKIP LOCKED` to safely claim jobs (supports multiple concurrent workers)
+
+### Worker Features
+
+- **Safe Job Claiming**: Uses PostgreSQL's `FOR UPDATE SKIP LOCKED` to prevent multiple workers from processing the same job
+- **Automatic Retries**: Failed jobs are automatically re-queued if `attempts < max_attempts`
+- **Error Logging**: All errors are logged with stage information in `ingestion_jobs.logs`
+- **Document Status Updates**: Updates document status to `processing` on success, `error` on permanent failure
+- **Metadata Updates**: Updates document `metadata` with extraction details using `flag_modified()` for JSONB columns
+
+### Running Multiple Workers
+
+You can run multiple worker processes simultaneously for increased throughput. Each worker will safely claim different jobs using `FOR UPDATE SKIP LOCKED`.
+
+```bash
+# Terminal 1
+python run_worker.py
+
+# Terminal 2
+python run_worker.py
+
+# Terminal 3
+python run_worker.py
+```
+
+### Worker Configuration
+
+The worker polls every 2 seconds by default. You can customize this in the `IngestionWorker` class:
+
+```python
+worker = IngestionWorker(poll_interval=2.0)  # Adjust as needed
+```
+
 ## 📖 Additional Documentation
 
 See the `docs/` directory for detailed guides:
@@ -238,6 +289,8 @@ See the `docs/` directory for detailed guides:
 - `MIGRATIONS_VS_CREATE_ALL.md` - Migration best practices
 - `EMBED_SECURITY_AND_SNIPPETS.md` - Complete guide to embed security and code snippets
 - `INSTALLATION_SNIPPETS_SCHEMA.md` - Installation snippets table schema
+- `INGESTION_JOBS_SCHEMA.md` - Ingestion jobs table schema and worker details
+- `DOCUMENTS_SCHEMA.md` - Documents table schema and text extraction details
 
 ## 🚀 Production Deployment
 

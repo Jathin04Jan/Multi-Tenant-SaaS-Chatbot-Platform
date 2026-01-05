@@ -9,16 +9,26 @@ from langchain_ollama import OllamaEmbeddings
 from langchain_core.documents import Document
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
+import pypdfium2 as pdfium
+
+from io import BytesIO
+from PIL import Image
+
+from langchain_ollama import ChatOllama
+from base64 import b64encode
+import json
 
 
 class IngestionWorker:
     def __init__(
         self, 
         embedding_model_name: str = "embeddinggemma:latest",
+        vlm_model_name: str = "qwen3-vl:8b",
         qdrant_host: str = "localhost",
         qdrant_port: int = 6333,
     ):
         self.embeddings = OllamaEmbeddings(model=embedding_model_name)
+        self.vlm_model_name = ChatOllama(model=vlm_model_name)
         self.qdrant_client = QdrantClient(host=qdrant_host, port=qdrant_port)
 
     def _normalize_metadata(
@@ -84,6 +94,119 @@ class IngestionWorker:
                 "page": None,  # TXT files don't have pages
             })
 
+        
+    def render_page_to_png_bytes(self, pdf_path: str, page_index: int, dpi: int = 200) -> bytes:
+        pdf = pdfium.PdfDocument(pdf_path)
+        page = pdf.get_page(page_index)
+        pil_image = page.render(scale=dpi/72).to_pil()  # 72 dpi base
+        buf = BytesIO()
+        pil_image.save(buf, format="PNG")
+        return buf.getvalue()
+
+
+
+    def analyze_page_with_vlm(self, image_bytes: bytes, page_number: int) -> dict:
+        """
+        Returns JSON like:
+        {
+        "blocks": [
+            {
+            "type": "text" | "table",
+            "page": 1,
+            "content": "...",         # markdown text or markdown table
+            "block_index": 0
+            },
+            ...
+            ]
+            }
+        }
+        """
+        b64 = b64encode(image_bytes).decode("utf-8")
+        prompt = f"""
+You are a document parser for a RAG system.
+
+For the given page image (page {page_number}), extract content in strict JSON.
+
+Rules:
+- Preserve reading order.
+- For normal text, return as plain markdown paragraphs.
+- For tables, convert each table into a markdown table (with header row if present).
+- Do NOT summarise, do NOT drop rows/cells.
+- Output ONLY valid JSON with this schema:
+
+{{
+  "blocks": [
+    {{
+      "type": "text" | "table",
+      "page": {page_number},
+      "block_index": 0,
+      "content": "..."
+    }}
+  ]
+}}
+        """
+
+        msg = self.vlm_model_name.invoke(
+            [
+                {"role": "system", "content": "You extract structured content from document images."},
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": f"data:image/png;base64,{b64}"}
+                    ]
+                },
+            ]
+        )
+
+        # LangChain returns a Message with .content (string)
+        # Extract JSON from response (might be wrapped in markdown code blocks or have extra text)
+        content = msg.content.strip()
+        
+        # Try to extract JSON from markdown code blocks if present
+        if "```json" in content:
+            # Extract JSON from ```json ... ``` block
+            start = content.find("```json") + 7
+            end = content.find("```", start)
+            if end != -1:
+                content = content[start:end].strip()
+        elif "```" in content:
+            # Extract JSON from ``` ... ``` block
+            start = content.find("```") + 3
+            end = content.find("```", start)
+            if end != -1:
+                content = content[start:end].strip()
+        
+        # Try to find JSON object in the content
+        try:
+            # First, try direct parsing
+            return json.loads(content)
+        except json.JSONDecodeError:
+            # If that fails, try to find JSON object boundaries
+            start_idx = content.find("{")
+            end_idx = content.rfind("}")
+            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+                json_str = content[start_idx:end_idx + 1]
+                return json.loads(json_str)
+            else:
+                # If still can't parse, raise with more context
+                raise ValueError(f"Could not parse JSON from VLM response. Content: {content[:200]}...")
+
+
+    def blocks_to_documents(self,blocks: list, base_metadata: dict) -> List[Document]:
+        docs = []
+        for block in blocks:
+            meta = {
+                **base_metadata,
+                "page": block["page"],
+                "block_index": block["block_index"],
+                "block_type": block["type"],       # "text" or "table"
+                "is_table": block["type"] == "table",
+            }
+            docs.append(Document(page_content=block["content"], metadata=meta))
+        return docs
+
+
     def load_document(self, file_path: str) -> List[Document]:
         """
         Load a document from file path. Automatically detects file type.
@@ -124,6 +247,31 @@ class IngestionWorker:
             self._normalize_metadata(doc, file_path, file_name, file_ext[1:])  # Remove the dot from extension
         
         return loaded_documents
+
+    def load_complex_pdf_with_vlm(self, file_path: str, tenant_id: str, category: str) -> List[Document]:
+        pdf = pdfium.PdfDocument(file_path)
+        num_pages = len(pdf)
+        file_name = os.path.basename(file_path)
+
+        all_docs: List[Document] = []
+
+        for page_index in range(num_pages):
+            image_bytes = self.render_page_to_png_bytes(file_path, page_index)
+            parsed = self.analyze_page_with_vlm(image_bytes, page_number=page_index + 1)
+            blocks = parsed.get("blocks", [])
+
+        base_meta = {
+            "file_name": file_name,
+            "file_type": "pdf_image",
+            "source": file_path,
+            "tenant_id": tenant_id,
+            "category": category,
+        }
+
+        docs = self.blocks_to_documents(blocks, base_meta)
+        all_docs.extend(docs)
+
+        return all_docs
 
     def chunk_documents(
         self, 
@@ -315,34 +463,15 @@ class IngestionWorker:
 if __name__ == "__main__":
 
     ingestion_worker = IngestionWorker()
-    # Load document (handles both PDF and TXT)
-    documents = ingestion_worker.load_document("test.pdf")
-    # Chunk the documents
-    chunks = ingestion_worker.chunk_documents(documents)
-    print(chunks)
-    for chunk in chunks:
-        print(chunk.page_content)
+    
+    print("Loading complex pdf document...")
+    complex_documents = ingestion_worker.load_complex_pdf_with_vlm("test-3-single-page.pdf", tenant_id="1", category="test")
+    
+    print("Complex pdf document loaded successfully.")
+    print(f"Loaded {len(complex_documents)} documents")
+    
+    for doc in complex_documents:
+        print(doc.page_content)
         print("-"*100)
-    print(f"\n\n{'-' * 100}Embedding the text...\n")
-    embeddings = ingestion_worker.embed_chunks(chunks)
-    print(f"Generated {len(embeddings)} embeddings")
-    print(f"First embedding sample (first 10 values): {embeddings[0]['embedding'][:10]}")
-
-    points = ingestion_worker.to_qdrant_points(embeddings, tenant_id="1", category="test", file_name="test.pdf", minio_path="test.pdf")
-    print(f"Converted {len(points)} points for Qdrant")
     
-    if not points:
-        raise ValueError("No points generated; cannot infer vector size")
-    
-    # Get vector size from first point
-    vector_size = len(points[0]["vector"])
-    print(f"Vector size: {vector_size}")
-    
-    # Create collection
-    print(f"\n\n{'-' * 100}Creating Qdrant collection...\n")
-    ingestion_worker.create_collection(vector_size=vector_size)
-    
-    # Append points to collection
-    print(f"\n\n{'-' * 100}Appending points to Qdrant...\n")
-    ingestion_worker.append_points_to_collection(points)
-    print("Done!")
+    print(complex_documents)

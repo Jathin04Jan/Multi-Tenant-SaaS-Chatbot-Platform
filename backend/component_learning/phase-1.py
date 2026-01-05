@@ -1,6 +1,9 @@
 from typing import List, Dict, Any, Optional
 import hashlib
-from langchain_community.document_loaders import PyPDFium2Loader
+import os
+from pathlib import Path
+from datetime import datetime
+from langchain_community.document_loaders import PyPDFium2Loader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_ollama import OllamaEmbeddings
 from langchain_core.documents import Document
@@ -18,21 +21,134 @@ class IngestionWorker:
         self.embeddings = OllamaEmbeddings(model=embedding_model_name)
         self.qdrant_client = QdrantClient(host=qdrant_host, port=qdrant_port)
 
-    def extract_text_and_chunk(self, file_path: str, chunk_size: int = 1000, chunk_overlap: int = 200) -> List[Document]:
+    def _normalize_metadata(
+        self, 
+        doc: Document, 
+        file_path: str, 
+        file_name: str, 
+        file_type: str
+    ) -> None:
         """
-        Load PDF
-        Split into chunks (paragraph-aware recursive splitter)
+        Normalize document metadata to ensure uniform structure across all file types.
+        Ensures all documents have the same metadata fields regardless of source.
+        
+        Args:
+            doc: Document object to normalize
+            file_path: Full path to the file
+            file_name: Basename of the file
+            file_type: "pdf" or "txt"
         """
-        loaded_documents = PyPDFium2Loader(file_path).load()
-        print("Document Loading is Successful....")
+        # Initialize metadata if None
+        doc.metadata = doc.metadata or {}
+        
+        if file_type == "pdf":
+            # For PDFs, preserve existing values and set defaults only if missing
+            doc.metadata.setdefault("producer", "")
+            doc.metadata.setdefault("creator", "")
+            doc.metadata.setdefault("creationdate", "")
+            doc.metadata.setdefault("title", "")
+            doc.metadata.setdefault("author", "")
+            doc.metadata.setdefault("subject", "")
+            doc.metadata.setdefault("keywords", "")
+            doc.metadata.setdefault("moddate", "")
+            doc.metadata.setdefault("source", file_path)
+            doc.metadata.setdefault("file_name", file_name)
+            doc.metadata.setdefault("file_type", "pdf")
+            # total_pages and page should already be set by PDF loader, but ensure they exist
+            doc.metadata.setdefault("total_pages", doc.metadata.get("total_pages", 0))
+            doc.metadata.setdefault("page", doc.metadata.get("page", 0))
+        elif file_type == "txt":
+            # For TXT files, get file timestamps and set all fields
+            try:
+                stat_info = os.stat(file_path)
+                creation_time = datetime.fromtimestamp(stat_info.st_ctime).isoformat() + "+00:00"
+                mod_time = datetime.fromtimestamp(stat_info.st_mtime).isoformat() + "+00:00"
+            except OSError:
+                creation_time = ""
+                mod_time = ""
+            
+            # Set all uniform metadata fields (TXT files don't have PDF-specific fields)
+            doc.metadata.update({
+                "producer": "",
+                "creator": "",
+                "creationdate": creation_time,
+                "title": "",
+                "author": "",
+                "subject": "",
+                "keywords": "",
+                "moddate": mod_time,
+                "source": file_path,
+                "file_name": file_name,
+                "file_type": "txt",
+                "total_pages": None,  # TXT files don't have pages
+                "page": None,  # TXT files don't have pages
+            })
 
+    def load_document(self, file_path: str) -> List[Document]:
+        """
+        Load a document from file path. Automatically detects file type.
+        Supports PDF and TXT files.
+        
+        Args:
+            file_path: Path to the file (PDF or TXT)
+        
+        Returns:
+            List of Document objects
+        
+        Raises:
+            ValueError: If file type is not supported
+        """
+        file_ext = Path(file_path).suffix.lower()
+        file_name = os.path.basename(file_path)
+        
+        if file_ext == '.pdf':
+            loaded_documents = PyPDFium2Loader(file_path).load()
+            print(f"PDF Document Loading is Successful. Loaded {len(loaded_documents)} document(s).")
+        elif file_ext == '.txt':
+            try:
+                # Use LangChain's TextLoader which handles encoding automatically
+                loader = TextLoader(file_path, encoding='utf-8')
+                loaded_documents = loader.load()
+                print(f"TXT Document Loading is Successful. Loaded {len(loaded_documents)} document(s).")
+            except UnicodeDecodeError:
+                # Fallback to latin-1 if UTF-8 fails
+                print("UTF-8 decoding failed, trying latin-1 encoding...")
+                loader = TextLoader(file_path, encoding='latin-1')
+                loaded_documents = loader.load()
+                print(f"TXT Document Loading is Successful (latin-1). Loaded {len(loaded_documents)} document(s).")
+        else:
+            raise ValueError(f"Unsupported file type: {file_ext}. Supported types: .pdf, .txt")
+        
+        # Normalize metadata for all documents
+        for doc in loaded_documents:
+            self._normalize_metadata(doc, file_path, file_name, file_ext[1:])  # Remove the dot from extension
+        
+        return loaded_documents
+
+    def chunk_documents(
+        self, 
+        documents: List[Document], 
+        chunk_size: int = 1000, 
+        chunk_overlap: int = 200
+    ) -> List[Document]:
+        """
+        Split documents into chunks using recursive character text splitter.
+        
+        Args:
+            documents: List of Document objects to chunk
+            chunk_size: Maximum size of each chunk
+            chunk_overlap: Overlap between chunks
+        
+        Returns:
+            List of Document objects (chunks)
+        """
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             separators=["\n\n", "\n", ". ", " "],  # paragraph → line → sentence → word-ish
         )
 
-        chunks = text_splitter.split_documents(loaded_documents)
+        chunks = text_splitter.split_documents(documents)
         print(f"Chunking complete. Total chunks: {len(chunks)}")
         return chunks
 
@@ -85,7 +201,8 @@ class IngestionWorker:
             vec = item["embedding"]
             meta = item["metadata"].copy()
 
-            if "page" in meta:
+            # Normalize page number (PDFs have page numbers, TXT files have None)
+            if "page" in meta and meta["page"] is not None:
                 meta["page"] = int(meta["page"]) + 1
 
             base_meta = {
@@ -199,7 +316,10 @@ class IngestionWorker:
 if __name__ == "__main__":
 
     ingestion_worker = IngestionWorker()
-    chunks = ingestion_worker.extract_text_and_chunk("test.pdf")
+    # Load document (handles both PDF and TXT)
+    documents = ingestion_worker.load_document("test.pdf")
+    # Chunk the documents
+    chunks = ingestion_worker.chunk_documents(documents)
     print(chunks)
     for chunk in chunks:
         print(chunk.page_content)

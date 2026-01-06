@@ -159,29 +159,80 @@ class IngestionWorker:
         }
         """
         b64 = b64encode(image_bytes).decode("utf-8")
-        prompt = f"""
-You are a document parser for a RAG system.
+        prompt = f"""You are a document parser for a RAG system. Extract ALL content from page {page_number} and return it as valid JSON.
 
-For the given page image (page {page_number}), extract content in strict JSON.
+CRITICAL REQUIREMENTS:
+1. Output ONLY valid JSON - no markdown, no explanations, no code blocks, no arrays
+2. You MUST return an object with a "blocks" key containing an array
+3. Extract content in reading order (top to bottom, left to right)
+4. Extract EVERY piece of content - do not skip anything
+5. Split content into logical blocks (paragraphs, headings, tables, lists)
+6. Each block MUST have ALL four fields: type, page, block_index, and content
+7. block_index: Sequential number identifying each block's position on the page (0-indexed)
+   - First block = 0, second block = 1, third block = 2, etc.
+   - Must start at 0 and increment by 1 for each subsequent block
+   - This preserves the reading order and allows tracking block sequence
+8. page must be exactly {page_number} for ALL blocks
+9. content field MUST contain the actual text/table content - never leave it empty
+10. If a block has no visible content, skip it - do not include empty blocks
 
-Rules:
-- Preserve reading order.
-- For normal text, return as plain markdown paragraphs.
-- For tables, convert each table into a markdown table (with header row if present).
-- Do NOT summarise, do NOT drop rows/cells.
-- Output ONLY valid JSON with this schema:
+CONTENT EXTRACTION RULES:
+- Text blocks: Extract as plain markdown text. Preserve line breaks and formatting.
+- Tables: Convert to markdown table format with pipes (|). Include header row if present.
+- Do NOT summarize, paraphrase, or modify the content
+- Do NOT drop any rows, cells, or text
+- Preserve mathematical notation, formulas, and special characters
+- Keep tables as separate blocks (type: "table")
+- Keep text paragraphs as separate blocks (type: "text")
 
+REQUIRED JSON FORMAT (MUST follow exactly - this is the ONLY acceptable format):
 {{
   "blocks": [
     {{
-      "type": "text" | "table",
+      "type": "text",
       "page": {page_number},
       "block_index": 0,
-      "content": "..."
+      "content": "First paragraph or heading text here..."
+    }},
+    {{
+      "type": "table",
+      "page": {page_number},
+      "block_index": 1,
+      "content": "| Header1 | Header2 |\\n|---------|---------|\\n| Cell1   | Cell2   |"
+    }},
+    {{
+      "type": "text",
+      "page": {page_number},
+      "block_index": 2,
+      "content": "Next paragraph text here..."
     }}
   ]
 }}
-        """
+
+CRITICAL FORMAT RULES:
+- Start with {{ (opening brace for object)
+- Must have "blocks" key (with quotes)
+- "blocks" value must be an array [ ]
+- Each block must be a complete object with all 4 fields: type, page, block_index, content
+- End with }} (closing brace for object)
+- DO NOT return just an array [ ] - it must be wrapped in an object with "blocks" key
+- DO NOT return incomplete blocks - every block must have all fields filled
+- DO NOT stop mid-response - extract ALL content from the page
+- content field MUST contain actual text/table content - never leave it empty
+
+Note: block_index represents the sequential position of each block on the page (0=first, 1=second, 2=third, etc.)
+
+IMPORTANT: Return ONLY the JSON object starting with {{ and ending with }}, nothing else. No markdown code blocks, no explanations, no arrays."""
+        
+        # DEBUG: Print the prompt being sent to VLM
+        print(f"\n{'='*100}")
+        print(f"[DEBUG] VLM PROMPT for page {page_number}:")
+        print(f"{'='*100}")
+        print(prompt)
+        print(f"{'='*100}")
+        print(f"[DEBUG] System Message: You extract structured content from document images.")
+        print(f"[DEBUG] Image size: {len(image_bytes)} bytes (base64 length: {len(b64)} chars)")
+        print(f"[DEBUG] Calling VLM model...\n")
 
         msg = self.vlm_model_name.invoke(
             [
@@ -198,7 +249,19 @@ Rules:
 
         # LangChain returns a Message with .content (string)
         # Extract JSON from response (might be wrapped in markdown code blocks or have extra text)
-        content = msg.content.strip()
+        raw_content = msg.content.strip()
+        
+        # DEBUG: Print raw VLM response
+        print(f"\n{'='*100}")
+        print(f"[DEBUG] VLM RAW RESPONSE for page {page_number}:")
+        print(f"{'='*100}")
+        print(raw_content)
+        print(f"{'='*100}")
+        print(f"[DEBUG] Response length: {len(raw_content)} characters")
+        print(f"[DEBUG] Response type: {type(msg)}")
+        print(f"{'='*100}\n")
+        
+        content = raw_content
         
         # Try to extract JSON from markdown code blocks if present
         if "```json" in content:
@@ -207,41 +270,109 @@ Rules:
             end = content.find("```", start)
             if end != -1:
                 content = content[start:end].strip()
+                print(f"[DEBUG] Extracted JSON from markdown code block")
         elif "```" in content:
             # Extract JSON from ``` ... ``` block
             start = content.find("```") + 3
             end = content.find("```", start)
             if end != -1:
                 content = content[start:end].strip()
+                print(f"[DEBUG] Extracted JSON from generic code block")
         
         # Try to find JSON object in the content
         try:
             # First, try direct parsing
-            return json.loads(content)
-        except json.JSONDecodeError:
+            parsed_json = json.loads(content)
+            print(f"[DEBUG] ✓ Successfully parsed JSON directly")
+            print(f"[DEBUG] Parsed JSON structure:")
+            print(f"  - Type: {type(parsed_json)}")
+            if isinstance(parsed_json, dict):
+                print(f"  - Keys: {list(parsed_json.keys())}")
+                if "blocks" in parsed_json:
+                    print(f"  - Number of blocks: {len(parsed_json.get('blocks', []))}")
+                    for i, block in enumerate(parsed_json.get('blocks', [])[:3]):  # Show first 3 blocks
+                        print(f"    Block {i}: type={block.get('type')}, page={block.get('page')}, block_index={block.get('block_index')}")
+            print(f"{'='*100}\n")
+            return parsed_json
+        except json.JSONDecodeError as e:
+            print(f"[DEBUG] ✗ Direct JSON parsing failed: {e}")
+            print(f"[DEBUG] Attempting to extract JSON from boundaries...")
             # If that fails, try to find JSON object boundaries
             start_idx = content.find("{")
             end_idx = content.rfind("}")
             if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
                 json_str = content[start_idx:end_idx + 1]
-                return json.loads(json_str)
+                print(f"[DEBUG] Found JSON boundaries: start={start_idx}, end={end_idx}, length={len(json_str)}")
+                try:
+                    parsed_json = json.loads(json_str)
+                    print(f"[DEBUG] ✓ Successfully parsed JSON by extracting boundaries")
+                    print(f"[DEBUG] Parsed JSON structure:")
+                    print(f"  - Type: {type(parsed_json)}")
+                    if isinstance(parsed_json, dict):
+                        print(f"  - Keys: {list(parsed_json.keys())}")
+                        if "blocks" in parsed_json:
+                            print(f"  - Number of blocks: {len(parsed_json.get('blocks', []))}")
+                    print(f"{'='*100}\n")
+                    return parsed_json
+                except json.JSONDecodeError as e2:
+                    print(f"[DEBUG] ✗ Boundary extraction also failed: {e2}")
+                    print(f"[DEBUG] Extracted JSON string (first 500 chars): {json_str[:500]}")
+                    print(f"[DEBUG] Error position: {e2.pos if hasattr(e2, 'pos') else 'unknown'}")
+                    print(f"{'='*100}\n")
+                    raise ValueError(f"Could not parse JSON from VLM response. First error: {e}, Second error: {e2}. Raw content preview: {raw_content[:500]}...")
             else:
                 # If still can't parse, raise with more context
-                raise ValueError(f"Could not parse JSON from VLM response. Content: {content[:200]}...")
+                print(f"[DEBUG] ✗ Could not find JSON boundaries in content")
+                print(f"[DEBUG] Content preview (first 500 chars): {content[:500]}")
+                print(f"{'='*100}\n")
+                raise ValueError(f"Could not parse JSON from VLM response. No JSON object found. Raw content preview: {raw_content[:500]}...")
 
 
-    def blocks_to_documents(self,blocks: list, base_metadata: dict) -> List[Document]:
+    def blocks_to_documents(self, blocks: list, base_metadata: dict, page_number: Optional[int] = None) -> List[Document]:
+        """
+        Convert VLM blocks to Document objects.
+        
+        Args:
+            blocks: List of block dictionaries from VLM
+            base_metadata: Base metadata to merge with block metadata
+            page_number: Page number to use if not present in blocks (defaults to block["page"] if available)
+        """
         docs = []
-        for block in blocks:
+        valid_blocks = 0
+        skipped_blocks = 0
+        
+        for idx, block in enumerate(blocks):
+            # Use .get() with defaults to handle missing fields gracefully
+            block_type = block.get("type", "text")
+            block_content = block.get("content", "")
+            block_page = block.get("page", page_number)  # Use provided page_number if block doesn't have it
+            block_index = block.get("block_index", idx)  # Use enumerate index if not provided
+            
+            # Validate block - skip if content is empty or invalid
+            if not block_content or not isinstance(block_content, str) or not block_content.strip():
+                skipped_blocks += 1
+                print(f"[WARNING] Skipping block {idx} on page {block_page}: empty or missing content (type={block_type}, block_index={block_index})")
+                continue
+            
+            # Validate block_index is sequential
+            if block_index != valid_blocks:
+                print(f"[WARNING] Block {idx} has block_index={block_index}, expected {valid_blocks}. Correcting...")
+                block_index = valid_blocks
+            
             meta = {
                 **base_metadata,
-                "page": block["page"],
-                "block_index": block["block_index"],
-                "block_type": block["type"],       # "text" or "table"
-                "is_table": block["type"] == "table",
+                "page": block_page,
+                "block_index": block_index,
+                "block_type": block_type,
+                "is_table": block_type == "table",
                 "extraction_method": "vlm",  # VLM-processed blocks
             }
-            docs.append(Document(page_content=block["content"], metadata=meta))
+            docs.append(Document(page_content=block_content, metadata=meta))
+            valid_blocks += 1
+        
+        if skipped_blocks > 0:
+            print(f"[INFO] Processed {valid_blocks} valid blocks, skipped {skipped_blocks} invalid/incomplete blocks")
+        
         return docs
 
 
@@ -308,11 +439,23 @@ Rules:
             # Handle both formats: dict with "blocks" key or direct list
             if isinstance(parsed, dict):
                 blocks = parsed.get("blocks", [])
+                if not blocks:
+                    print(f"[WARNING] Page {page_index + 1}: Parsed dict but 'blocks' key is empty or missing")
+                    print(f"[WARNING] Dict keys: {list(parsed.keys())}")
             elif isinstance(parsed, list):
+                print(f"[WARNING] Page {page_index + 1}: VLM returned array instead of object with 'blocks' key")
+                print(f"[WARNING] Array length: {len(parsed)}")
                 blocks = parsed
             else:
-                print(f"Warning: Unexpected parsed format on page {page_index + 1}: {type(parsed)}")
+                print(f"[ERROR] Page {page_index + 1}: Unexpected parsed format: {type(parsed)}")
+                print(f"[ERROR] Parsed content: {parsed}")
                 blocks = []
+            
+            if not blocks:
+                print(f"[WARNING] Page {page_index + 1}: No blocks extracted from VLM response - skipping page")
+                continue
+            
+            print(f"[INFO] Page {page_index + 1}: Extracted {len(blocks)} blocks from VLM response")
 
             base_meta = {
                 "file_name": file_name,
@@ -322,7 +465,8 @@ Rules:
                 "category": category,
             }
 
-            docs = self.blocks_to_documents(blocks, base_meta)
+            # Pass page_number to blocks_to_documents in case VLM doesn't include it
+            docs = self.blocks_to_documents(blocks, base_meta, page_number=page_index + 1)
             all_docs.extend(docs)
         
         # Normalize metadata for all documents to ensure uniform structure
@@ -536,12 +680,6 @@ if __name__ == "__main__":
     print("Complex pdf document loaded successfully.")
     print(f"Loaded {len(complex_documents)} documents")
     
-    # for doc in complex_documents:
-    #     print(doc.page_content)
-    #     print("-"*100)
-    
-    print(complex_documents)
-
     print("-"*100)
 
     print("Chunking documents...")
@@ -552,12 +690,9 @@ if __name__ == "__main__":
         print(chunk.page_content)
         print("-"*100)
     
-    print(chunks[:10])
-
     embeddings = ingestion_worker.embed_chunks(chunks)
     print("Embeddings created successfully.")
     print(f"Created {len(embeddings)} embeddings")
-    print(embeddings[:10])
 
     print("-"*100)
 
@@ -565,7 +700,6 @@ if __name__ == "__main__":
     points = ingestion_worker.to_qdrant_points(embeddings, tenant_id="1", category="test", file_name="tables.pdf", minio_path="testing-files/tables.pdf")
     print("Qdrant points created successfully.")
     print(f"Created {len(points)} points")
-    print(points[:10])
 
     print("-"*100)
 

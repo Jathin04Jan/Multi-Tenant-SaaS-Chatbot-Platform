@@ -316,7 +316,7 @@ if __name__ == "__main__":
 
     ingestion_worker = IngestionWorker()
     # Load document (handles both PDF and TXT)
-    documents = ingestion_worker.load_document("test.pdf")
+    documents = ingestion_worker.load_document("testing-files/text-only-doc.txt")
     # Chunk the documents
     chunks = ingestion_worker.chunk_documents(documents)
     print(chunks)

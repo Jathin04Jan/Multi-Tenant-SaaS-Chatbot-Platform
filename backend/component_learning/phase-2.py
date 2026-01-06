@@ -14,11 +14,11 @@ import pypdfium2 as pdfium
 from io import BytesIO
 from PIL import Image
 
-from langchain_ollama import ChatOllama
 from base64 import b64encode
 import json
+import ollama
 
-from timing_decorator import timing_decorator_with_label
+from timing_decorator import timing_decorator_with_label, TimingContext
 
 
 class IngestionWorker:
@@ -28,9 +28,12 @@ class IngestionWorker:
         vlm_model_name: str = "qwen3-vl:8b",
         qdrant_host: str = "localhost",
         qdrant_port: int = 6333,
+        ollama_host: str = "http://localhost:11434",
     ):
         self.embeddings = OllamaEmbeddings(model=embedding_model_name)
-        self.vlm_model_name = ChatOllama(model=vlm_model_name)
+        self.vlm_model_name = vlm_model_name
+        # Use raw ollama client for vision models (better support than ChatOllama)
+        self.ollama_client = ollama.Client(host=ollama_host)
         self.qdrant_client = QdrantClient(host=qdrant_host, port=qdrant_port)
 
     def _normalize_metadata(
@@ -142,21 +145,28 @@ class IngestionWorker:
 
 
     @timing_decorator_with_label("VLM Page Analysis")
-    def analyze_page_with_vlm(self, image_bytes: bytes, page_number: int) -> dict:
+    def analyze_page_with_vlm(self, image_bytes: bytes, page_number: int, debug: bool = False) -> dict:
         """
-        Returns JSON like:
-        {
-        "blocks": [
+        Analyze a PDF page image using VLM and extract structured content.
+        
+        Args:
+            image_bytes: PNG image bytes of the PDF page
+            page_number: Page number (1-indexed)
+            debug: If True, prints the prompt sent to VLM and the raw response (default: False)
+        
+        Returns:
+            dict: Parsed JSON with blocks structure:
             {
-            "type": "text" | "table",
-            "page": 1,
-            "content": "...",         # markdown text or markdown table
-            "block_index": 0
-            },
-            ...
-            ]
+                "blocks": [
+                    {
+                        "type": "text" | "table",
+                        "page": 1,
+                        "content": "...",         # markdown text or markdown table
+                        "block_index": 0
+                    },
+                    ...
+                ]
             }
-        }
         """
         b64 = b64encode(image_bytes).decode("utf-8")
         prompt = f"""You are a document parser for a RAG system. Extract ALL content from page {page_number} and return it as valid JSON.
@@ -234,32 +244,78 @@ IMPORTANT: Return ONLY the JSON object starting with {{ and ending with }}, noth
         print(f"[DEBUG] Image size: {len(image_bytes)} bytes (base64 length: {len(b64)} chars)")
         print(f"[DEBUG] Calling VLM model...\n")
 
-        msg = self.vlm_model_name.invoke(
-            [
-                {"role": "system", "content": "You extract structured content from document images."},
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": f"data:image/png;base64,{b64}"}
-                    ]
-                },
-            ]
-        )
-
-        # LangChain returns a Message with .content (string)
-        # Extract JSON from response (might be wrapped in markdown code blocks or have extra text)
-        raw_content = msg.content.strip()
+        # Use raw Ollama client for vision models - it handles images better than ChatOllama
+        try:
+            response = self.ollama_client.chat(
+                model=self.vlm_model_name,
+                messages=[
+                    {"role": "system", "content": "You extract structured content from document images."},
+                    {
+                        "role": "user",
+                        "content": prompt,
+                        "images": [b64]  # Ollama expects base64 strings directly in images array
+                    }
+                ]
+            )
+            
+            # DEBUG: Inspect response structure
+            if debug:
+                print(f"[DEBUG] Response object type: {type(response)}")
+                print(f"[DEBUG] Response has 'message' attr: {hasattr(response, 'message')}")
+                if hasattr(response, 'message'):
+                    print(f"[DEBUG] response.message type: {type(response.message)}")
+                    print(f"[DEBUG] response.message has 'content' attr: {hasattr(response.message, 'content')}")
+                if hasattr(response, '__dict__'):
+                    print(f"[DEBUG] Response __dict__ keys: {list(response.__dict__.keys())}")
+            
+            # Ollama returns ChatResponse object - access as attribute, not dict
+            # Try both dict and attribute access for compatibility
+            if hasattr(response, 'message'):
+                # ChatResponse object with message attribute
+                if hasattr(response.message, 'content'):
+                    raw_content = response.message.content.strip()
+                elif isinstance(response.message, dict):
+                    raw_content = response.message.get("content", "").strip()
+                else:
+                    # Fallback: try to convert to dict
+                    raw_content = str(response.message).strip()
+            elif isinstance(response, dict):
+                # Dict response (fallback)
+                raw_content = response.get("message", {}).get("content", "").strip()
+            else:
+                # Unknown format - try to get string representation
+                raw_content = str(response).strip()
+                if debug:
+                    print(f"[DEBUG] Unexpected response format, using string representation")
+                    print(f"[DEBUG] Response attributes: {dir(response)}")
+            
+            # Validate we got content
+            if not raw_content:
+                if debug:
+                    print(f"[DEBUG] Empty response content. Response object: {response}")
+                    print(f"[DEBUG] Response type: {type(response)}")
+                    if hasattr(response, '__dict__'):
+                        print(f"[DEBUG] Response __dict__: {response.__dict__}")
+                raise ValueError("VLM returned empty response content")
+                
+        except Exception as e:
+            if debug:
+                print(f"[DEBUG] Error calling Ollama: {e}")
+                print(f"[DEBUG] Error type: {type(e)}")
+                import traceback
+                print(f"[DEBUG] Traceback: {traceback.format_exc()}")
+            raise RuntimeError(f"Failed to call Ollama VLM model: {e}") from e
         
-        # DEBUG: Print raw VLM response
-        print(f"\n{'='*100}")
-        print(f"[DEBUG] VLM RAW RESPONSE for page {page_number}:")
-        print(f"{'='*100}")
-        print(raw_content)
-        print(f"{'='*100}")
-        print(f"[DEBUG] Response length: {len(raw_content)} characters")
-        print(f"[DEBUG] Response type: {type(msg)}")
-        print(f"{'='*100}\n")
+        # DEBUG: Print raw VLM response (only if debug=True)
+        if debug:
+            print(f"\n{'='*100}")
+            print(f"[DEBUG] VLM RAW RESPONSE for page {page_number}:")
+            print(f"{'='*100}")
+            print(raw_content)
+            print(f"{'='*100}")
+            print(f"[DEBUG] Response length: {len(raw_content)} characters")
+            print(f"[DEBUG] Response type: {type(response)}")
+            print(f"{'='*100}\n")
         
         content = raw_content
         
@@ -270,61 +326,69 @@ IMPORTANT: Return ONLY the JSON object starting with {{ and ending with }}, noth
             end = content.find("```", start)
             if end != -1:
                 content = content[start:end].strip()
-                print(f"[DEBUG] Extracted JSON from markdown code block")
+                if debug:
+                    print(f"[DEBUG] Extracted JSON from markdown code block")
         elif "```" in content:
             # Extract JSON from ``` ... ``` block
             start = content.find("```") + 3
             end = content.find("```", start)
             if end != -1:
                 content = content[start:end].strip()
-                print(f"[DEBUG] Extracted JSON from generic code block")
+                if debug:
+                    print(f"[DEBUG] Extracted JSON from generic code block")
         
         # Try to find JSON object in the content
         try:
             # First, try direct parsing
             parsed_json = json.loads(content)
-            print(f"[DEBUG] ✓ Successfully parsed JSON directly")
-            print(f"[DEBUG] Parsed JSON structure:")
-            print(f"  - Type: {type(parsed_json)}")
-            if isinstance(parsed_json, dict):
-                print(f"  - Keys: {list(parsed_json.keys())}")
-                if "blocks" in parsed_json:
-                    print(f"  - Number of blocks: {len(parsed_json.get('blocks', []))}")
-                    for i, block in enumerate(parsed_json.get('blocks', [])[:3]):  # Show first 3 blocks
-                        print(f"    Block {i}: type={block.get('type')}, page={block.get('page')}, block_index={block.get('block_index')}")
-            print(f"{'='*100}\n")
+            if debug:
+                print(f"[DEBUG] ✓ Successfully parsed JSON directly")
+                print(f"[DEBUG] Parsed JSON structure:")
+                print(f"  - Type: {type(parsed_json)}")
+                if isinstance(parsed_json, dict):
+                    print(f"  - Keys: {list(parsed_json.keys())}")
+                    if "blocks" in parsed_json:
+                        print(f"  - Number of blocks: {len(parsed_json.get('blocks', []))}")
+                        for i, block in enumerate(parsed_json.get('blocks', [])[:3]):  # Show first 3 blocks
+                            print(f"    Block {i}: type={block.get('type')}, page={block.get('page')}, block_index={block.get('block_index')}")
+                print(f"{'='*100}\n")
             return parsed_json
         except json.JSONDecodeError as e:
-            print(f"[DEBUG] ✗ Direct JSON parsing failed: {e}")
-            print(f"[DEBUG] Attempting to extract JSON from boundaries...")
+            if debug:
+                print(f"[DEBUG] ✗ Direct JSON parsing failed: {e}")
+                print(f"[DEBUG] Attempting to extract JSON from boundaries...")
             # If that fails, try to find JSON object boundaries
             start_idx = content.find("{")
             end_idx = content.rfind("}")
             if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
                 json_str = content[start_idx:end_idx + 1]
-                print(f"[DEBUG] Found JSON boundaries: start={start_idx}, end={end_idx}, length={len(json_str)}")
+                if debug:
+                    print(f"[DEBUG] Found JSON boundaries: start={start_idx}, end={end_idx}, length={len(json_str)}")
                 try:
                     parsed_json = json.loads(json_str)
-                    print(f"[DEBUG] ✓ Successfully parsed JSON by extracting boundaries")
-                    print(f"[DEBUG] Parsed JSON structure:")
-                    print(f"  - Type: {type(parsed_json)}")
-                    if isinstance(parsed_json, dict):
-                        print(f"  - Keys: {list(parsed_json.keys())}")
-                        if "blocks" in parsed_json:
-                            print(f"  - Number of blocks: {len(parsed_json.get('blocks', []))}")
-                    print(f"{'='*100}\n")
+                    if debug:
+                        print(f"[DEBUG] ✓ Successfully parsed JSON by extracting boundaries")
+                        print(f"[DEBUG] Parsed JSON structure:")
+                        print(f"  - Type: {type(parsed_json)}")
+                        if isinstance(parsed_json, dict):
+                            print(f"  - Keys: {list(parsed_json.keys())}")
+                            if "blocks" in parsed_json:
+                                print(f"  - Number of blocks: {len(parsed_json.get('blocks', []))}")
+                        print(f"{'='*100}\n")
                     return parsed_json
                 except json.JSONDecodeError as e2:
-                    print(f"[DEBUG] ✗ Boundary extraction also failed: {e2}")
-                    print(f"[DEBUG] Extracted JSON string (first 500 chars): {json_str[:500]}")
-                    print(f"[DEBUG] Error position: {e2.pos if hasattr(e2, 'pos') else 'unknown'}")
-                    print(f"{'='*100}\n")
+                    if debug:
+                        print(f"[DEBUG] ✗ Boundary extraction also failed: {e2}")
+                        print(f"[DEBUG] Extracted JSON string (first 500 chars): {json_str[:500]}")
+                        print(f"[DEBUG] Error position: {e2.pos if hasattr(e2, 'pos') else 'unknown'}")
+                        print(f"{'='*100}\n")
                     raise ValueError(f"Could not parse JSON from VLM response. First error: {e}, Second error: {e2}. Raw content preview: {raw_content[:500]}...")
             else:
                 # If still can't parse, raise with more context
-                print(f"[DEBUG] ✗ Could not find JSON boundaries in content")
-                print(f"[DEBUG] Content preview (first 500 chars): {content[:500]}")
-                print(f"{'='*100}\n")
+                if debug:
+                    print(f"[DEBUG] ✗ Could not find JSON boundaries in content")
+                    print(f"[DEBUG] Content preview (first 500 chars): {content[:500]}")
+                    print(f"{'='*100}\n")
                 raise ValueError(f"Could not parse JSON from VLM response. No JSON object found. Raw content preview: {raw_content[:500]}...")
 
 
@@ -425,7 +489,19 @@ IMPORTANT: Return ONLY the JSON object starting with {{ and ending with }}, noth
         return loaded_documents
 
     @timing_decorator_with_label("Loading Complex PDF with VLM")
-    def load_complex_pdf_with_vlm(self, file_path: str, tenant_id: str, category: str) -> List[Document]:
+    def load_complex_pdf_with_vlm(self, file_path: str, tenant_id: str, category: str, debug: bool = False) -> List[Document]:
+        """
+        Load a complex PDF document using VLM for OCR and structured extraction.
+        
+        Args:
+            file_path: Path to the PDF file
+            tenant_id: Tenant identifier
+            category: Document category
+            debug: If True, prints VLM prompts and responses for debugging (default: False)
+        
+        Returns:
+            List[Document]: List of Document objects with extracted content
+        """
         pdf = pdfium.PdfDocument(file_path)
         num_pages = len(pdf)
         file_name = os.path.basename(file_path)
@@ -434,8 +510,9 @@ IMPORTANT: Return ONLY the JSON object starting with {{ and ending with }}, noth
 
         for page_index in range(num_pages):
             image_bytes = self.render_page_to_png_bytes(file_path, page_index)
-            parsed = self.analyze_page_with_vlm(image_bytes, page_number=page_index + 1)
+            parsed = self.analyze_page_with_vlm(image_bytes, page_number=page_index + 1, debug=debug)
             
+            # Normalize VLM response to ensure consistent format
             # Handle both formats: dict with "blocks" key or direct list
             if isinstance(parsed, dict):
                 blocks = parsed.get("blocks", [])
@@ -443,8 +520,9 @@ IMPORTANT: Return ONLY the JSON object starting with {{ and ending with }}, noth
                     print(f"[WARNING] Page {page_index + 1}: Parsed dict but 'blocks' key is empty or missing")
                     print(f"[WARNING] Dict keys: {list(parsed.keys())}")
             elif isinstance(parsed, list):
-                print(f"[WARNING] Page {page_index + 1}: VLM returned array instead of object with 'blocks' key")
-                print(f"[WARNING] Array length: {len(parsed)}")
+                if debug:
+                    print(f"[WARNING] Page {page_index + 1}: VLM returned array instead of object with 'blocks' key")
+                    print(f"[WARNING] Array length: {len(parsed)}")
                 blocks = parsed
             else:
                 print(f"[ERROR] Page {page_index + 1}: Unexpected parsed format: {type(parsed)}")
@@ -455,7 +533,34 @@ IMPORTANT: Return ONLY the JSON object starting with {{ and ending with }}, noth
                 print(f"[WARNING] Page {page_index + 1}: No blocks extracted from VLM response - skipping page")
                 continue
             
-            print(f"[INFO] Page {page_index + 1}: Extracted {len(blocks)} blocks from VLM response")
+            # Normalize blocks: ensure all blocks have required fields (page, block_index)
+            current_page = page_index + 1
+            normalized_blocks = []
+            for idx, block in enumerate(blocks):
+                if not isinstance(block, dict):
+                    print(f"[WARNING] Page {current_page}: Block {idx} is not a dict, skipping: {type(block)}")
+                    continue
+                
+                # Ensure page field exists
+                if "page" not in block:
+                    block["page"] = current_page
+                
+                # Ensure block_index exists and is sequential
+                if "block_index" not in block:
+                    block["block_index"] = len(normalized_blocks)
+                elif block["block_index"] != len(normalized_blocks):
+                    if debug:
+                        print(f"[WARNING] Page {current_page}: Block {idx} has block_index={block['block_index']}, expected {len(normalized_blocks)}. Correcting...")
+                    block["block_index"] = len(normalized_blocks)
+                
+                # Ensure type field exists
+                if "type" not in block:
+                    block["type"] = "text"  # Default to text if not specified
+                
+                normalized_blocks.append(block)
+            
+            blocks = normalized_blocks
+            print(f"[INFO] Page {current_page}: Extracted {len(blocks)} blocks from VLM response")
 
             base_meta = {
                 "file_name": file_name,
@@ -671,43 +776,60 @@ IMPORTANT: Return ONLY the JSON object starting with {{ and ending with }}, noth
 
 
 if __name__ == "__main__":
-
-    ingestion_worker = IngestionWorker()
-    
-    print("Loading complex pdf document...")
-    complex_documents = ingestion_worker.load_complex_pdf_with_vlm("testing-files/tables-half.pdf", tenant_id="1", category="test")
-    
-    print("Complex pdf document loaded successfully.")
-    print(f"Loaded {len(complex_documents)} documents")
-    
-    print("-"*100)
-
-    print("Chunking documents...")
-    chunks = ingestion_worker.chunk_documents(complex_documents)
-    print("Chunks created successfully.")
-    print(f"Created {len(chunks)} chunks")
-    for chunk in chunks:
-        print(chunk.page_content)
+    # Wrap entire pipeline in timing context
+    with TimingContext("TOTAL PIPELINE EXECUTION"):
+        ingestion_worker = IngestionWorker()
+        
+        print("Loading complex pdf document...")
+        # Set debug=True for testing - this will print prompts and responses
+        complex_documents = ingestion_worker.load_complex_pdf_with_vlm(
+            "testing-files/tables-half.pdf", 
+            tenant_id="1", 
+            category="test",
+            debug=True  # Enable debug output for testing
+        )
+        
+        print("Complex pdf document loaded successfully.")
+        print(f"Loaded {len(complex_documents)} documents")
+        
         print("-"*100)
+
+        print("Chunking documents...")
+        chunks = ingestion_worker.chunk_documents(complex_documents)
+        print("Chunks created successfully.")
+        print(f"Created {len(chunks)} chunks")
+        for chunk in chunks:
+            print(chunk.page_content)
+            print("-"*100)
+        
+        embeddings = ingestion_worker.embed_chunks(chunks)
+        print("Embeddings created successfully.")
+        print(f"Created {len(embeddings)} embeddings")
+
+        print("-"*100)
+
+        print("Converting chunks to Qdrant points...")
+        points = ingestion_worker.to_qdrant_points(
+            embeddings, 
+            tenant_id="1", 
+            category="test", 
+            file_name="tables.pdf", 
+            minio_path="testing-files/tables.pdf"
+        )
+        print("Qdrant points created successfully.")
+        print(f"Created {len(points)} points")
+
+        print("-"*100)
+
+        embedding_size = len(embeddings[0]["embedding"])
+        print(f"Embedding size: {embedding_size}")
+        print(f"Creating Qdrant collection of size {embedding_size}...")
+        ingestion_worker.create_collection(vector_size=embedding_size)
+        print("Qdrant collection created successfully.")
+        print("Appending points to Qdrant collection...")
+        ingestion_worker.append_points_to_collection(points)
+        print("Points appended to Qdrant collection successfully.")
     
-    embeddings = ingestion_worker.embed_chunks(chunks)
-    print("Embeddings created successfully.")
-    print(f"Created {len(embeddings)} embeddings")
-
-    print("-"*100)
-
-    print("Converting chunks to Qdrant points...")
-    points = ingestion_worker.to_qdrant_points(embeddings, tenant_id="1", category="test", file_name="tables.pdf", minio_path="testing-files/tables.pdf")
-    print("Qdrant points created successfully.")
-    print(f"Created {len(points)} points")
-
-    print("-"*100)
-
-    embedding_size = len(embeddings[0]["embedding"])
-    print(f"Embedding size: {embedding_size}")
-    print(f"Creating Qdrant collection of size {embedding_size}...")
-    ingestion_worker.create_collection(vector_size=embedding_size)
-    print("Qdrant collection created successfully.")
-    print("Appending points to Qdrant collection...")
-    ingestion_worker.append_points_to_collection(points)
-    print("Points appended to Qdrant collection successfully.")
+    print("\n" + "="*100)
+    print("Pipeline execution completed!")
+    print("="*100)

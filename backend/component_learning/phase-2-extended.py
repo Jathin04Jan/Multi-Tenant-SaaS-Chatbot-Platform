@@ -727,14 +727,28 @@ if __name__ == "__main__":
 
 
     # Load document (handles both PDF and TXT)
-    documents = ingestion_worker.load_document("testing-files/test.pdf")
+
+    file_path = "testing-files/tables.pdf"
+    file_id = "123"
+
+    documents = ingestion_worker.load_document(file_path)
     logger.info(f"Loaded {len(documents)} document(s)")
+
+    ingestion_worker._normalize_metadata(documents, document_id=file_id)
+    logger.info(f"Normalized metadata for {len(documents)} text document(s)")
+
+    text_chunks = ingestion_worker.chunk_documents(documents)
+    logger.info(f"Generated {len(text_chunks)} text chunks")
     
-    print(documents)
-    '''
-    # Chunk the documents (chunks inherit normalized metadata)
-    chunks = ingestion_worker.chunk_documents(documents)
-    logger.info(f"Generated {len(chunks)} chunks")
+    documents_with_tables_chunks = ingestion_worker.extract_tables_as_documents(file_path)
+    logger.info(f"Extracted {len(documents_with_tables_chunks)} table chunks")
+
+    ingestion_worker._normalize_metadata(documents_with_tables_chunks, document_id=file_id)
+    logger.info(f"Normalized metadata for {len(documents_with_tables_chunks)} table document(s)")
+
+
+    chunks = text_chunks + documents_with_tables_chunks
+    logger.info(f"Total chunks: {len(chunks)}")
     
     # Generate embeddings (returns chunks and embeddings as parallel lists)
     logger.info("Generating embeddings...")
@@ -749,7 +763,7 @@ if __name__ == "__main__":
     points = ingestion_worker.to_qdrant_points(
         embedded_chunks,
         embeddings,
-        document_id="123"  # Document UUID or unique ID
+        document_id=file_id  # Document UUID or unique ID
     )
     logger.info(f"Converted {len(points)} points for Qdrant")
     
@@ -772,4 +786,3 @@ if __name__ == "__main__":
         raise RuntimeError("Failed to append points to collection")
     
     logger.info("Done!")
-    '''

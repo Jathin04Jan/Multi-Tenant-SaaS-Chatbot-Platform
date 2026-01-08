@@ -1,446 +1,193 @@
-from typing import List, Dict, Any, Optional
-import hashlib
+"""
+Production-ready document ingestion worker for Qdrant vector database.
+
+This module provides a robust implementation for loading, chunking, embedding,
+and storing documents in Qdrant following industry best practices.
+"""
+
+import logging
+import uuid
 import os
 from pathlib import Path
 from datetime import datetime
+from typing import List, Dict, Any, Optional, Tuple
+
 from langchain_community.document_loaders import PyPDFium2Loader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_ollama import OllamaEmbeddings
 from langchain_core.documents import Document
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
-import pypdfium2 as pdfium
 
-from io import BytesIO
-from PIL import Image
+import pdfplumber
 
-from base64 import b64encode
-import json
-import ollama
+# Configure logging
+logger = logging.getLogger(__name__)
 
-from timing_decorator import timing_decorator_with_label, TimingContext
+# Qdrant batch size for optimal performance (recommended: 100-500)
+QDRANT_BATCH_SIZE = 100
 
 
 class IngestionWorker:
+    """
+    Production-ready ingestion worker for processing documents and storing them in Qdrant.
+    
+    Features:
+    - Proper error handling and logging
+    - Batch processing for optimal performance
+    - Configurable Qdrant client (gRPC, API keys)
+    - Collision-resistant ID generation
+    - Input validation
+    """
+    
     def __init__(
         self, 
         embedding_model_name: str = "embeddinggemma:latest",
-        vlm_model_name: str = "qwen3-vl:8b",
         qdrant_host: str = "localhost",
         qdrant_port: int = 6333,
-        ollama_host: str = "http://localhost:11434",
+        qdrant_api_key: Optional[str] = None,
+        prefer_grpc: bool = True,
     ):
-        self.embeddings = OllamaEmbeddings(model=embedding_model_name)
-        self.vlm_model_name = vlm_model_name
-        # Use raw ollama client for vision models (better support than ChatOllama)
-        self.ollama_client = ollama.Client(host=ollama_host)
-        self.qdrant_client = QdrantClient(host=qdrant_host, port=qdrant_port)
+        """
+        Initialize the ingestion worker.
+        
+        Args:
+            embedding_model_name: Name of the Ollama embedding model
+            qdrant_host: Qdrant server hostname
+            qdrant_port: Qdrant REST API port (gRPC port is typically port + 1)
+            qdrant_api_key: Optional API key for Qdrant Cloud/authenticated instances
+            prefer_grpc: Use gRPC instead of REST API for better performance (default: True)
+        """
+        # Initialize embeddings
+        try:
+            self.embeddings = OllamaEmbeddings(model=embedding_model_name)
+            logger.info(f"Initialized embedding model: {embedding_model_name}")
+        except Exception as e:
+            logger.error(f"Failed to initialize embedding model: {e}")
+            raise
+        
+        # Initialize Qdrant client with production-ready configuration
+        client_kwargs = {
+            "host": qdrant_host,
+            "port": qdrant_port,
+            "prefer_grpc": prefer_grpc,
+        }
+        
+        # Add API key if provided (for production/cloud Qdrant)
+        if qdrant_api_key:
+            client_kwargs["api_key"] = qdrant_api_key
+            logger.info("Qdrant API key configured")
+        
+        try:
+            self.qdrant_client = QdrantClient(**client_kwargs)
+            logger.info(f"Initialized Qdrant client: {qdrant_host}:{qdrant_port} (gRPC: {prefer_grpc})")
+        except Exception as e:
+            logger.error(f"Failed to initialize Qdrant client: {e}")
+            raise
 
     def _normalize_metadata(
         self, 
-        doc: Document, 
-        file_path: str, 
-        file_name: str, 
-        file_type: str,
-        total_pages: Optional[int] = None
+        documents: List[Document], 
+        *,
+        document_id: Optional[str] = None,
     ) -> None:
         """
         Normalize document metadata to ensure uniform structure across all file types.
-        Ensures all documents have the same metadata fields regardless of source.
+        
+        This function should be called ONCE before chunking to normalize common metadata
+        for all documents. Then chunk_index is added separately in to_qdrant_points loop.
+        
+        Extracts file_name and file_type from document metadata or source path.
+        Handles both single and multi-page documents.
         
         Args:
-            doc: Document object to normalize
-            file_path: Full path to the file
-            file_name: Basename of the file
-            file_type: "pdf", "pdf_image", or "txt"
-            total_pages: Total number of pages (for PDFs), None for TXT
+            documents: List of Document objects to normalize
+            document_id: Document identifier (UUID or unique ID) - stored in metadata
         """
-        # Initialize metadata if None
-        doc.metadata = doc.metadata or {}
+        if not documents:
+            logger.warning("No documents provided for normalization")
+            return
         
-        # Get file timestamps (used for TXT and as fallback for PDFs)
-        try:
-            stat_info = os.stat(file_path)
-            creation_time = datetime.fromtimestamp(stat_info.st_ctime).isoformat() + "+00:00"
-            mod_time = datetime.fromtimestamp(stat_info.st_mtime).isoformat() + "+00:00"
-        except OSError:
-            creation_time = ""
-            mod_time = ""
-        
-        if file_type in ("pdf", "pdf_image"):
-            # For PDFs (both simple and complex), preserve existing values and set defaults only if missing
-            doc.metadata.setdefault("producer", "")
-            doc.metadata.setdefault("creator", "")
-            doc.metadata.setdefault("creationdate", creation_time if not doc.metadata.get("creationdate") else doc.metadata.get("creationdate"))
-            doc.metadata.setdefault("title", "")
-            doc.metadata.setdefault("author", "")
-            doc.metadata.setdefault("subject", "")
-            doc.metadata.setdefault("keywords", "")
-            doc.metadata.setdefault("moddate", mod_time if not doc.metadata.get("moddate") else doc.metadata.get("moddate"))
-            doc.metadata.setdefault("source", file_path)
-            doc.metadata.setdefault("file_name", file_name)
-            doc.metadata.setdefault("file_type", file_type)  # Preserve "pdf" or "pdf_image"
-            # total_pages: use provided value, existing value, or 0
-            if total_pages is not None:
-                doc.metadata["total_pages"] = total_pages
-            else:
-                doc.metadata.setdefault("total_pages", doc.metadata.get("total_pages", 0))
+        for doc in documents:
+            # Initialize metadata if None
+            doc.metadata = doc.metadata or {}
             
-            # Normalize page number to 1-indexed (consistent across all PDF types)
-            # Simple PDFs (PyPDFium2Loader) are 0-indexed, VLM PDFs are already 1-indexed
-            current_page = doc.metadata.get("page")
-            if current_page is not None:
-                # If page is 0-indexed (from simple PDF), convert to 1-indexed
-                # If page is already 1-indexed (from VLM), keep it as is
-                # We can detect: if file_type is "pdf_image", it's already 1-indexed
-                if file_type == "pdf_image":
-                    # VLM already returns 1-indexed, keep it
-                    doc.metadata["page"] = int(current_page)
+            # Extract file_name and file_type from metadata or source path
+            file_name = doc.metadata.get("file_name")
+            file_type = doc.metadata.get("file_type")
+            
+            # If not in metadata, extract from source path (set by PyPDFium2Loader/TextLoader)
+            if not file_name or not file_type:
+                source_path = doc.metadata.get("source", "")
+                if source_path:
+                    if not file_name:
+                        file_name = os.path.basename(source_path)
+                    if not file_type:
+                        file_ext = Path(source_path).suffix.lower()
+                        file_type = file_ext[1:] if file_ext else "unknown"
                 else:
-                    # Simple PDF is 0-indexed, convert to 1-indexed
-                    doc.metadata["page"] = int(current_page) + 1
-            else:
+                    file_name = file_name or "unknown"
+                    file_type = file_type or "unknown"
+            
+            
+            if file_type == "pdf":
+                # For PDFs: preserve ALL existing values, only add missing fields with defaults
+                # Don't modify any existing metadata values
+                doc.metadata.setdefault("producer", "")
+                doc.metadata.setdefault("creator", "")
+                doc.metadata.setdefault("creationdate", "")
+                doc.metadata.setdefault("title", "")
+                doc.metadata.setdefault("author", "")
+                doc.metadata.setdefault("subject", "")
+                doc.metadata.setdefault("keywords", "")
+                doc.metadata.setdefault("moddate", "")
+                doc.metadata.setdefault("source", "")
+                doc.metadata.setdefault("file_name", file_name)
+                doc.metadata.setdefault("file_type", "pdf")
+                doc.metadata.setdefault("total_pages", 0)
                 doc.metadata.setdefault("page", 0)
-        elif file_type == "txt":
-            # For TXT files, set all fields with defaults
-            doc.metadata.update({
-                "producer": "",
-                "creator": "",
-                "creationdate": creation_time,
-                "title": "",
-                "author": "",
-                "subject": "",
-                "keywords": "",
-                "moddate": mod_time,
-                "source": file_path,
-                "file_name": file_name,
-                "file_type": "txt",
-                "total_pages": None,  # TXT files don't have pages
-                "page": None,  # TXT files don't have pages
-            })
-        
-        # Ensure common fields that might be added by VLM processing exist
-        doc.metadata.setdefault("block_index", None)
-        doc.metadata.setdefault("block_type", None)
-        doc.metadata.setdefault("is_table", False)
-        
-        # Set extraction_method based on file_type for clarity
-        if file_type == "pdf_image":
-            doc.metadata.setdefault("extraction_method", "vlm")
-        elif file_type == "pdf":
-            doc.metadata.setdefault("extraction_method", "text_extraction")
-        elif file_type == "txt":
-            doc.metadata.setdefault("extraction_method", "direct_load")
-
-        
-    @timing_decorator_with_label("Rendering PDF Page to PNG")
-    def render_page_to_png_bytes(self, pdf_path: str, page_index: int, dpi: int = 200) -> bytes:
-        pdf = pdfium.PdfDocument(pdf_path)
-        page = pdf.get_page(page_index)
-        pil_image = page.render(scale=dpi/72).to_pil()  # 72 dpi base
-        buf = BytesIO()
-        pil_image.save(buf, format="PNG")
-        return buf.getvalue()
-
-
-
-    @timing_decorator_with_label("VLM Page Analysis")
-    def analyze_page_with_vlm(self, image_bytes: bytes, page_number: int, debug: bool = False) -> dict:
-        """
-        Analyze a PDF page image using VLM and extract structured content.
-        
-        Args:
-            image_bytes: PNG image bytes of the PDF page
-            page_number: Page number (1-indexed)
-            debug: If True, prints the prompt sent to VLM and the raw response (default: False)
-        
-        Returns:
-            dict: Parsed JSON with blocks structure:
-            {
-                "blocks": [
-                    {
-                        "type": "text" | "table",
-                        "page": 1,
-                        "content": "...",         # markdown text or markdown table
-                        "block_index": 0
-                    },
-                    ...
-                ]
-            }
-        """
-        b64 = b64encode(image_bytes).decode("utf-8")
-        prompt = f"""You are a document parser for a RAG system. Extract ALL content from page {page_number} and return it as valid JSON.
-
-CRITICAL REQUIREMENTS:
-1. Output ONLY valid JSON - no markdown, no explanations, no code blocks, no arrays
-2. You MUST return an object with a "blocks" key containing an array
-3. Extract content in reading order (top to bottom, left to right)
-4. Extract EVERY piece of content - do not skip anything
-5. Split content into logical blocks (paragraphs, headings, tables, lists)
-6. Each block MUST have ALL four fields: type, page, block_index, and content
-7. block_index: Sequential number identifying each block's position on the page (0-indexed)
-   - First block = 0, second block = 1, third block = 2, etc.
-   - Must start at 0 and increment by 1 for each subsequent block
-   - This preserves the reading order and allows tracking block sequence
-8. page must be exactly {page_number} for ALL blocks
-9. content field MUST contain the actual text/table content - never leave it empty
-10. If a block has no visible content, skip it - do not include empty blocks
-
-CONTENT EXTRACTION RULES:
-- Text blocks: Extract as plain markdown text. Preserve line breaks and formatting.
-- Tables: Convert to markdown table format with pipes (|). Include header row if present.
-- Do NOT summarize, paraphrase, or modify the content
-- Do NOT drop any rows, cells, or text
-- Preserve mathematical notation, formulas, and special characters
-- Keep tables as separate blocks (type: "table")
-- Keep text paragraphs as separate blocks (type: "text")
-
-REQUIRED JSON FORMAT (MUST follow exactly - this is the ONLY acceptable format):
-{{
-  "blocks": [
-    {{
-      "type": "text",
-      "page": {page_number},
-      "block_index": 0,
-      "content": "First paragraph or heading text here..."
-    }},
-    {{
-      "type": "table",
-      "page": {page_number},
-      "block_index": 1,
-      "content": "| Header1 | Header2 |\\n|---------|---------|\\n| Cell1   | Cell2   |"
-    }},
-    {{
-      "type": "text",
-      "page": {page_number},
-      "block_index": 2,
-      "content": "Next paragraph text here..."
-    }}
-  ]
-}}
-
-CRITICAL FORMAT RULES:
-- Start with {{ (opening brace for object)
-- Must have "blocks" key (with quotes)
-- "blocks" value must be an array [ ]
-- Each block must be a complete object with all 4 fields: type, page, block_index, content
-- End with }} (closing brace for object)
-- DO NOT return just an array [ ] - it must be wrapped in an object with "blocks" key
-- DO NOT return incomplete blocks - every block must have all fields filled
-- DO NOT stop mid-response - extract ALL content from the page
-- content field MUST contain actual text/table content - never leave it empty
-
-Note: block_index represents the sequential position of each block on the page (0=first, 1=second, 2=third, etc.)
-
-IMPORTANT: Return ONLY the JSON object starting with {{ and ending with }}, nothing else. No markdown code blocks, no explanations, no arrays."""
-        
-        # DEBUG: Print the prompt being sent to VLM
-        print(f"\n{'='*100}")
-        print(f"[DEBUG] VLM PROMPT for page {page_number}:")
-        print(f"{'='*100}")
-        print(prompt)
-        print(f"{'='*100}")
-        print(f"[DEBUG] System Message: You extract structured content from document images.")
-        print(f"[DEBUG] Image size: {len(image_bytes)} bytes (base64 length: {len(b64)} chars)")
-        print(f"[DEBUG] Calling VLM model...\n")
-
-        # Use raw Ollama client for vision models - it handles images better than ChatOllama
-        try:
-            response = self.ollama_client.chat(
-                model=self.vlm_model_name,
-                messages=[
-                    {"role": "system", "content": "You extract structured content from document images."},
-                    {
-                        "role": "user",
-                        "content": prompt,
-                        "images": [b64]  # Ollama expects base64 strings directly in images array
-                    }
-                ]
-            )
-            
-            # DEBUG: Inspect response structure
-            if debug:
-                print(f"[DEBUG] Response object type: {type(response)}")
-                print(f"[DEBUG] Response has 'message' attr: {hasattr(response, 'message')}")
-                if hasattr(response, 'message'):
-                    print(f"[DEBUG] response.message type: {type(response.message)}")
-                    print(f"[DEBUG] response.message has 'content' attr: {hasattr(response.message, 'content')}")
-                if hasattr(response, '__dict__'):
-                    print(f"[DEBUG] Response __dict__ keys: {list(response.__dict__.keys())}")
-            
-            # Ollama returns ChatResponse object - access as attribute, not dict
-            # Try both dict and attribute access for compatibility
-            if hasattr(response, 'message'):
-                # ChatResponse object with message attribute
-                if hasattr(response.message, 'content'):
-                    raw_content = response.message.content.strip()
-                elif isinstance(response.message, dict):
-                    raw_content = response.message.get("content", "").strip()
-                else:
-                    # Fallback: try to convert to dict
-                    raw_content = str(response.message).strip()
-            elif isinstance(response, dict):
-                # Dict response (fallback)
-                raw_content = response.get("message", {}).get("content", "").strip()
-            else:
-                # Unknown format - try to get string representation
-                raw_content = str(response).strip()
-                if debug:
-                    print(f"[DEBUG] Unexpected response format, using string representation")
-                    print(f"[DEBUG] Response attributes: {dir(response)}")
-            
-            # Validate we got content
-            if not raw_content:
-                if debug:
-                    print(f"[DEBUG] Empty response content. Response object: {response}")
-                    print(f"[DEBUG] Response type: {type(response)}")
-                    if hasattr(response, '__dict__'):
-                        print(f"[DEBUG] Response __dict__: {response.__dict__}")
-                raise ValueError("VLM returned empty response content")
+                doc.metadata.setdefault("is_table", False) 
                 
-        except Exception as e:
-            if debug:
-                print(f"[DEBUG] Error calling Ollama: {e}")
-                print(f"[DEBUG] Error type: {type(e)}")
-                import traceback
-                print(f"[DEBUG] Traceback: {traceback.format_exc()}")
-            raise RuntimeError(f"Failed to call Ollama VLM model: {e}") from e
-        
-        # DEBUG: Print raw VLM response (only if debug=True)
-        if debug:
-            print(f"\n{'='*100}")
-            print(f"[DEBUG] VLM RAW RESPONSE for page {page_number}:")
-            print(f"{'='*100}")
-            print(raw_content)
-            print(f"{'='*100}")
-            print(f"[DEBUG] Response length: {len(raw_content)} characters")
-            print(f"[DEBUG] Response type: {type(response)}")
-            print(f"{'='*100}\n")
-        
-        content = raw_content
-        
-        # Try to extract JSON from markdown code blocks if present
-        if "```json" in content:
-            # Extract JSON from ```json ... ``` block
-            start = content.find("```json") + 7
-            end = content.find("```", start)
-            if end != -1:
-                content = content[start:end].strip()
-                if debug:
-                    print(f"[DEBUG] Extracted JSON from markdown code block")
-        elif "```" in content:
-            # Extract JSON from ``` ... ``` block
-            start = content.find("```") + 3
-            end = content.find("```", start)
-            if end != -1:
-                content = content[start:end].strip()
-                if debug:
-                    print(f"[DEBUG] Extracted JSON from generic code block")
-        
-        # Try to find JSON object in the content
-        try:
-            # First, try direct parsing
-            parsed_json = json.loads(content)
-            if debug:
-                print(f"[DEBUG] ✓ Successfully parsed JSON directly")
-                print(f"[DEBUG] Parsed JSON structure:")
-                print(f"  - Type: {type(parsed_json)}")
-                if isinstance(parsed_json, dict):
-                    print(f"  - Keys: {list(parsed_json.keys())}")
-                    if "blocks" in parsed_json:
-                        print(f"  - Number of blocks: {len(parsed_json.get('blocks', []))}")
-                        for i, block in enumerate(parsed_json.get('blocks', [])[:3]):  # Show first 3 blocks
-                            print(f"    Block {i}: type={block.get('type')}, page={block.get('page')}, block_index={block.get('block_index')}")
-                print(f"{'='*100}\n")
-            return parsed_json
-        except json.JSONDecodeError as e:
-            if debug:
-                print(f"[DEBUG] ✗ Direct JSON parsing failed: {e}")
-                print(f"[DEBUG] Attempting to extract JSON from boundaries...")
-            # If that fails, try to find JSON object boundaries
-            start_idx = content.find("{")
-            end_idx = content.rfind("}")
-            if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-                json_str = content[start_idx:end_idx + 1]
-                if debug:
-                    print(f"[DEBUG] Found JSON boundaries: start={start_idx}, end={end_idx}, length={len(json_str)}")
-                try:
-                    parsed_json = json.loads(json_str)
-                    if debug:
-                        print(f"[DEBUG] ✓ Successfully parsed JSON by extracting boundaries")
-                        print(f"[DEBUG] Parsed JSON structure:")
-                        print(f"  - Type: {type(parsed_json)}")
-                        if isinstance(parsed_json, dict):
-                            print(f"  - Keys: {list(parsed_json.keys())}")
-                            if "blocks" in parsed_json:
-                                print(f"  - Number of blocks: {len(parsed_json.get('blocks', []))}")
-                        print(f"{'='*100}\n")
-                    return parsed_json
-                except json.JSONDecodeError as e2:
-                    if debug:
-                        print(f"[DEBUG] ✗ Boundary extraction also failed: {e2}")
-                        print(f"[DEBUG] Extracted JSON string (first 500 chars): {json_str[:500]}")
-                        print(f"[DEBUG] Error position: {e2.pos if hasattr(e2, 'pos') else 'unknown'}")
-                        print(f"{'='*100}\n")
-                    raise ValueError(f"Could not parse JSON from VLM response. First error: {e}, Second error: {e2}. Raw content preview: {raw_content[:500]}...")
-            else:
-                # If still can't parse, raise with more context
-                if debug:
-                    print(f"[DEBUG] ✗ Could not find JSON boundaries in content")
-                    print(f"[DEBUG] Content preview (first 500 chars): {content[:500]}")
-                    print(f"{'='*100}\n")
-                raise ValueError(f"Could not parse JSON from VLM response. No JSON object found. Raw content preview: {raw_content[:500]}...")
-
-
-    def blocks_to_documents(self, blocks: list, base_metadata: dict, page_number: Optional[int] = None) -> List[Document]:
-        """
-        Convert VLM blocks to Document objects.
-        
-        Args:
-            blocks: List of block dictionaries from VLM
-            base_metadata: Base metadata to merge with block metadata
-            page_number: Page number to use if not present in blocks (defaults to block["page"] if available)
-        """
-        docs = []
-        valid_blocks = 0
-        skipped_blocks = 0
-        
-        for idx, block in enumerate(blocks):
-            # Use .get() with defaults to handle missing fields gracefully
-            block_type = block.get("type", "text")
-            block_content = block.get("content", "")
-            block_page = block.get("page", page_number)  # Use provided page_number if block doesn't have it
-            block_index = block.get("block_index", idx)  # Use enumerate index if not provided
+                # Page normalization happens per chunk (each chunk may have different page)
+                # This is handled separately in to_qdrant_points loop
+                        
+            elif file_type == "txt":
+                # For TXT files: preserve existing values (like 'source'), add missing PDF fields with None/empty
+                # Use setdefault to avoid overwriting existing values - same fields as PDF for consistency
+                doc.metadata.setdefault("producer", "")
+                doc.metadata.setdefault("creator", "")
+                doc.metadata.setdefault("creationdate", "")  # Will be updated with file stats if available
+                doc.metadata.setdefault("title", "")
+                doc.metadata.setdefault("author", "")
+                doc.metadata.setdefault("subject", "")
+                doc.metadata.setdefault("keywords", "")
+                doc.metadata.setdefault("moddate", "")  # Will be updated with file stats if available
+                doc.metadata.setdefault("source", "")
+                doc.metadata.setdefault("file_name", file_name)
+                doc.metadata.setdefault("file_type", "txt")
+                doc.metadata.setdefault("total_pages", None)
+                doc.metadata.setdefault("page", None)
+                doc.metadata.setdefault("is_table", False)
+                
+                # Update timestamps with file stats if available and not already set
+                file_path_for_stats = doc.metadata.get("source")
+                if file_path_for_stats and os.path.exists(file_path_for_stats) and os.path.isfile(file_path_for_stats):
+                    try:
+                        stat_info = os.stat(file_path_for_stats)
+                        # Only update if still empty (preserve any existing value)
+                        if not doc.metadata.get("creationdate"):
+                            doc.metadata["creationdate"] = datetime.fromtimestamp(stat_info.st_ctime).isoformat() + "+00:00"
+                        if not doc.metadata.get("moddate"):
+                            doc.metadata["moddate"] = datetime.fromtimestamp(stat_info.st_mtime).isoformat() + "+00:00"
+                    except OSError as e:
+                        logger.warning(f"Could not get file stats for {file_path_for_stats}: {e}")
             
-            # Validate block - skip if content is empty or invalid
-            if not block_content or not isinstance(block_content, str) or not block_content.strip():
-                skipped_blocks += 1
-                print(f"[WARNING] Skipping block {idx} on page {block_page}: empty or missing content (type={block_type}, block_index={block_index})")
-                continue
-            
-            # Validate block_index is sequential
-            if block_index != valid_blocks:
-                print(f"[WARNING] Block {idx} has block_index={block_index}, expected {valid_blocks}. Correcting...")
-                block_index = valid_blocks
-            
-            meta = {
-                **base_metadata,
-                "page": block_page,
-                "block_index": block_index,
-                "block_type": block_type,
-                "is_table": block_type == "table",
-                "extraction_method": "vlm",  # VLM-processed blocks
-            }
-            docs.append(Document(page_content=block_content, metadata=meta))
-            valid_blocks += 1
-        
-        if skipped_blocks > 0:
-            print(f"[INFO] Processed {valid_blocks} valid blocks, skipped {skipped_blocks} invalid/incomplete blocks")
-        
-        return docs
+            # Add Qdrant-specific metadata if provided
+            # Note: chunk_index is added separately in to_qdrant_points loop for efficiency
+            if document_id is not None:
+                doc.metadata["document_id"] = document_id
 
 
-    @timing_decorator_with_label("Loading Document")
     def load_document(self, file_path: str) -> List[Document]:
         """
         Load a document from file path. Automatically detects file type.
@@ -454,135 +201,50 @@ IMPORTANT: Return ONLY the JSON object starting with {{ and ending with }}, noth
         
         Raises:
             ValueError: If file type is not supported
+            FileNotFoundError: If file does not exist
+            IOError: If file cannot be read
         """
+        # Validate file exists
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+        
+        if not os.path.isfile(file_path):
+            raise ValueError(f"Path is not a file: {file_path}")
+        
         file_ext = Path(file_path).suffix.lower()
         file_name = os.path.basename(file_path)
-        total_pages = None  # Will be set for PDFs
         
-        if file_ext == '.pdf':
-            loaded_documents = PyPDFium2Loader(file_path).load()
-            print(f"PDF Document Loading is Successful. Loaded {len(loaded_documents)} document(s).")
-            # Get total pages from the first document's metadata if available
-            total_pages = loaded_documents[0].metadata.get("total_pages", len(loaded_documents)) if loaded_documents else 0
-        elif file_ext == '.txt':
-            try:
-                # Use LangChain's TextLoader which handles encoding automatically
-                loader = TextLoader(file_path, encoding='utf-8')
-                loaded_documents = loader.load()
-                print(f"TXT Document Loading is Successful. Loaded {len(loaded_documents)} document(s).")
-            except UnicodeDecodeError:
-                # Fallback to latin-1 if UTF-8 fails
-                print("UTF-8 decoding failed, trying latin-1 encoding...")
-                loader = TextLoader(file_path, encoding='latin-1')
-                loaded_documents = loader.load()
-                print(f"TXT Document Loading is Successful (latin-1). Loaded {len(loaded_documents)} document(s).")
-        else:
-            raise ValueError(f"Unsupported file type: {file_ext}. Supported types: .pdf, .txt")
-        
-        # Normalize metadata for all documents
-        for doc in loaded_documents:
+        try:
             if file_ext == '.pdf':
-                self._normalize_metadata(doc, file_path, file_name, "pdf", total_pages=total_pages)
+                loaded_documents = PyPDFium2Loader(file_path).load()
+                logger.info(f"PDF document loaded successfully: {len(loaded_documents)} page(s)")
+            elif file_ext == '.txt':
+                try:
+                    # Use LangChain's TextLoader which handles encoding automatically
+                    loader = TextLoader(file_path, encoding='utf-8')
+                    loaded_documents = loader.load()
+                    logger.info(f"TXT document loaded successfully (UTF-8): {len(loaded_documents)} document(s)")
+                except UnicodeDecodeError:
+                    # Fallback to latin-1 if UTF-8 fails
+                    logger.warning("UTF-8 decoding failed, trying latin-1 encoding...")
+                    loader = TextLoader(file_path, encoding='latin-1')
+                    loaded_documents = loader.load()
+                    logger.info(f"TXT document loaded successfully (latin-1): {len(loaded_documents)} document(s)")
             else:
-                self._normalize_metadata(doc, file_path, file_name, file_ext[1:])  # Remove the dot from extension
+                raise ValueError(f"Unsupported file type: {file_ext}. Supported types: .pdf, .txt")
+        except Exception as e:
+            logger.error(f"Error loading document {file_path}: {e}")
+            raise
+
+        #normalise data before returning
+        #self._normalize_metadata(loaded_documents, document_id=document_id)
+        
+        # PyPDFium2Loader and TextLoader already set 'source' and 'page' metadata
+        # All other metadata (file_name, file_type, etc.) will be set during normalization
+        # right before converting to Qdrant points in to_qdrant_points()
         
         return loaded_documents
 
-    @timing_decorator_with_label("Loading Complex PDF with VLM")
-    def load_complex_pdf_with_vlm(self, file_path: str, tenant_id: str, category: str, debug: bool = False) -> List[Document]:
-        """
-        Load a complex PDF document using VLM for OCR and structured extraction.
-        
-        Args:
-            file_path: Path to the PDF file
-            tenant_id: Tenant identifier
-            category: Document category
-            debug: If True, prints VLM prompts and responses for debugging (default: False)
-        
-        Returns:
-            List[Document]: List of Document objects with extracted content
-        """
-        pdf = pdfium.PdfDocument(file_path)
-        num_pages = len(pdf)
-        file_name = os.path.basename(file_path)
-
-        all_docs: List[Document] = []
-
-        for page_index in range(num_pages):
-            image_bytes = self.render_page_to_png_bytes(file_path, page_index)
-            parsed = self.analyze_page_with_vlm(image_bytes, page_number=page_index + 1, debug=debug)
-            
-            # Normalize VLM response to ensure consistent format
-            # Handle both formats: dict with "blocks" key or direct list
-            if isinstance(parsed, dict):
-                blocks = parsed.get("blocks", [])
-                if not blocks:
-                    print(f"[WARNING] Page {page_index + 1}: Parsed dict but 'blocks' key is empty or missing")
-                    print(f"[WARNING] Dict keys: {list(parsed.keys())}")
-            elif isinstance(parsed, list):
-                if debug:
-                    print(f"[WARNING] Page {page_index + 1}: VLM returned array instead of object with 'blocks' key")
-                    print(f"[WARNING] Array length: {len(parsed)}")
-                blocks = parsed
-            else:
-                print(f"[ERROR] Page {page_index + 1}: Unexpected parsed format: {type(parsed)}")
-                print(f"[ERROR] Parsed content: {parsed}")
-                blocks = []
-            
-            if not blocks:
-                print(f"[WARNING] Page {page_index + 1}: No blocks extracted from VLM response - skipping page")
-                continue
-            
-            # Normalize blocks: ensure all blocks have required fields (page, block_index)
-            current_page = page_index + 1
-            normalized_blocks = []
-            for idx, block in enumerate(blocks):
-                if not isinstance(block, dict):
-                    print(f"[WARNING] Page {current_page}: Block {idx} is not a dict, skipping: {type(block)}")
-                    continue
-                
-                # Ensure page field exists
-                if "page" not in block:
-                    block["page"] = current_page
-                
-                # Ensure block_index exists and is sequential
-                if "block_index" not in block:
-                    block["block_index"] = len(normalized_blocks)
-                elif block["block_index"] != len(normalized_blocks):
-                    if debug:
-                        print(f"[WARNING] Page {current_page}: Block {idx} has block_index={block['block_index']}, expected {len(normalized_blocks)}. Correcting...")
-                    block["block_index"] = len(normalized_blocks)
-                
-                # Ensure type field exists
-                if "type" not in block:
-                    block["type"] = "text"  # Default to text if not specified
-                
-                normalized_blocks.append(block)
-            
-            blocks = normalized_blocks
-            print(f"[INFO] Page {current_page}: Extracted {len(blocks)} blocks from VLM response")
-
-            base_meta = {
-                "file_name": file_name,
-                "file_type": "pdf_image",
-                "source": file_path,
-                "tenant_id": tenant_id,
-                "category": category,
-            }
-
-            # Pass page_number to blocks_to_documents in case VLM doesn't include it
-            docs = self.blocks_to_documents(blocks, base_meta, page_number=page_index + 1)
-            all_docs.extend(docs)
-        
-        # Normalize metadata for all documents to ensure uniform structure
-        for doc in all_docs:
-            self._normalize_metadata(doc, file_path, file_name, "pdf_image", total_pages=num_pages)
-        
-        return all_docs
-
-        return all_docs
-
-    @timing_decorator_with_label("Chunking Documents")
     def chunk_documents(
         self, 
         documents: List[Document], 
@@ -594,12 +256,22 @@ IMPORTANT: Return ONLY the JSON object starting with {{ and ending with }}, noth
         
         Args:
             documents: List of Document objects to chunk
-            chunk_size: Maximum size of each chunk
-            chunk_overlap: Overlap between chunks
+            chunk_size: Maximum size of each chunk (in characters)
+            chunk_overlap: Overlap between chunks (in characters)
         
         Returns:
             List of Document objects (chunks)
+        
+        Raises:
+            ValueError: If chunk_size or chunk_overlap are invalid
         """
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be positive")
+        if chunk_overlap < 0:
+            raise ValueError("chunk_overlap must be non-negative")
+        if chunk_overlap >= chunk_size:
+            raise ValueError("chunk_overlap must be less than chunk_size")
+        
         text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
@@ -607,229 +279,497 @@ IMPORTANT: Return ONLY the JSON object starting with {{ and ending with }}, noth
         )
 
         chunks = text_splitter.split_documents(documents)
-        print(f"Chunking complete. Total chunks: {len(chunks)}")
+        logger.info(f"Chunking complete: {len(chunks)} chunk(s) from {len(documents)} document(s)")
         return chunks
 
-    @timing_decorator_with_label("Generating Embeddings")
-    def embed_chunks(self, chunks: List[Document]) -> List[Dict[str, Any]]:
-        """
-        Generate embeddings for each chunk.
-        Returns a list ready to be sent to Qdrant (or any vector DB):
-        {
-          "id": "chunk-0",
-          "text": "...",
-          "embedding": [...],
-          "metadata": {...}
-        }
-        """
-        texts = [c.page_content for c in chunks]
-        metadatas = [c.metadata for c in chunks]
-
-        # FastEmbed will batch efficiently under the hood
-        vectors = self.embeddings.embed_documents(texts)
-
-        payloads = []
-        for i, (text, meta, vec) in enumerate(zip(texts, metadatas, vectors)):
-            payloads.append(
-                {
-                    "id": f"chunk-{i}",
-                    "text": text,
-                    "embedding": vec,
-                    "metadata": meta,
-                }
-            )
-
-        print(f"Embedding complete. Total embedded chunks: {len(payloads)}")
-        return payloads
-
-    @timing_decorator_with_label("Converting to Qdrant Points")
-    def to_qdrant_points(
+    def _chunk_table_rows(
         self,
-        embedded_items: List[Dict[str, Any]],
-        *,
-        tenant_id: str,
-        category: str,
-        file_name: str,
-        minio_path: str,
-        ):
+        headers: List[str],
+        rows: List[List[Any]],
+        base_metadata: Dict[str, Any],
+        window_size: int = 10,
+        overlap: int = 2,
+    ) -> List[Document]:
         """
-        Convert embedded items to Qdrant points.
+        Chunk a table into row windows while preserving headers.
+
+        Each chunk becomes a Document with:
+        - markdown-style table text
+        - row_start / row_end metadata
+        - is_table = True
         """
-        points = []
-        for i, item in enumerate(embedded_items):
-            text = item["text"]
-            vec = item["embedding"]
-            meta = item["metadata"].copy()
+        docs: List[Document] = []
+        n = len(rows)
+        if n == 0:
+            return docs
 
-            # Page numbers are already normalized to 1-indexed during metadata normalization
-            # No need to modify here - just ensure it's an integer if present
-            if "page" in meta and meta["page"] is not None:
-                meta["page"] = int(meta["page"])
+        start = 0
+        while start < n:
+            end = min(start + window_size, n)
+            window_rows = rows[start:end]
 
-            base_meta = {
-                "tenant_id": tenant_id,
-                "category": category,
-                "file_name": file_name,
-                "minio_path": minio_path,
-                "chunk_index": i,
+            # Build markdown content for this window
+            header_line = " | ".join(headers)
+            separator_line = " | ".join("---" for _ in headers)
+            md_lines = [header_line, separator_line]
+
+            for r in window_rows:
+                # Ensure same number of columns as headers
+                row_cells = [
+                    "" if cell is None else str(cell).strip()
+                    for cell in r[: len(headers)]
+                ]
+                if len(row_cells) < len(headers):
+                    row_cells += [""] * (len(headers) - len(row_cells))
+                md_lines.append(" | ".join(row_cells))
+
+            content = "\n".join(md_lines)
+
+            meta = {
+                **base_metadata,
+                "row_start": start,
+                "row_end": end - 1,
+                "is_table": True,
             }
 
-            merged_meta = {**meta, **base_meta}
+            docs.append(Document(page_content=content, metadata=meta))
 
-            # Create a unique string identifier for this point
-            point_id_str = f"{tenant_id}:{file_name}:chunk-{i}"
-            # Convert to integer ID using hash (Qdrant requires integer or UUID)
-            # Using MD5 hash to ensure consistent integer IDs
-            point_id = int(hashlib.md5(point_id_str.encode()).hexdigest()[:15], 16)
+            if end == n:
+                break
+            start = max(end - overlap, 0)
 
-            points.append(
-                {
-                    "id": point_id,
-                    "vector": vec,
-                    "payload": {
-                        "text": text,
-                        "point_id_str": point_id_str,  # Store original string ID in payload for reference
-                        **merged_meta,
-                    },
-                }
-            )
+        return docs
+
+
+    def extract_tables_as_documents(
+        self,
+        file_path: str,
+    ) -> List[Document]:
+        """
+        Extract tables from a PDF as structured Documents using pdfplumber.
+
+        Each table is split into row-window chunks via _chunk_table_rows(),
+        and tagged with:
+            - is_table = True
+            - table_index
+            - page (0-indexed, normalized later)
+            - extraction_mode = "table_parser"
+        """
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"File not found: {file_path}")
+        if not os.path.isfile(file_path):
+            raise ValueError(f"Path is not a file: {file_path}")
+
+        file_ext = Path(file_path).suffix.lower()
+        if file_ext != ".pdf":
+            # Table parser currently only supports PDF
+            logger.info(f"Table extraction skipped: not a PDF ({file_path})")
+            return []
+
+        file_name = os.path.basename(file_path)
+        table_docs: List[Document] = []
+
+        try:
+            with pdfplumber.open(file_path) as pdf:
+                for page_index, page in enumerate(pdf.pages):
+                    try:
+                        tables = page.extract_tables()
+                    except Exception as e:
+                        logger.warning(f"Failed to extract tables on page {page_index}: {e}")
+                        continue
+
+                    if not tables:
+                        continue
+
+                    for table_index, table in enumerate(tables):
+                        if not table or len(table) < 2:
+                            # need at least header + 1 data row
+                            continue
+
+                        # First row as headers
+                        raw_headers = table[0]
+                        headers = [
+                            "" if h is None else str(h).strip()
+                            for h in raw_headers
+                        ]
+
+                        # Remaining rows as data
+                        raw_rows = table[1:]
+                        rows = [
+                            ["" if cell is None else str(cell).strip() for cell in row]
+                            for row in raw_rows
+                        ]
+
+                        base_meta = {
+                            "file_name": file_name,
+                            "file_type": "pdf",
+                            "source": file_path,
+                            "page": page_index,  # will be normalized to +1 later
+                            "table_index": table_index,
+                            "extraction_mode": "table_parser",
+                            # is_table + row_start/row_end added in _chunk_table_rows
+                        }
+
+                        table_docs.extend(
+                            self._chunk_table_rows(
+                                headers=headers,
+                                rows=rows,
+                                base_metadata=base_meta,
+                                window_size=10,
+                                overlap=2,
+                            )
+                        )
+        except Exception as e:
+            logger.error(f"Error during table extraction for {file_path}: {e}", exc_info=True)
+            return []
+
+        logger.info(f"Extracted {len(table_docs)} table chunk(s) from {file_path}")
+        return table_docs
+
+
+    def embed_chunks(self, chunks: List[Document]) -> Tuple[List[Document], List[List[float]]]:
+        """
+        Generate embeddings for each chunk.
+        
+        Returns chunks and their embeddings as separate parallel lists,
+        preserving the original Document structure without mutation.
+        
+        Args:
+            chunks: List of Document objects to embed
+        
+        Returns:
+            Tuple of (chunks, embeddings) where embeddings[i] corresponds to chunks[i]
+        
+        Raises:
+            ValueError: If chunks list is empty
+            RuntimeError: If embedding generation fails
+        """
+        if not chunks:
+            raise ValueError("Cannot embed empty chunks list")
+        
+        # Extract page_content for embedding (embed_documents requires list of strings)
+        page_contents = [chunk.page_content for chunk in chunks]
+
+        try:
+            # OllamaEmbeddings will batch efficiently under the hood
+            embeddings = self.embeddings.embed_documents(page_contents)
+            logger.info(f"Generated embeddings for {len(embeddings)} chunk(s)")
+        except Exception as e:
+            logger.error(f"Error generating embeddings: {e}")
+            raise RuntimeError(f"Failed to generate embeddings: {e}") from e
+        
+        # Validate vector dimensions match
+        if len(embeddings) != len(chunks):
+            raise RuntimeError(f"Vector count mismatch: {len(embeddings)} vectors for {len(chunks)} chunks")
+        
+        # Filter out empty embeddings while maintaining parallel structure
+        valid_chunks = []
+        valid_embeddings = []
+        for chunk, embedding in zip(chunks, embeddings):
+            if not embedding or len(embedding) == 0:
+                logger.warning(f"Empty embedding for chunk, skipping")
+                continue
+            valid_chunks.append(chunk)
+            valid_embeddings.append(embedding)
+
+        logger.info(f"Embedding complete: {len(valid_chunks)} embedded chunk(s)")
+        return valid_chunks, valid_embeddings
+
+
+    def to_qdrant_points(
+        self,
+        chunks: List[Document],
+        embeddings: List[List[float]],
+        *,
+        document_id: str,
+    ) -> List[models.PointStruct]:
+        """
+        Convert Document chunks and their embeddings to Qdrant PointStruct objects.
+        
+        This is the ONLY place where we transform to Qdrant's required structure.
+        All other methods preserve the original Document structure.
+        
+        The file path is automatically extracted from the 'source' metadata field
+        set by PyPDFium2Loader/TextLoader.
+        
+        Args:
+            chunks: List of Document objects (from embed_chunks)
+            embeddings: List of embedding vectors, parallel to chunks
+            document_id: Document identifier (UUID or unique ID) - stored in metadata
+        
+        Returns:
+            List of PointStruct objects ready for Qdrant upsert
+        
+        Raises:
+            ValueError: If required parameters are missing or invalid
+        """
+        if not chunks or not embeddings:
+            raise ValueError("chunks and embeddings cannot be empty")
+        
+        if len(chunks) != len(embeddings):
+            raise ValueError(f"chunks and embeddings must have same length: {len(chunks)} vs {len(embeddings)}")
+        
+        points = []
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
+            # Validate chunk structure
+            if not hasattr(chunk, 'page_content') or not hasattr(chunk, 'metadata'):
+                logger.warning(f"Invalid chunk structure at index {i}, skipping")
+                continue
+            
+            # Metadata is already normalized before chunking, just add chunk-specific fields
+            chunk_copy = Document(page_content=chunk.page_content, metadata=chunk.metadata.copy())
+            
+            # Add chunk_index (only chunk-specific field)
+            chunk_copy.metadata["chunk_index"] = i
+            
+            # Normalize page number for this chunk (PDFs: 0-indexed -> 1-indexed)
+            if "page" in chunk_copy.metadata and chunk_copy.metadata["page"] is not None:
+                try:
+                    page_num = int(chunk_copy.metadata["page"])
+                    # Normalize 0-indexed to 1-indexed (0 -> 1, 1 -> 2, etc.)
+                    chunk_copy.metadata["page"] = page_num + 1
+                except (ValueError, TypeError):
+                    logger.warning(f"Invalid page number '{chunk_copy.metadata['page']}', setting to None")
+                    chunk_copy.metadata["page"] = None
+            
+            # Use normalized metadata (this is the JSON metadata dict)
+            metadata = chunk_copy.metadata
+
+            # Generate UUID string ID for the point
+            point_id = str(uuid.uuid4())
+
+            # Create PointStruct directly (more efficient than converting later)
+            # Payload structure: {page_content, file_id, metadata}
+            # Vector structure: {"text": embedding} for named vectors
+            try:
+                points.append(
+                    models.PointStruct(
+                        id=point_id,
+                        vector={"text": embedding},  # Named vector with "text" key
+                        payload={
+                            "page_content": chunk.page_content,  # Store chunk text
+                            "file_id": document_id,  # Document identifier
+                            "metadata": metadata,  # Nested JSON metadata dict
+                        },
+                    )
+                )
+            except Exception as e:
+                logger.error(f"Error creating PointStruct for chunk {i}: {e}")
+                continue
+        
+        logger.info(f"Converted {len(points)} embedded items to Qdrant points")
         return points
 
-    @timing_decorator_with_label("Creating Qdrant Collection")
-    def create_collection(self, vector_size: int, distance: str = "Cosine", collection_name: str = "default_testing") -> bool:
+    def create_collection(
+        self, 
+        vector_size: int, 
+        distance: str = "Cosine", 
+        collection_name: str = "default_testing"
+    ) -> bool:
         """
-        Create or ensure the 'testing' collection exists in Qdrant.
+        Create or ensure a Qdrant collection exists with named vectors.
+        
+        Uses named vector "text" to match the vector structure in points.
         
         Args:
             vector_size: Size of the embedding vectors
             distance: Distance metric ("Cosine", "Euclidean", or "Dot")
+            collection_name: Name of the collection
         
         Returns:
-            bool: True if collection exists or was created successfully
+            bool: True if collection exists or was created successfully, False otherwise
         """
+        if vector_size <= 0:
+            logger.error(f"Invalid vector_size: {vector_size}")
+            return False
+        
+        valid_distances = {"Cosine", "Euclidean", "Dot"}
+        if distance not in valid_distances:
+            logger.error(f"Invalid distance metric: {distance}. Must be one of {valid_distances}")
+            return False
+        
         try:
-            # Check if collection exists
+            # Check if collection exists and verify vector configuration
             collections = self.qdrant_client.get_collections()
             collection_names = [col.name for col in collections.collections]
             
             if collection_name in collection_names:
-                print(f"Collection '{collection_name}' already exists")
-                return True
+                # Check if collection has compatible configuration
+                try:
+                    collection_info = self.qdrant_client.get_collection(collection_name)
+                    vectors_config = collection_info.config.params.vectors
+                    
+                    # Check if it's a dict (named vectors) with "text" key
+                    is_compatible = False
+                    if isinstance(vectors_config, dict):
+                        # Named vectors - check for "text" vector
+                        if "text" in vectors_config:
+                            text_vector = vectors_config["text"]
+                            # Check if size and distance match
+                            if (hasattr(text_vector, 'size') and text_vector.size == vector_size and
+                                hasattr(text_vector, 'distance') and text_vector.distance == getattr(models.Distance, distance.upper())):
+                                is_compatible = True
+                                logger.info(f"Collection '{collection_name}' already exists with compatible named vector 'text' (size: {vector_size}, distance: {distance})")
+                                return True
+                            else:
+                                logger.warning(f"Collection '{collection_name}' has named vector 'text' but incompatible size/distance. Will recreate.")
+                        else:
+                            logger.warning(f"Collection '{collection_name}' has named vectors but missing 'text' vector. Will recreate.")
+                    else:
+                        # Unnamed/default vectors - incompatible
+                        logger.warning(f"Collection '{collection_name}' uses unnamed vectors (incompatible). Will recreate.")
+                    
+                    # Collection exists but is incompatible - delete it
+                    if not is_compatible:
+                        logger.info(f"Deleting incompatible collection '{collection_name}'...")
+                        self.qdrant_client.delete_collection(collection_name)
+                        logger.info(f"Deleted incompatible collection '{collection_name}'")
+                        
+                except Exception as e:
+                    logger.warning(f"Could not verify collection config for '{collection_name}': {e}. Assuming incompatible and deleting...")
+                    try:
+                        self.qdrant_client.delete_collection(collection_name)
+                        logger.info(f"Deleted collection '{collection_name}' due to verification error")
+                    except Exception as delete_error:
+                        logger.error(f"Could not delete collection '{collection_name}': {delete_error}")
+                        # Continue anyway - create_collection will fail if it still exists
             
-            # Create collection
+            # Create collection with named vectors
+            # Vector name "text" matches the vector key used in points
             self.qdrant_client.create_collection(
                 collection_name=collection_name,
-                vectors_config=models.VectorParams(
-                    size=vector_size,
-                    distance=getattr(models.Distance, distance.upper()),
-                ),
+                vectors_config={
+                    "text": models.VectorParams(
+                        size=vector_size,
+                        distance=getattr(models.Distance, distance.upper()),
+                    ),
+                },
             )
-            print(f"Collection '{collection_name}' created successfully with vector size {vector_size}")
+            logger.info(f"Collection '{collection_name}' created successfully with named vector 'text' (size: {vector_size})")
             return True
         except Exception as e:
-            print(f"Error creating collection '{collection_name}': {e}")
+            logger.error(f"Unexpected error creating collection '{collection_name}': {e}", exc_info=True)
             return False
 
-    @timing_decorator_with_label("Appending Points to Qdrant")
     def append_points_to_collection(
         self, 
-        points: List[Dict[str, Any]],
-        collection_name: str = "default_testing"
+        points: List[models.PointStruct],
+        collection_name: str = "default_testing",
+        batch_size: int = QDRANT_BATCH_SIZE
     ) -> bool:
         """
-        Append/upsert points to the 'testing' collection in Qdrant.
+        Append/upsert points to a Qdrant collection with batch processing.
+        
+        This method processes points in batches for optimal performance and reliability.
+        Points are already PointStruct objects, so no conversion needed.
         
         Args:
-            points: List of point dictionaries with 'id', 'vector', and 'payload' keys
-            collection_name: Name of the collection (default: "testing")
+            points: List of PointStruct objects (created by to_qdrant_points)
+            collection_name: Name of the collection
+            batch_size: Number of points to upsert per batch (default: 100)
         
         Returns:
-            bool: True if points were successfully upserted
+            bool: True if all points were successfully upserted, False otherwise
         """
+        if not points:
+            logger.warning("No points to append")
+            return False
+        
+        if batch_size <= 0:
+            logger.error(f"Invalid batch_size: {batch_size}")
+            return False
+        
         try:
-            if not points:
-                print("No points to append")
-                return False
+            # Process points in batches for better performance and reliability
+            total_points = len(points)
+            successful_batches = 0
+            failed_batches = 0
             
-            # Convert points to Qdrant PointStruct format
-            qdrant_points = []
-            for point in points:
-                qdrant_points.append(
-                    models.PointStruct(
-                        id=point["id"],
-                        vector=point["vector"],
-                        payload=point["payload"],
+            for batch_start in range(0, total_points, batch_size):
+                batch_end = min(batch_start + batch_size, total_points)
+                batch_points = points[batch_start:batch_end]
+                
+                # Points are already PointStruct objects, ready to upsert
+                try:
+                    self.qdrant_client.upsert(
+                        collection_name=collection_name,
+                        points=batch_points,
                     )
+                    successful_batches += 1
+                    logger.debug(f"Upserted batch {batch_start}-{batch_end}: {len(batch_points)} point(s)")
+                except Exception as e:
+                    logger.error(f"Unexpected error upserting batch {batch_start}-{batch_end}: {e}", exc_info=True)
+                    failed_batches += 1
+            
+            if failed_batches == 0:
+                logger.info(f"Successfully upserted {total_points} point(s) to collection '{collection_name}' in {successful_batches} batch(es)")
+                return True
+            else:
+                logger.warning(
+                    f"Partially successful upsert: {successful_batches} successful batch(es), "
+                    f"{failed_batches} failed batch(es) to collection '{collection_name}'"
                 )
-            
-            # Upsert points (will insert or update if exists)
-            self.qdrant_client.upsert(
-                collection_name=collection_name,
-                points=qdrant_points,
-            )
-            
-            print(f"Successfully upserted {len(qdrant_points)} points to collection '{collection_name}'")
-            return True
+                return False
+                
         except Exception as e:
-            print(f"Error appending points to collection '{collection_name}': {e}")
+            logger.error(f"Error appending points to collection '{collection_name}': {e}", exc_info=True)
             return False
 
 
 if __name__ == "__main__":
-    # Wrap entire pipeline in timing context
-    with TimingContext("TOTAL PIPELINE EXECUTION"):
-        ingestion_worker = IngestionWorker()
-        
-        print("Loading complex pdf document...")
-        # Set debug=True for testing - this will print prompts and responses
-        complex_documents = ingestion_worker.load_complex_pdf_with_vlm(
-            "testing-files/tables-half.pdf", 
-            tenant_id="1", 
-            category="test",
-            debug=True  # Enable debug output for testing
-        )
-        
-        print("Complex pdf document loaded successfully.")
-        print(f"Loaded {len(complex_documents)} documents")
-        
-        print("-"*100)
-
-        print("Chunking documents...")
-        chunks = ingestion_worker.chunk_documents(complex_documents)
-        print("Chunks created successfully.")
-        print(f"Created {len(chunks)} chunks")
-        for chunk in chunks:
-            print(chunk.page_content)
-            print("-"*100)
-        
-        embeddings = ingestion_worker.embed_chunks(chunks)
-        print("Embeddings created successfully.")
-        print(f"Created {len(embeddings)} embeddings")
-
-        print("-"*100)
-
-        print("Converting chunks to Qdrant points...")
-        points = ingestion_worker.to_qdrant_points(
-            embeddings, 
-            tenant_id="1", 
-            category="test", 
-            file_name="tables.pdf", 
-            minio_path="testing-files/tables.pdf"
-        )
-        print("Qdrant points created successfully.")
-        print(f"Created {len(points)} points")
-
-        print("-"*100)
-
-        embedding_size = len(embeddings[0]["embedding"])
-        print(f"Embedding size: {embedding_size}")
-        print(f"Creating Qdrant collection of size {embedding_size}...")
-        ingestion_worker.create_collection(vector_size=embedding_size)
-        print("Qdrant collection created successfully.")
-        print("Appending points to Qdrant collection...")
-        ingestion_worker.append_points_to_collection(points)
-        print("Points appended to Qdrant collection successfully.")
+    # Configure logging for script execution
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
     
-    print("\n" + "="*100)
-    print("Pipeline execution completed!")
-    print("="*100)
+    ingestion_worker = IngestionWorker()
+
+
+    # Load document (handles both PDF and TXT)
+    documents = ingestion_worker.load_document("testing-files/test.pdf")
+    logger.info(f"Loaded {len(documents)} document(s)")
+    
+    print(documents)
+    '''
+    # Chunk the documents (chunks inherit normalized metadata)
+    chunks = ingestion_worker.chunk_documents(documents)
+    logger.info(f"Generated {len(chunks)} chunks")
+    
+    # Generate embeddings (returns chunks and embeddings as parallel lists)
+    logger.info("Generating embeddings...")
+    embedded_chunks, embeddings = ingestion_worker.embed_chunks(chunks)
+    logger.info(f"Generated embeddings for {len(embedded_chunks)} chunks")
+    
+    if embeddings:
+        logger.info(f"First embedding sample (first 10 values): {embeddings[0][:10]}")
+    
+    # Convert to Qdrant points (only place where we transform structure)
+    # Metadata already normalized, only chunk_index is added in the loop
+    points = ingestion_worker.to_qdrant_points(
+        embedded_chunks,
+        embeddings,
+        document_id="123"  # Document UUID or unique ID
+    )
+    logger.info(f"Converted {len(points)} points for Qdrant")
+    
+    if not points:
+        raise ValueError("No points generated; cannot infer vector size")
+    
+    # Get vector size from first point (PointStruct with named vector structure)
+    # PointStruct.vector is a dict with named vectors
+    vector_size = len(points[0].vector["text"])
+    logger.info(f"Vector size: {vector_size}")
+    
+    # Create collection
+    logger.info("Creating Qdrant collection...")
+    if not ingestion_worker.create_collection(vector_size=vector_size, collection_name="default_testing-2"):
+        raise RuntimeError("Failed to create collection")
+    
+    # Append points to collection
+    logger.info("Appending points to Qdrant...")
+    if not ingestion_worker.append_points_to_collection(points, collection_name="default_testing-2"):
+        raise RuntimeError("Failed to append points to collection")
+    
+    logger.info("Done!")
+    '''

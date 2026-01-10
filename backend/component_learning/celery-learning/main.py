@@ -8,7 +8,7 @@ if __name__ == '__main__':
         command = input("type START 1 or 2 to start the process, 'process minio' to fetch file, and END to kill everything : ")
         if command.lower() == "start 1":
             result = process.delay(1, 2)
-            print(result)
+
         elif command.lower() == "start 2":
             result = process2.delay(1, 2)
             print(result)

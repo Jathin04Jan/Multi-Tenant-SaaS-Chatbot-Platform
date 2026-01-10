@@ -1,7 +1,8 @@
-from celery import Celery
 from time import sleep
+from celery import Celery
 
-app = Celery('celery-learning', broker='redis://localhost:6379')
+# First separate Celery app for general tasks
+app = Celery('celery-learning-1', broker='redis://localhost:6379')
 
 @app.task
 def process(a, b):
@@ -15,7 +16,7 @@ def process(a, b):
     return "given to subprocess 1"
 
 def subprocess(task_name):
-    print(f"subprocessing {"task_name"} task......")
+    print(f"subprocessing {task_name} task......")
     sleep(3)
 
 @app.task

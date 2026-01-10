@@ -1,11 +1,12 @@
-from celery import Celery
 from minio import Minio
 from minio.error import S3Error
 from io import BytesIO
 from time import sleep
 from typing import List
+from celery import Celery
 
-app = Celery('celery-learning', broker='redis://localhost:6379')
+# Second separate Celery app for MinIO tasks
+app = Celery('celery-learning-2', broker='redis://localhost:6379')    
 
 # MinIO Configuration (from docker-compose.yml)
 MINIO_ENDPOINT = "localhost:9000"

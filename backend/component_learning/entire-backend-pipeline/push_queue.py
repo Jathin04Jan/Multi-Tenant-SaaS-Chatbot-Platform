@@ -28,13 +28,13 @@ r = Redis(
 
 payload = {
     # identity
-    "bot_id": str(uuid.uuid4()),
+    "tennant_id": str("1234567890"),
     "file_id": str(uuid.uuid4()),
     "file_path": "tables.pdf",  # MinIO object key
 
     # routing (recommended to include explicitly)
-    "bucket_name": DEFAULT_BUCKET,
-    "collection_name": DEFAULT_COLLECTION,
+    #"bucket_name": DEFAULT_BUCKET,
+    #"collection_name": DEFAULT_COLLECTION,
 
     # observability
     "event_type": "document_uploaded",
@@ -44,7 +44,12 @@ payload = {
 # Ensure everything is a string (Redis Streams expects string values)
 payload = {k: ("" if v is None else str(v)) for k, v in payload.items()}
 
-msg_id = r.xadd(STREAM, payload)
+msg_id = r.xadd(
+    STREAM,
+    payload,
+    maxlen=5000,          # cap stream growth
+    approximate=True
+)
 
 print("Pushed to stream:", STREAM)
 print("Message ID:", msg_id)
@@ -55,4 +60,6 @@ print("Payload:", json.dumps(payload, indent=2))
 reviews
 
 payload has to change
+adding proper support to env files
+add database connection 
 '''

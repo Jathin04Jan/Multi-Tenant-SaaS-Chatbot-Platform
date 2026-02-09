@@ -12,7 +12,7 @@ from sqlalchemy.sql import func
 from app.core.database import Base
 
 SourceTypeEnum = Enum("file", "url", "integration", name="document_source_type")
-StatusEnum = Enum("pending", "processing", "indexed", "error", name="document_status")
+StatusEnum = Enum("pending", "processing", "uploaded_to_database", "error", name="document_status")
 
 
 class Document(Base):

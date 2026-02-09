@@ -14,8 +14,8 @@ This table stores metadata for tenant knowledge sources persisted in MinIO or re
 | `filename` | VARCHAR(255) | Original filename provided by the tenant (nullable for URL/integration sources). |
 | `content_type` | VARCHAR(128) | MIME type (nullable for URL/integration sources). |
 | `size` | INTEGER | File size in bytes (only populated for file uploads, not URLs). |
-| `status` | ENUM('pending','processing','indexed','error') | Lifecycle state for ingestion/indexing. Crawled URLs start as `processing` until the pipeline ingests them. |
-| `metadata` | JSONB | Optional extra data (checksums, crawler info, ingest pipeline outputs, etc.). |
+| `status` | ENUM('pending','processing','uploaded_to_database','error') | Lifecycle state for ingestion/indexing. Documents start as `pending`, move to `processing` after text extraction, and `error` on permanent failure. |
+| `metadata` | JSONB | Optional extra data. After text extraction, includes: `extracted_text_key` (MinIO key for extracted text), `parser` (parser name), `page_count` (for PDFs), `char_count`, `checksum` (SHA256 hash). |
 | `created_at` | TIMESTAMP WITH TIME ZONE | Creation time. |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | Last modification time (auto-updated). |
 
@@ -50,11 +50,68 @@ The frontend calls `POST /api/v1/bots/{bot_id}/documents` as soon as a file is s
 
 The frontend then updates its local state with the document ID and status, ensuring the UI reflects the persisted state.
 
+## Text Extraction Pipeline
+
+When a file is uploaded, an ingestion job is created and queued for processing by the async worker (`run_worker.py`). The worker:
+
+1. **Downloads** the file from MinIO (stage: `download`)
+2. **Parses** the document to extract text (stage: `parse`)
+   - Supports PDF (PyPDF2), DOCX (python-docx), and TXT files
+   - Extracts text content and calculates metadata (page count, character count, checksum)
+3. **Stores** extracted text to MinIO (stage: `store`)
+   - Extracted text is stored at: `{user_id}/{bot_id}/{document_id}/{filename}.txt`
+   - Updates document `metadata` with extraction details:
+     ```json
+     {
+       "extracted_text_key": "{user_id}/{bot_id}/{document_id}/{filename}.txt",
+       "parser": "PyPDF2",
+       "page_count": 10,
+       "char_count": 5000,
+       "checksum": "sha256_hash_here"
+     }
+     ```
+4. **Updates** document status to `processing` (text extracted, ready for chunking/embedding)
+
+### Document Status Transitions
+
+- **`pending`** - Document uploaded, waiting for text extraction (default)
+- **`processing`** - Text extraction completed, ready for next pipeline stage
+- **`uploaded_to_database`** - Reserved for future use
+- **`error`** - Text extraction failed permanently (after max retry attempts)
+
+### Metadata Structure After Extraction
+
+After successful text extraction, the `metadata` JSONB field contains:
+
+```json
+{
+  "extracted_text_key": "{user_id}/{bot_id}/{document_id}/document.txt",
+  "parser": "PyPDF2",
+  "page_count": 10,
+  "char_count": 5000,
+  "checksum": "a1b2c3d4e5f6..."
+}
+```
+
+- **`extracted_text_key`**: MinIO object key where extracted text is stored (always ends with `.txt`)
+- **`parser`**: Parser used (`PyPDF2`, `python-docx`, or `plain_text`)
+- **`page_count`**: Number of pages (for PDFs, 0 for DOCX/TXT)
+- **`char_count`**: Character count of extracted text
+- **`checksum`**: SHA256 hash of original file data
+
+### Error Handling
+
+If text extraction fails:
+- Job is automatically retried if `attempts < max_attempts` (default: 5)
+- Error details are logged in `ingestion_jobs.logs` with stage information
+- On permanent failure (`attempts >= max_attempts`), document status is set to `error`
+
 ### Future Enhancements
 
 - Implement pre-signed URLs for large uploads (recorded as TODO in `app/services/presign.py`).
-- Extend ingestion pipeline to populate `status` transitions (`pending → processing → indexed/error`) automatically.
+- Extend ingestion pipeline to chunk extracted text and generate embeddings.
 - Surface metadata such as page counts, vectorization stats, and crawl summaries in the UI.
+- Implement URL crawling and processing (currently URL jobs remain in `queued` status).
 
 ---
 
@@ -63,7 +120,7 @@ The frontend then updates its local state with the document ID and status, ensur
 ```sql
 -- Create enum types for document source type and status
 CREATE TYPE document_source_type AS ENUM ('file', 'url', 'integration');
-CREATE TYPE document_status AS ENUM ('pending', 'processing', 'indexed', 'error');
+CREATE TYPE document_status AS ENUM ('pending', 'processing', 'uploaded_to_database', 'error');
 
 CREATE TABLE documents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

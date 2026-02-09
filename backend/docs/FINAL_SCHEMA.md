@@ -345,6 +345,63 @@ Stores all chatbot/bot configurations and settings for each user/tenant.
 
 ### JSONB Field Structures
 
+#### `llm_config` Structure:
+```json
+{
+  "model": "qwen3-vl:8b",
+  "temperature": 0.7,
+  "top_p": 0.9,
+  "max_tokens": 1000,
+  "communication_style": "friendly",
+  "style_prompt": "You are a friendly and warm assistant..."
+}
+```
+
+**Default Values** (set automatically when creating a draft bot or new bot):
+- `model`: `"qwen3-vl:8b"` (from `settings.OLLAMA_LLM_MODEL`)
+- `temperature`: `0.7`
+
+These defaults are applied in `BotService.create_draft_bot()` and `BotService.create_bot()` if not provided.
+
+#### `retrieval_config` Structure:
+```json
+{
+  "embedding_model": "qwen3-embedding:4b",
+  "chunk_size": 1000,
+  "chunk_overlap": 200,
+  "vector_db": {
+    "provider": "qdrant",
+    "collection_name": "bot_{bot_id}"
+  },
+  "filters": {},
+  "rag_params": {
+    "top_k": 5,
+    "similarity_threshold": 0.7
+  }
+}
+```
+
+**Default Values** (set automatically when creating a draft bot or new bot):
+- `embedding_model`: `"qwen3-embedding:4b"` (from `settings.OLLAMA_EMBEDDING_MODEL`)
+- `chunk_size`: `1000` (characters)
+- `chunk_overlap`: `200` (characters)
+
+These defaults are applied in `BotService.create_draft_bot()` and `BotService.create_bot()` if not provided.
+
+#### `guardrails` Structure:
+```json
+{
+  "max_response_length": 500,
+  "blocked_phrases": ["refund immediately", "cancel now"],
+  "block_explicit_content": true,
+  "block_political_views": true,
+  "strictly_stick_to_topic": true,
+  "block_personal_info": true,
+  "enable_fact_checking": true,
+  "custom_instructions": "Always be helpful and professional..."
+}
+```
+
 #### `branding` Structure (stores all UI configuration):
 ```json
 {
@@ -382,8 +439,8 @@ Tracks knowledge sources uploaded or linked by tenants. Files live in MinIO (or 
 | `filename` | VARCHAR(255) | NULLABLE | Original filename (null for URL/integration sources) |
 | `content_type` | VARCHAR(128) | NULLABLE | MIME type |
 | `size` | INTEGER | NULLABLE | File size (bytes). Only populated for uploads; URLs usually have `NULL`. |
-| `status` | ENUM('pending','processing','indexed','error') | NOT NULL, DEFAULT 'pending' | Ingestion/indexing pipeline state. Crawled URLs remain `processing` until the crawler ingests them. |
-| `metadata` | JSONB | NULLABLE | Extra payload (checksums, crawl info, etc.) |
+| `status` | ENUM('pending','processing','uploaded_to_database','error') | NOT NULL, DEFAULT 'pending' | Ingestion/indexing pipeline state. Documents start as `pending`, move to `processing` after text extraction. |
+| `metadata` | JSONB | NULLABLE | Extra payload. After text extraction, includes: `extracted_text_key` (MinIO key for extracted text), `parser`, `page_count`, `char_count`, `checksum`. |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now() | Upload timestamp |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last mutation timestamp |
 
@@ -391,6 +448,9 @@ Tracks knowledge sources uploaded or linked by tenants. Files live in MinIO (or 
 - The backend generates a storage path `{user_id}/{bot_id}/{document_id}/{filename}` and saves it in `source_url`. Clients never provide this value.
 - File uploads are validated server-side: only PDF/DOC/DOCX/TXT are accepted and max size is 1 GB. URLs are stored as metadata only (no MinIO object) and can be managed just like files.
 - Every query must include `user_id = current_user.id` to maintain isolation.
+- After file upload, an ingestion job is created and queued for text extraction by the async worker (`run_worker.py`).
+- The worker extracts text from documents (PDF, DOCX, TXT) and stores it in MinIO at `{user_id}/{bot_id}/{document_id}/{filename}.txt`.
+- Document metadata is updated with extraction details: `extracted_text_key`, `parser`, `page_count`, `char_count`, `checksum`.
 
 ## 📊 `installation_snippets` Table
 
@@ -524,7 +584,7 @@ CREATE INDEX idx_installation_snippets_user_bot ON installation_snippets(user_id
 ```sql
 -- Create enum types for document source type and status
 CREATE TYPE document_source_type AS ENUM ('file', 'url', 'integration');
-CREATE TYPE document_status AS ENUM ('pending', 'processing', 'indexed', 'error');
+CREATE TYPE document_status AS ENUM ('pending', 'processing', 'uploaded_to_database', 'error');
 
 CREATE TABLE documents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

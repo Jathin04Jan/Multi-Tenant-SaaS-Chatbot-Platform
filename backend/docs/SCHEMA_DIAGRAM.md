@@ -242,10 +242,10 @@ Please refer to the **Enum Details** section below and the full schema documenta
 - **`integration`** - 3rd-party integration (e.g., Notion, Google Drive)
 
 ### `documents.status` (ENUM: document_status)
-- **`pending`** - Document uploaded, waiting for processing (default)
-- **`processing`** - Currently being indexed/processed
-- **`indexed`** - Successfully indexed and ready for use
-- **`error`** - Processing failed
+- **`pending`** - Document uploaded, waiting for text extraction (default)
+- **`processing`** - Text extraction completed, ready for next pipeline stage
+- **`uploaded_to_database`** - Reserved for future use
+- **`error`** - Text extraction failed permanently (after max retry attempts)
 
 ### `installation_snippets.status` (VARCHAR)
 - **`active`** - Snippet is active and can be used (default)
@@ -302,5 +302,80 @@ Please refer to the **Enum Details** section below and the full schema documenta
   - `IngestionJob.is_active` - computed from `ingestion_jobs.status` (returns `True` if status is queued or processing)
   - `IngestionJob.can_retry` - computed from `ingestion_jobs.status`, `attempts`, and `max_attempts` (returns `True` if failed and attempts < max_attempts)
   - `IngestionJob.duration_seconds` - computed from `ingestion_jobs.started_at` and `finished_at` (returns duration in seconds)
+
+## JSONB Field Structures
+
+### `bots.llm_config` Structure
+```json
+{
+  "model": "qwen3-vl:8b",
+  "temperature": 0.7,
+  "top_p": 0.9,
+  "max_tokens": 1000,
+  "communication_style": "friendly",
+  "style_prompt": "You are a friendly and warm assistant..."
+}
+```
+
+**Default Values** (set automatically when creating a draft bot or new bot):
+- `model`: `"qwen3-vl:8b"` (from `settings.OLLAMA_LLM_MODEL`)
+- `temperature`: `0.7`
+
+### `bots.retrieval_config` Structure
+```json
+{
+  "embedding_model": "qwen3-embedding:4b",
+  "chunk_size": 1000,
+  "chunk_overlap": 200,
+  "vector_db": {
+    "provider": "qdrant",
+    "collection_name": "bot_{bot_id}"
+  },
+  "filters": {},
+  "rag_params": {
+    "top_k": 5,
+    "similarity_threshold": 0.7
+  }
+}
+```
+
+**Default Values** (set automatically when creating a draft bot or new bot):
+- `embedding_model`: `"qwen3-embedding:4b"` (from `settings.OLLAMA_EMBEDDING_MODEL`)
+- `chunk_size`: `1000` (characters)
+- `chunk_overlap`: `200` (characters)
+
+These defaults are applied in `BotService.create_draft_bot()` and `BotService.create_bot()` if not provided.
+
+### `bots.guardrails` Structure
+```json
+{
+  "max_response_length": 500,
+  "blocked_phrases": ["refund immediately", "cancel now"],
+  "block_explicit_content": true,
+  "block_political_views": true,
+  "strictly_stick_to_topic": true,
+  "block_personal_info": true,
+  "enable_fact_checking": true,
+  "custom_instructions": "Always be helpful and professional..."
+}
+```
+
+### `bots.branding` Structure
+```json
+{
+  "logo_url": "https://example.com/logo.png",
+  "avatar_url": "https://example.com/avatar.png",
+  "primary_color": "#6366f1",
+  "background_color": "#ffffff",
+  "welcome_message": "Hello! How can I help?",
+  "intro_message": "Hello! How can I help you today?",
+  "assistant_name": "Assistant",
+  "chat_title": "Assistant",
+  "position": "bottom-right",
+  "height": 600,
+  "width": 400
+}
+```
+
 - For full column details and SQL, see `FINAL_SCHEMA.md` and `DATABASE_SCHEMA.md`.
 

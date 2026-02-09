@@ -225,12 +225,41 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
         (brandingConfig.welcome_message &&
           brandingConfig.welcome_message !== DEFAULT_WELCOME_MESSAGE);
 
+      // Only detect tone progress if values differ from defaults
+      // Defaults: temperature=0.7, communication_style='friendly', style_prompt=''
       const hasToneProgress =
-        typeof llmConfig.temperature === 'number' ||
-        typeof llmConfig.communication_style === 'string' ||
-        typeof llmConfig.style_prompt === 'string';
+        (typeof llmConfig.temperature === 'number' && llmConfig.temperature !== 0.7) ||
+        (typeof llmConfig.communication_style === 'string' && 
+         llmConfig.communication_style !== 'friendly' && 
+         llmConfig.communication_style.trim() !== '') ||
+        (typeof llmConfig.style_prompt === 'string' && 
+         llmConfig.style_prompt.trim() !== '');
 
-      const hasGuardrailProgress = Object.keys(guardrailsConfig).length > 0;
+      // Only detect guardrail progress if there are actual customizations
+      // Check if any guardrail values differ from defaults
+      // For a new draft bot, guardrails will be null or empty, so this will be false
+      const defaultGuardrails = {
+        max_response_length: 500,
+        enable_fact_checking: true,
+        block_explicit_content: true,
+        block_political_views: true,
+        strictly_stick_to_topic: true,
+        block_personal_info: true,
+      };
+      const hasGuardrailProgress = 
+        guardrailsConfig &&
+        typeof guardrailsConfig === 'object' &&
+        Object.keys(guardrailsConfig).length > 0 &&
+        (
+          guardrailsConfig.max_response_length !== defaultGuardrails.max_response_length ||
+          guardrailsConfig.enable_fact_checking !== defaultGuardrails.enable_fact_checking ||
+          guardrailsConfig.block_explicit_content !== defaultGuardrails.block_explicit_content ||
+          guardrailsConfig.block_political_views !== defaultGuardrails.block_political_views ||
+          guardrailsConfig.strictly_stick_to_topic !== defaultGuardrails.strictly_stick_to_topic ||
+          guardrailsConfig.block_personal_info !== defaultGuardrails.block_personal_info ||
+          (Array.isArray(guardrailsConfig.blocked_phrases) && guardrailsConfig.blocked_phrases.length > 0) ||
+          (typeof guardrailsConfig.custom_instructions === 'string' && guardrailsConfig.custom_instructions.trim() !== '')
+        );
 
       // Get existing progress from store to preserve steps 4-7
       const existingCompletedSteps = useWizardStore.getState().completedSteps;
@@ -591,14 +620,24 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
   // Queued upload helper remains for compatibility but no longer used
   const uploadQueuedDocuments = async (_botId: string) => {};
 
+  // Helper to check if an ID is a UUID (already saved to database)
+  const isUUID = (id: string): boolean => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(id);
+  };
+
   const saveCrawledSources = async (botId: string) => {
-    const crawlSources = dataSources.filter((source) => source.type === 'crawl');
-    if (crawlSources.length === 0) {
+    // Filter crawl sources that haven't been saved yet (don't have UUID IDs)
+    const unsavedCrawlSources = dataSources.filter(
+      (source) => source.type === 'crawl' && !isUUID(source.id)
+    );
+    
+    if (unsavedCrawlSources.length === 0) {
       return;
     }
 
     let successCount = 0;
-    for (const source of crawlSources) {
+    for (const source of unsavedCrawlSources) {
       const url = source.url || source.name;
       if (!url) {
         continue;
@@ -610,7 +649,7 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           name: source.name,
         });
 
-        if (response.error) {
+        if (response.error || !response.data) {
           toast.error(response.error || `Failed to register ${url}`);
           updateDataSource(source.id, {
             status: 'failed',
@@ -618,9 +657,15 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           });
         } else {
           successCount += 1;
-          updateDataSource(source.id, {
-            status: 'indexed',
-            updatedAt: new Date().toISOString(),
+          // Remove old source and add new one with database ID
+          removeDataSource(source.id);
+          addDataSource({
+            id: response.data.id,
+            type: 'crawl',
+            name: response.data.filename || source.name,
+            url: response.data.source_url || url,
+            status: (response.data.status as DataSource['status']) || 'processing',
+            updatedAt: response.data.updated_at || response.data.created_at || new Date().toISOString(),
           });
         }
       } catch (error) {
@@ -646,22 +691,48 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
       return;
     }
 
+    if (!draftBotId) {
+      toast.error('Draft bot is not ready yet. Please wait and try again.');
+      return;
+    }
+
     setIsCrawling(true);
     try {
       const normalizedUrl = normalizeUrl(crawlUrl);
-      await mockStartCrawl(normalizedUrl);
-      addDataSource({
-        id: Date.now().toString(),
-        type: 'crawl',
-        name: normalizedUrl,
+      if (!normalizedUrl) {
+        toast.error('Please enter a valid URL');
+        return;
+      }
+
+      // Immediately save to database, just like file uploads
+      const response = await createCrawlDocument(draftBotId, {
         url: normalizedUrl,
-        status: 'processing',
-        updatedAt: new Date().toISOString(),
+        name: normalizedUrl,
+      });
+
+      if (response.error || !response.data) {
+        toast.error(response.error || `Failed to register ${normalizedUrl}`);
+        return;
+      }
+
+      const doc = response.data;
+      addDataSource({
+        id: doc.id,
+        type: 'crawl',
+        name: doc.filename || normalizedUrl,
+        url: doc.source_url || normalizedUrl,
+        status: (doc.status as DataSource['status']) || 'processing',
+        updatedAt: doc.updated_at || doc.created_at || new Date().toISOString(),
       });
       setCrawlUrl('');
-      toast.success('Crawl started successfully!');
-    } catch (error) {
-      toast.error('Failed to start crawl');
+      toast.success('Website registered for crawling!');
+    } catch (error: any) {
+      console.error('Error registering crawl source:', error);
+      const message =
+        error?.response?.data?.detail ||
+        error?.message ||
+        'Failed to register website';
+      toast.error(message);
     } finally {
       setIsCrawling(false);
     }
@@ -753,6 +824,10 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
     }
 
     try {
+      // Get existing draft bot to preserve retrieval_config values
+      const draftBotResponse = await getDraftBot();
+      const existingRetrievalConfig = draftBotResponse.data?.retrieval_config || {};
+      
       const botName = persona.botName || 'My Bot';
       const payload = {
         name: botName,
@@ -795,16 +870,17 @@ export const OnboardingPanel = ({ open, onOpenChange }: OnboardingPanelProps) =>
           custom_instructions: guardrails.customInstructions,
         },
         retrieval_config: {
-          data_sources: dataSources.map((ds) => ({
-            id: ds.id,
-            name: ds.name,
-            type: ds.type,
-            status: ds.status,
-            updatedAt: ds.updatedAt,
-          })),
-          chunk_size: 1000,
-          chunk_overlap: 200,
-          embedding_model: 'text-embedding-ada-002',
+          // Preserve existing embedding_model (from backend defaults) or use default
+          embedding_model: existingRetrievalConfig.embedding_model || 'qwen3-embedding:4b',
+          // Preserve existing chunk settings or use defaults
+          chunk_size: existingRetrievalConfig.chunk_size || 1000,
+          chunk_overlap: existingRetrievalConfig.chunk_overlap || 200,
+          // Preserve any other existing retrieval_config fields (vector_db, filters, rag_params, etc.)
+          ...Object.fromEntries(
+            Object.entries(existingRetrievalConfig).filter(([key]) => 
+              !['data_sources'].includes(key) // Remove data_sources as it's redundant (documents are in documents table)
+            )
+          ),
         },
         status: 'active' as const,
       };

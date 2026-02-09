@@ -6,6 +6,12 @@ from app.models.bot import Bot, BotStatus
 from app.models.user import User
 from app.schemas.bot import BotCreate, BotUpdate
 from app.models.document import Document
+from app.services.qdrant_collection_service import (
+    create_bot_collection,
+    delete_bot_collection,
+    get_bot_collection_name
+)
+from app.core.config import settings
 from app.core.minio_client import delete_file
 
 
@@ -44,15 +50,31 @@ class BotService:
         branding.setdefault("width", 400)
         branding.setdefault("background_color", "#ffffff")
 
+        # Set default LLM config if not provided
+        llm_config = payload.get("llm_config") or {}
+        if "model" not in llm_config:
+            llm_config["model"] = settings.OLLAMA_LLM_MODEL
+        if "temperature" not in llm_config:
+            llm_config["temperature"] = 0.7
+
+        # Set default retrieval config if not provided
+        retrieval_config = payload.get("retrieval_config") or {}
+        if "embedding_model" not in retrieval_config:
+            retrieval_config["embedding_model"] = settings.OLLAMA_EMBEDDING_MODEL
+        if "chunk_size" not in retrieval_config:
+            retrieval_config["chunk_size"] = 1000
+        if "chunk_overlap" not in retrieval_config:
+            retrieval_config["chunk_overlap"] = 200
+
         bot = Bot(
             user_id=user.id,
             name=name,
             description=payload.get("description"),
             status=BotStatus.DRAFT,
             branding=branding,
-            llm_config=payload.get("llm_config"),
+            llm_config=llm_config if llm_config else None,
             guardrails=payload.get("guardrails"),
-            retrieval_config=payload.get("retrieval_config"),
+            retrieval_config=retrieval_config if retrieval_config else None,
         )
 
         db.add(bot)
@@ -112,6 +134,22 @@ class BotService:
         if "background_color" not in branding:
             branding["background_color"] = "#ffffff"
         
+        # Set default LLM config if not provided
+        llm_config = bot_data.get("llm_config") or {}
+        if "model" not in llm_config:
+            llm_config["model"] = settings.OLLAMA_LLM_MODEL
+        if "temperature" not in llm_config:
+            llm_config["temperature"] = 0.7
+        
+        # Set default retrieval config if not provided
+        retrieval_config = bot_data.get("retrieval_config") or {}
+        if "embedding_model" not in retrieval_config:
+            retrieval_config["embedding_model"] = settings.OLLAMA_EMBEDDING_MODEL
+        if "chunk_size" not in retrieval_config:
+            retrieval_config["chunk_size"] = 1000
+        if "chunk_overlap" not in retrieval_config:
+            retrieval_config["chunk_overlap"] = 200
+        
         # Create bot instance
         # Start as DRAFT - user must activate it after configuration is complete
         bot = Bot(
@@ -121,14 +159,24 @@ class BotService:
             status=BotStatus.DRAFT,  # Start as draft - must be activated to be embeddable
             # Note: is_active is now computed from status (status == ACTIVE means active)
             branding=branding,
-            llm_config=bot_data.get("llm_config"),
+            llm_config=llm_config if llm_config else None,
             guardrails=bot_data.get("guardrails"),
-            retrieval_config=bot_data.get("retrieval_config"),
+            retrieval_config=retrieval_config if retrieval_config else None,
         )
         
         db.add(bot)
         db.commit()
         db.refresh(bot)
+        
+        # Create Qdrant collection if bot is created as ACTIVE (unlikely but handle it)
+        if bot.status == BotStatus.ACTIVE:
+            try:
+                create_bot_collection(
+                    bot_id=bot.id,
+                    retrieval_config=bot.retrieval_config
+                )
+            except Exception as e:
+                print(f"Warning: Failed to create Qdrant collection for bot {bot.id}: {e}")
         
         return bot
     
@@ -160,6 +208,10 @@ class BotService:
         if not bot:
             return None
         
+        # Track if status is changing to ACTIVE (for collection creation)
+        old_status = bot.status
+        was_active = old_status == BotStatus.ACTIVE
+        
         # Update only provided fields
         update_data = bot_update.model_dump(exclude_unset=True)
         print(f"DEBUG: Updating bot {bot_id} with fields: {list(update_data.keys())}")
@@ -171,6 +223,22 @@ class BotService:
         db.commit()
         db.refresh(bot)
         print(f"DEBUG: Bot name after update: '{bot.name}'")
+        
+        # Handle Qdrant collection lifecycle
+        new_status = bot.status
+        is_now_active = new_status == BotStatus.ACTIVE
+        
+        # Create collection when bot is activated (status changes to ACTIVE)
+        if not was_active and is_now_active:
+            try:
+                create_bot_collection(
+                    bot_id=bot.id,
+                    retrieval_config=bot.retrieval_config
+                )
+                print(f"Created Qdrant collection for bot {bot_id}")
+            except Exception as e:
+                print(f"Warning: Failed to create Qdrant collection for bot {bot_id}: {e}")
+                # Don't fail the update if collection creation fails
         
         return bot
     
@@ -224,6 +292,13 @@ class BotService:
                         pass
             db.delete(doc)
         db.flush()
+        
+        # Delete Qdrant collection for this bot
+        try:
+            delete_bot_collection(bot_id)
+        except Exception as e:
+            # Log but don't fail bot deletion if collection deletion fails
+            print(f"Warning: Failed to delete Qdrant collection for bot {bot_id}: {e}")
         
         # Use raw SQL to delete the bot, bypassing SQLAlchemy's relationship management
         # This ensures database CASCADE handles snippet deletion without SQLAlchemy

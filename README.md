@@ -29,6 +29,10 @@ python run.py              # http://localhost:8000
 cd ../frontend
 npm install
 npm run dev                # http://localhost:8080
+
+# 4. (Optional) Run the ingestion worker (separate process)
+cd ../backend
+python run_worker.py      # Processes document text extraction jobs
 ```
 
 > The backend auto-creates tables for local development. Use Alembic migrations in staging/production.

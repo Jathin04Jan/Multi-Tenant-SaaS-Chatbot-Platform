@@ -213,20 +213,23 @@ Stores tenant-uploaded knowledge sources that live in MinIO. The backend control
 | `filename` | VARCHAR(255) | NULLABLE | Original filename (nullable for URL/integration) |
 | `content_type` | VARCHAR(128) | NULLABLE | Stored mime type |
 | `size` | INTEGER | NULLABLE | File size (bytes) |
-| `status` | ENUM('pending','processing','indexed','error') | NOT NULL, DEFAULT 'pending' | Ingestion/indexing status |
-| `metadata` | JSONB | NULLABLE | Additional metadata (checksums, crawler info, etc.) |
+| `status` | ENUM('pending','processing','uploaded_to_database','error') | NOT NULL, DEFAULT 'pending' | Ingestion/indexing status. Documents start as `pending`, move to `processing` after text extraction. |
+| `metadata` | JSONB | NULLABLE | Additional metadata. After text extraction, includes: `extracted_text_key`, `parser`, `page_count`, `char_count`, `checksum`. |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL | Upload timestamp |
 | `updated_at` | TIMESTAMP WITH TIME ZONE | NOT NULL, DEFAULT now(), ON UPDATE | Last modification |
 
 #### Notes
 - Tenants never provide storage paths. The backend builds the MinIO key as `{user_id}/{bot_id}/{document_id}/{filename}` and persists it in `source_url`.
 - Queries always filter by `user_id` to enforce isolation.
+- After file upload, an ingestion job is created and queued for text extraction by the async worker (`run_worker.py`).
+- The worker extracts text from documents (PDF, DOCX, TXT) and stores it in MinIO at `{user_id}/{bot_id}/{document_id}/{filename}.txt`.
+- Document metadata is updated with extraction details: `extracted_text_key`, `parser`, `page_count`, `char_count`, `checksum`.
 
 ### Documents Table
 ```sql
 -- Create enum types for document source type and status
 CREATE TYPE document_source_type AS ENUM ('file', 'url', 'integration');
-CREATE TYPE document_status AS ENUM ('pending', 'processing', 'indexed', 'error');
+CREATE TYPE document_status AS ENUM ('pending', 'processing', 'uploaded_to_database', 'error');
 
 CREATE TABLE documents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -311,8 +314,23 @@ CREATE INDEX idx_documents_source_type ON documents(source_type);
   "status": "active",
   "is_active": true,  // Computed from status (status == 'active')
   "llm_config": {
+    "model": "qwen3-vl:8b",
     "temperature": 0.7,
-    "communication_style": "friendly"
+    "communication_style": "friendly",
+    "style_prompt": "You are a friendly and warm assistant..."
+  },
+  "retrieval_config": {
+    "embedding_model": "qwen3-embedding:4b",
+    "chunk_size": 1000,
+    "chunk_overlap": 200
+  },
+  "guardrails": {
+    "max_response_length": 500,
+    "block_explicit_content": true,
+    "block_political_views": true,
+    "strictly_stick_to_topic": true,
+    "block_personal_info": true,
+    "enable_fact_checking": true
   },
   "branding": {
     "primary_color": "#6366f1",
@@ -611,6 +629,11 @@ Tracks RAG pipeline jobs for document processing. This table manages the lifecyc
 - `logs` stores detailed execution logs and error information as JSONB
 - Composite indexes on `(user_id, bot_id)` and `(user_id, bot_id, status)` for efficient queries
 - Index on `document_id` for document-specific queries
+- **Async Worker**: Jobs are processed by the async worker (`run_worker.py`) which runs as a separate process
+- **Job Claiming**: Worker uses `FOR UPDATE SKIP LOCKED` to safely claim jobs (supports multiple concurrent workers)
+- **URL Jobs**: URL and integration jobs are currently ignored by the worker and remain in `queued` status
+- **Text Extraction**: Worker extracts text from file uploads (PDF, DOCX, TXT) and stores it in MinIO
+- **Automatic Retries**: Failed jobs are automatically re-queued if `attempts < max_attempts`
 
 #### Computed Properties (Not Database Columns)
 The model provides four computed properties for convenience:
@@ -979,8 +1002,23 @@ CREATE INDEX idx_ingestion_jobs_created ON ingestion_jobs(created_at);
   "status": "active",
   "is_active": true,  // Computed from status (status == 'active')
   "llm_config": {
+    "model": "qwen3-vl:8b",
     "temperature": 0.7,
-    "communication_style": "friendly"
+    "communication_style": "friendly",
+    "style_prompt": "You are a friendly and warm assistant..."
+  },
+  "retrieval_config": {
+    "embedding_model": "qwen3-embedding:4b",
+    "chunk_size": 1000,
+    "chunk_overlap": 200
+  },
+  "guardrails": {
+    "max_response_length": 500,
+    "block_explicit_content": true,
+    "block_political_views": true,
+    "strictly_stick_to_topic": true,
+    "block_personal_info": true,
+    "enable_fact_checking": true
   },
   "branding": {
     "primary_color": "#6366f1",

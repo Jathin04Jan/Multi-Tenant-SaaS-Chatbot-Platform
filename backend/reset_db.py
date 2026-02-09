@@ -113,6 +113,21 @@ def reset_database():
             conn.execute(text("DROP TABLE IF EXISTS ui_configs CASCADE;"))
             print("  → Old ui_configs table and constraints removed")
         
+        # Drop dependent functions first (before dropping tables/enums)
+        print("  → Dropping dependent functions...")
+        with engine.begin() as conn:
+            # Drop function that depends on user_subscription_status enum
+            conn.execute(text("""
+                DROP FUNCTION IF EXISTS user_subscription_status_to_text(user_subscription_status) CASCADE;
+            """))
+            
+            # Drop trigger function for user_subscription_entitlements
+            conn.execute(text("""
+                DROP FUNCTION IF EXISTS validate_user_subscription_entitlement_user_id() CASCADE;
+            """))
+            
+            print("  → Dependent functions dropped")
+        
         # Drop all tables (outside transaction for better performance)
         print("  → Dropping all tables...")
         Base.metadata.drop_all(bind=engine, checkfirst=True)

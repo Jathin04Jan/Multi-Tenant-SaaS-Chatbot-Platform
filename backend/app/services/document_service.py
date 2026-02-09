@@ -64,7 +64,7 @@ class DocumentService:
         source_url: str,
         size: Optional[int],
         content_type: Optional[str],
-        status: str = "indexed",
+        status: str = "uploaded_to_database",
     ) -> Document:
         doc = (
             db.query(Document)

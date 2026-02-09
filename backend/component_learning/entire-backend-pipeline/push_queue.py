@@ -28,9 +28,11 @@ r = Redis(
 
 payload = {
     # identity
-    "tennant_id": str("1234567890"),
+    "tenant_id": str("yourbot-documents"),
     "file_id": str(uuid.uuid4()),
     "file_path": "tables.pdf",  # MinIO object key
+    #"bot_id": str(uuid.uuid4()),
+    "job_id": str("8db842a0-0980-46c0-87ed-b79f538128d8"),
 
     # routing (recommended to include explicitly)
     #"bucket_name": DEFAULT_BUCKET,

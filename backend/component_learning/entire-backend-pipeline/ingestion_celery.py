@@ -43,6 +43,13 @@ from qdrant_client import QdrantClient
 from qdrant_client.http import models
 from redis import Redis
 
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
+from database_operations import update_job_stage, mark_job_succeeded, mark_job_failed, append_job_log
+from db.enums import IngestionJobStage
+
+
 # -----------------------------------------------------------------------------
 # Logging
 # -----------------------------------------------------------------------------
@@ -476,17 +483,24 @@ class IngestionWorker:
             batch = points[start : start + bs]
             _retry(lambda: self.qdrant.upsert(collection_name=collection_name, points=batch), tries=3)
 
-    def ingestion_pipeline(self, *, object_key: str, bucket_name: str, document_id: str, collection_name: str) -> Dict[str, Any]:
+    def ingestion_pipeline(self, *, job_id: str, object_key: str, bucket_name: str, document_id: str, collection_name: str) -> Dict[str, Any]:
         self._validate_non_empty("object_key", object_key)
         self._validate_non_empty("bucket_name", bucket_name)
         self._validate_non_empty("document_id", document_id)
         self._validate_non_empty("collection_name", collection_name)
+        self._validate_non_empty("job_id", job_id)
 
         tmp_path: Optional[str] = None
         suffix: Optional[str] = None
 
         try:
+            #updating job stage to download
+            update_job_stage(job_id=job_id, stage=IngestionJobStage.DOWNLOAD)
+            append_job_log(job_id=job_id, level="info", message="Downloading file from MinIO and carrying out the ingestion pipeline", extra={"object_key": object_key, "bucket_name": bucket_name})
+            
             tmp_path, suffix = self._download_minio_to_tempfile(bucket=bucket_name, object_key=object_key)
+
+            update_job_stage(job_id=job_id, stage=IngestionJobStage.PARSE)
 
             docs = self._load_text_from_local_file(local_path=tmp_path, object_key=object_key, bucket_name=bucket_name)
             if not docs:
@@ -501,9 +515,13 @@ class IngestionWorker:
                 if table_chunks:
                     self._normalize_metadata(table_chunks, document_id=document_id)
 
+            update_job_stage(job_id=job_id, stage=IngestionJobStage.CHUNK)
+
             chunks = text_chunks + table_chunks
             if not chunks:
                 return {"ok": False, "error": "no_chunks_generated"}
+
+            update_job_stage(job_id=job_id, stage=IngestionJobStage.EMBED)
 
             embedded_chunks, vectors = self.embed_chunks(chunks)
             if not vectors:
@@ -513,6 +531,7 @@ class IngestionWorker:
             if not points:
                 return {"ok": False, "error": "no_points_generated"}
 
+            update_job_stage(job_id=job_id, stage=IngestionJobStage.INDEX)
             vector_size = len(points[0].vector["text"])
             self.ensure_collection(collection_name=collection_name, vector_size=vector_size)
             self.upsert_points(collection_name=collection_name, points=points)
@@ -534,6 +553,7 @@ def worker_singleton() -> IngestionWorker:
 def ingest_document_task(
     self,
     *,
+    job_id: str,
     object_key: str,
     bucket_name: str,
     document_id: str,
@@ -548,7 +568,11 @@ def ingest_document_task(
             document_id, object_key, bucket_name, collection_name, stream_msg_id
         )
 
+        append_job_log(job_id=job_id, level="info", message="Celery task started", extra={"msg_id": stream_msg_id})
+        
+
         result = worker_singleton().ingestion_pipeline(
+            job_id=job_id,
             object_key=object_key,
             bucket_name=bucket_name,
             document_id=document_id,
@@ -565,6 +589,10 @@ def ingest_document_task(
             except Exception as e:
                 raise RuntimeError(f"Failed to XACK stream msg_id={stream_msg_id}: {e}") from e
 
+        #updated the database to succeeded
+        mark_job_succeeded(job_id=job_id, extra_log={"vector_size": result.get("vector_size")})
+        append_job_log(job_id=job_id, level="info", message="Celery task completed", extra={"msg_id": stream_msg_id})
+
         logger.info("Task success | doc=%s | points=%s", document_id, result.get("points"))
         return result
 
@@ -572,14 +600,12 @@ def ingest_document_task(
         logger.exception("Task error | doc=%s | msg=%s | err=%s", document_id, stream_msg_id, e)
 
         if self.request.retries >= self.max_retries:
+            #updated the database to failed
+            mark_job_failed(job_id=job_id, error=str(e), stage=IngestionJobStage.DOWNLOAD)
+            append_job_log(job_id=job_id, level="error", message="Celery task failed", extra={"msg_id": stream_msg_id})
             logger.error("Max retries exhausted for doc=%s", document_id)
             raise
 
         countdown = min(60, 5 * (2 ** self.request.retries))
         raise self.retry(exc=e, countdown=countdown)
 
-
-        '''
-        reviews
-        qdrant name bucket name should be fixed, should take tennant_id 
-        '''

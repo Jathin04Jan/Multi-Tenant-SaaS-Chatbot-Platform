@@ -12,7 +12,11 @@ from typing import Any, Dict, Optional, Tuple, List
 from redis import Redis
 from redis.exceptions import RedisError
 
+
+
 from ingestion_celery import ingest_document_task
+from database_operations import mark_job_processing, append_job_log
+
 
 logger = logging.getLogger("stream-consumer")
 if not logger.handlers:
@@ -121,19 +125,25 @@ def safe_int(v: Any, default: int = 0) -> int:
     except Exception:
         return default
 
-def parse_required_fields(fields: Dict[str, Any]) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+def parse_required_fields(fields: Dict[str, Any]) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]:
+    job_id = fields.get("job_id")
     object_key = fields.get("object_key") or fields.get("file_path")
     document_id = fields.get("document_id") or fields.get("file_id")
-    bot_id = fields.get("bot_id")
+    tenant_id = fields.get("tenant_id")
+    bot_id = fields.get("bot_id")  # kept for backward compatibility
 
+    if job_id is not None and not isinstance(job_id, str):
+        raise ValueError(f"job_id must be string, got {type(job_id)}")
     if object_key is not None and not isinstance(object_key, str):
         raise ValueError(f"object_key must be string, got {type(object_key)}")
     if document_id is not None and not isinstance(document_id, str):
         raise ValueError(f"document_id must be string, got {type(document_id)}")
+    if tenant_id is not None and not isinstance(tenant_id, str):
+        raise ValueError(f"tenant_id must be string, got {type(tenant_id)}")
     if bot_id is not None and not isinstance(bot_id, str):
         raise ValueError(f"bot_id must be string, got {type(bot_id)}")
 
-    return object_key, document_id, bot_id
+    return object_key, document_id, tenant_id, bot_id, job_id
 
 def push_to_dlq(r: Redis, msg_id: str, fields: Dict[str, Any], reason: str) -> None:
     payload = {
@@ -221,15 +231,27 @@ def reclaim_pending(r: Redis) -> None:
         logger.exception("Pending reclaim error: %s", e)
 
 def queue_ingestion_task(*, msg_id: str, fields: Dict[str, Any]) -> None:
-    object_key, document_id, _bot_id = parse_required_fields(fields)
+    object_key, document_id, tenant_id, _bot_id, job_id = parse_required_fields(fields)
 
     if not object_key or not document_id:
         raise ValueError(f"Invalid payload: needs object_key+document_id (got {object_key=} {document_id=})")
+    
+    if not tenant_id:
+        raise ValueError(f"Invalid payload: tenant_id is required (got {tenant_id=})")
+    
+    if not job_id:
+        raise ValueError(f"Invalid payload: job_id is required (got {job_id=})")
 
-    bucket_name = fields.get("bucket_name") or SETTINGS.default_bucket_name
-    collection_name = fields.get("collection_name") or SETTINGS.default_collection_name
+    # Use tenant_id for both bucket name and collection name
+    bucket_name = tenant_id
+    collection_name = tenant_id
 
+    # DB: queued -> processing, stage=DOWNLOAD, started_at set
+    mark_job_processing(job_id=job_id)
+    append_job_log(job_id=job_id, level="info", message="Picked by consumer; queuing celery task", extra={"msg_id": msg_id})
+    
     async_result = ingest_document_task.delay(
+        job_id=job_id,
         object_key=object_key,
         bucket_name=bucket_name,
         document_id=document_id,
@@ -240,8 +262,8 @@ def queue_ingestion_task(*, msg_id: str, fields: Dict[str, Any]) -> None:
     )
 
     logger.info(
-        "Queued Celery task | msg=%s | task_id=%s | doc=%s | key=%s | bucket=%s | collection=%s",
-        msg_id, async_result.id, document_id, object_key, bucket_name, collection_name
+        "Queued Celery task | msg=%s | task_id=%s | doc=%s | key=%s | tenant=%s | bucket=%s | collection=%s",
+        msg_id, async_result.id, document_id, object_key, tenant_id, bucket_name, collection_name, job_id
     )
 
 _shutdown = False
